@@ -14,6 +14,12 @@ const MESSAGES = {
     MEMBER_NOT_FOUND: '이미 팀에 없는 멤버예요.',
     LEADER_CANNOT_LEAVE: '팀장은 팀을 나갈 수 없어요.',
     CANNOT_KICK_LEADER: '팀장은 추방할 수 없어요.',
+    MISSION_NOT_FOUND: '존재하지 않는 미션이에요.',
+    MISSION_DELETED: '삭제된 미션입니다.',
+    SUBMISSION_NOT_FOUND: '존재하지 않는 제출물이에요.',
+    NOT_MISSION_TARGET: '이 미션의 대상자가 아니에요.',
+    COMMENT_NOT_ALLOWED: '팀장과 제출자만 코멘트를 남길 수 있어요.',
+    ALREADY_SUBMITTED: '이미 제출했어요.',
 };
 
 export function teamErrorMessage(err, fallback = '요청을 처리하지 못했어요. 잠시 후 다시 시도해주세요.') {

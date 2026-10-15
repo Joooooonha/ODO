@@ -209,6 +209,63 @@ export const kickMember = async (teamId, userId) => {
   return fetchAPI(`/api/teams/${teamId}/members/${userId}/kick`, { method: 'POST' });
 };
 
+// ============ Mission API ============
+//
+// 실패하면 Error에 status와 code가 붙는다. 삭제된 미션은 404 MISSION_DELETED.
+// 영상은 먼저 uploadVideo(file, 'REFERENCE'|'PRACTICE', {}, onProgress, 'MISSION')로 올리고 id만 보낸다.
+
+/** 미션 탭 목록: [{ missionId, title, submittedCount, targetCount, myStatus, createdAt }] */
+export const getMissions = async (teamId) => {
+  return fetchAPI(`/api/teams/${teamId}/missions`);
+};
+
+/** { title, description, referenceVideoId, targetUserIds } → { missionId } */
+export const createMission = async (teamId, data) => {
+  return fetchAPI(`/api/teams/${teamId}/missions`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/** 미션 상세: { missionId, teamId, title, description, referenceVideoId, writerNickname,
+ *  createdAt, myRole, myStatus, targets: [{ userId, nickname, submissionId }] } */
+export const getMission = async (missionId) => {
+  return fetchAPI(`/api/missions/${missionId}`);
+};
+
+/** 제목·안내 텍스트·레퍼런스 영상을 통째로 바꾼다. 대상자는 바꿀 수 없다. */
+export const updateMission = async (missionId, data) => {
+  return fetchAPI(`/api/missions/${missionId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const deleteMission = async (missionId) => {
+  return fetchAPI(`/api/missions/${missionId}`, { method: 'DELETE' });
+};
+
+/** { videoId, content } → { submissionId } */
+export const submitMission = async (missionId, data) => {
+  return fetchAPI(`/api/missions/${missionId}/submissions`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/** 제출물: { submissionId, missionId, submitterUserId, submitterNickname, videoId, content,
+ *  createdAt, canComment, comments: [{ commentId, writerUserId, writerNickname, content, createdAt }] } */
+export const getSubmission = async (submissionId) => {
+  return fetchAPI(`/api/submissions/${submissionId}`);
+};
+
+export const addComment = async (submissionId, content) => {
+  return fetchAPI(`/api/submissions/${submissionId}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+};
+
 // ============ Video API ============
 
 /**
@@ -227,8 +284,10 @@ export const kickMember = async (teamId, userId) => {
  * - **videoId를 logId로 유추하지 말 것.** 두 값은 실제로 어긋난다.
  *
  * @param onProgress 0~1 진행률 콜백 (선택)
+ * @param purpose    'GENERAL'(자유 연습, 기본) 또는 'MISSION'. Mission 영상은 분석하지 않고
+ *                   연습 기록도 만들지 않는다 — 완료 응답의 logId는 늘 null이다.
  */
-export const uploadVideo = async (file, type, link = {}, onProgress) => {
+export const uploadVideo = async (file, type, link = {}, onProgress, purpose = 'GENERAL') => {
   // 1) 업로드 URL 발급
   const { videoId, uploadUrl } = await fetchAPI('/api/videos/upload-url', {
     method: 'POST',
@@ -236,6 +295,7 @@ export const uploadVideo = async (file, type, link = {}, onProgress) => {
       filename: file.name,
       contentType: file.type || 'video/mp4',
       type,
+      purpose,
     }),
   });
 

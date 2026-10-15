@@ -1,0 +1,258 @@
+/*
+ * 미션 탭 · 미션 만들기/수정 · 미션 상세.
+ *
+ * Teams.css와 같은 원칙: 새 색을 만들지 않고 index.css 전역 토큰(다크 네온)과 공용 클래스
+ * (.card .btn .badge .form-* .empty-state .video-container .auth-error)를 쓴다.
+ * Team Space의 상단 줄·멤버 목록 모양(.team-space-top, .team-member-list)을 그대로 재사용한다.
+ */
+
+/* ===== 미션 탭 ===== */
+.missions-tab-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+
+.mission-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* 위에서 아래로: 제목 → 제출 현황 → (대상자일 때만) 내 상태 배지 */
+.mission-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 16px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    text-decoration: none;
+    transition: var(--transition-normal);
+}
+
+.mission-card:hover {
+    border-color: var(--accent-pink);
+    transform: translateX(4px);
+    box-shadow: var(--shadow-glow);
+}
+
+.mission-card-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+}
+
+.mission-card-progress {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ===== 만들기/수정 ===== */
+.mission-targets {
+    border: none;
+    padding: 0;
+    margin: 0 0 20px;
+}
+
+.mission-target-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    margin-top: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.mission-target-option:hover {
+    border-color: var(--accent-cyan);
+}
+
+.mission-target-option input {
+    accent-color: var(--accent-pink);
+    width: 16px;
+    height: 16px;
+}
+
+.mission-progress {
+    position: relative;
+    height: 28px;
+    margin: 4px 0 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.mission-progress-bar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--accent-gradient);
+    opacity: 0.35;
+    transition: width 0.2s ease;
+}
+
+.mission-progress span {
+    position: relative;
+    display: block;
+    line-height: 26px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+/* ===== 상세 ===== */
+.mission-back {
+    display: inline-flex;
+    margin-bottom: 16px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.mission-back:hover {
+    color: var(--text-primary);
+}
+
+.mission-description {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+}
+
+.mission-section {
+    margin-bottom: 28px;
+}
+
+.mission-section-title {
+    font-size: 1.05rem;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+    -webkit-text-fill-color: var(--text-primary);
+    background: none;
+}
+
+.mission-section-count {
+    margin-left: 6px;
+    color: var(--text-muted);
+    -webkit-text-fill-color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.mission-video video {
+    display: block;
+    width: 100%;
+    max-height: 480px;
+    background: #000; /* 영상 여백 — 기존 .video-container와 같은 검정 */
+}
+
+.mission-submit {
+    margin-bottom: 28px;
+}
+
+.mission-status-item + .mission-status-item {
+    border-top: 1px solid var(--border-color);
+}
+
+.mission-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 14px 20px;
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+button.mission-status-row {
+    cursor: pointer;
+}
+
+button.mission-status-row:hover {
+    background: var(--bg-card-hover);
+}
+
+.mission-status-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+}
+
+.submission-panel {
+    padding: 16px 20px 20px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+}
+
+.submission-meta {
+    margin: 10px 0 8px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.comment-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.comment-item {
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+}
+
+.comment-writer {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent-cyan);
+}
+
+.comment-content {
+    margin: 4px 0 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--text-primary);
+}
+
+.comment-form {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.comment-form .form-textarea {
+    flex: 1;
+    min-height: 0;
+}
+
+@media (max-width: 768px) {
+    .mission-status-row,
+    .submission-panel {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .comment-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

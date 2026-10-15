@@ -10,6 +10,8 @@ import Teams from './pages/Teams';
 import TeamCreate from './pages/TeamCreate';
 import TeamJoin from './pages/TeamJoin';
 import TeamSpace from './pages/TeamSpace';
+import MissionEditor from './pages/MissionEditor';
+import MissionDetail from './pages/MissionDetail';
 import Logs from './pages/Logs';
 import LogDetail from './pages/LogDetail';
 import { DEV_LOGIN } from './devLogin';
@@ -122,6 +124,30 @@ function App() {
               element={
                 <ProtectedRoute>
                   <TeamSpace />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teams/:teamId/missions/new"
+              element={
+                <ProtectedRoute>
+                  <MissionEditor />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teams/:teamId/missions/:missionId"
+              element={
+                <ProtectedRoute>
+                  <MissionDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teams/:teamId/missions/:missionId/edit"
+              element={
+                <ProtectedRoute>
+                  <MissionEditor />
                 </ProtectedRoute>
               }
             />

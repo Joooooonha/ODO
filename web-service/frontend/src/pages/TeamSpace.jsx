@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ClipboardList, Copy, Crown, MessageCircle, Users } from 'lucide-react';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Copy, Crown, MessageCircle, Users } from 'lucide-react';
 import { getJoinCode, getTeam, getTeamMembers, kickMember, leaveTeam } from '../api/client';
 import { RoleBadge } from './Teams';
+import MissionsTab from './MissionsTab';
 import { isNoAccess, teamErrorMessage } from './teamErrors';
 import './Teams.css';
 
@@ -18,13 +19,27 @@ const TABS = [
  * 활동 중 멤버가 아니면 서버가 403/404를 주고, 그때는 TEAM 탭으로 돌려보낸다.
  * 화면에 머무는 동안 추방되는 경우도 다음 요청에서 같은 방식으로 나가게 된다
  * (실시간 갱신은 이번 범위가 아니다).
+ *
+ * 탭은 주소(`?tab=missions`)에 남긴다. 미션 상세에서 돌아왔을 때 기본 탭(채팅)이 아니라
+ * 미션 탭으로 돌아와야 하기 때문이다. 처음 들어오면 채팅 탭이다.
  */
 export default function TeamSpace() {
     const { teamId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tab = TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'chat';
+    const setTab = (key) => setSearchParams(key === 'chat' ? {} : { tab: key }, { replace: true });
+    // 미션 상세에서 돌려보내질 때 넘어온 안내("삭제된 미션입니다" 등). 한 번만 읽는다.
+    const [notice] = useState(() => location.state?.notice ?? '');
     const [team, setTeam] = useState(null);
-    const [tab, setTab] = useState('chat');
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (location.state?.notice) {
+            navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null });
+        }
+    }, [location, navigate]);
     const [confirmLeave, setConfirmLeave] = useState(false);
     const [leaving, setLeaving] = useState(false);
 
@@ -117,6 +132,7 @@ export default function TeamSpace() {
                     )}
                 </div>
 
+                {notice && <div className="auth-error">{notice}</div>}
                 {error && <div className="auth-error">{error}</div>}
 
                 <div className="team-tabs" role="tablist">
@@ -143,11 +159,7 @@ export default function TeamSpace() {
                         </div>
                     )}
                     {tab === 'missions' && (
-                        // 미션 목록·[새 미션]은 다음 작업(feature/mission)에서 채운다.
-                        <div className="empty-state">
-                            <span className="empty-state-icon"><ClipboardList size={48} /></span>
-                            <h3 className="empty-state-title">미션은 준비 중입니다</h3>
-                        </div>
+                        <MissionsTab teamId={teamId} isLeader={isLeader} onNoAccess={leaveSpace} />
                     )}
                     {tab === 'members' && (
                         <MembersTab
