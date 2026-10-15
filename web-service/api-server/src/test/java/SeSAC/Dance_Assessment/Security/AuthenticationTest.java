@@ -15,7 +15,9 @@ import jakarta.servlet.http.Cookie;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -87,6 +89,19 @@ class AuthenticationTest {
         mvc.perform(get("/api/teams/1/join-code")).andExpect(status().isUnauthorized());
         mvc.perform(post("/api/teams/1/leave")).andExpect(status().isUnauthorized());
         mvc.perform(post("/api/teams/1/members/2/kick")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Mission API는 로그인하지 않으면 모두 401")
+    void missionApisRequireLogin() throws Exception {
+        mvc.perform(get("/api/teams/1/missions")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/teams/1/missions")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/missions/1")).andExpect(status().isUnauthorized());
+        mvc.perform(put("/api/missions/1")).andExpect(status().isUnauthorized());
+        mvc.perform(delete("/api/missions/1")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/missions/1/submissions")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/submissions/1")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/submissions/1/comments")).andExpect(status().isUnauthorized());
     }
 
     @Test
