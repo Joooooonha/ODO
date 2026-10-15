@@ -200,6 +200,19 @@
 }
 
 /* 지금 비교 화면에서 반복 중인 구간 — 그림자 대신 흰 테두리로 표시 */
+/* 테이프 안의 글자·윤곽 버튼은 테이프 글자색(--tape-*-text)을 따른다.
+   .studio p · .studio .btn-outline이 --st-ink*로 색을 따로 주는데, 다크 네온으로
+   바꾸면서(D7) 그 값이 흰색이 되어 노랑 테이프 위 글자가 거의 보이지 않았다.
+   테이프 색마다 글자색을 정해 둔 위 규칙이 끝까지 적용되게 한다. */
+.issue-item .issue-message,
+.issue-item .btn-outline {
+    color: inherit;
+}
+
+.issue-item .btn-outline {
+    border-color: currentColor;
+}
+
 .issue-item.active {
     outline: 2px solid currentColor;
     outline-offset: -2px;

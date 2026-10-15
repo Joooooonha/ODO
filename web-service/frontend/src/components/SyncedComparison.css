@@ -99,17 +99,18 @@
     bottom: 0;
     border: none;
     padding: 0;
-    background: rgba(184, 20, 80, 0.3);
+    /* 어두운 트랙 위에서 구간이 보이도록 대비 3:1 이상(0.7 → 3.06:1) */
+    background: rgba(255, 45, 117, 0.7);
     cursor: pointer;
     transition: background 0.15s ease;
 }
 
 .synced-marker:hover {
-    background: rgba(184, 20, 80, 0.5);
+    background: rgba(255, 45, 117, 0.85);
 }
 
 .synced-marker.active {
-    background: rgba(184, 20, 80, 0.75);
+    background: var(--accent-pink);
 }
 
 .synced-playhead {
@@ -261,6 +262,15 @@
 
 /* 지금 이 대목의 판정. 색으로만 구분하지 않고 글자로도 적는다. */
 .dev-now.ok,
+/* 영상 위 "내 영상" 태그 안에서는 속도 글자를 태그 글자색(흰색)으로 둔다.
+   태그 바탕이 분홍이라 느림(분홍)·맞음(흐린 흰색)이 바탕에 묻혔다.
+   느림/빠름은 옆의 글자("느림" 등)로도 전달된다. */
+.synced-tag .synced-rate.ok,
+.synced-tag .synced-rate.slow,
+.synced-tag .synced-rate.fast {
+    color: inherit;
+}
+
 .synced-rate.ok {
     color: var(--st-ink-secondary);
 }
