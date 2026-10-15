@@ -424,3 +424,7 @@ ai-server/testdata/
 # 로컬 문서
 새싹_ㅂㅈㅎ_개인프로ㅔㄱ트.pdf
 새싹_박준하_AI 댄스 분석 플랫폼.pdf
+
+# 사전 작업 지시서·참고 Spec. 로컬에서만 쓰는 작업 문서라 커밋하지 않는다.
+docs/prework/Task-prework.md
+docs/prework/Spec-prework.md
