@@ -73,7 +73,32 @@ class AuthenticationTest {
     void unauthenticatedIsRejected() throws Exception {
         mvc.perform(get("/api/practice-logs")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/users/me")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/assignments")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("팀 API는 로그인하지 않으면 모두 401")
+    void teamApisRequireLogin() throws Exception {
+        mvc.perform(get("/api/teams")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/teams")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/teams/join-preview")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/teams/join")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/teams/1")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/teams/1/members")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/teams/1/join-code")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/teams/1/leave")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/teams/1/members/2/kick")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("숙제 API는 제거되었다 — 로그인해도 404")
+    void assignmentApiIsGone() throws Exception {
+        Cookie cookie = loginAndGetCookie();
+
+        mvc.perform(get("/api/assignments").cookie(cookie)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/assignments/1").cookie(cookie)).andExpect(status().isNotFound());
+        mvc.perform(post("/api/assignments").cookie(cookie)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
