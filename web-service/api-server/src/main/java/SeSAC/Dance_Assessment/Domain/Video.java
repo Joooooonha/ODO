@@ -24,6 +24,15 @@ public class Video extends BaseTimeEntity {
     private VideoType type;
 
     /**
+     * 자유 연습(GENERAL)인지 Mission(MISSION)인지. Mission 영상은 분석하지 않고
+     * 연습 기록도 만들지 않으며, 그 미션 팀의 활동 중 멤버가 볼 수 있다.
+     * DB 컬럼에는 DEFAULT 'GENERAL'이 있다(롤백된 직전 jar의 INSERT용).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private VideoPurpose purpose;
+
+    /**
      * 저장소 객체 키. 예: {@code videos/3/9f2c....mov}
      *
      * <p>예전에는 서버의 <b>로컬 절대경로</b>였다(`/Users/parkjooha/.../VideoUpload/x.mp4`).
@@ -75,13 +84,18 @@ public class Video extends BaseTimeEntity {
 
     @Builder
     public Video(User uploader, String objectKey, String contentType, VideoType type,
-                 String originalName) {
+                 VideoPurpose purpose, String originalName) {
         this.uploader = uploader;
         this.objectKey = objectKey;
         this.contentType = contentType;
         this.type = type;
+        this.purpose = purpose != null ? purpose : VideoPurpose.GENERAL;
         this.originalName = originalName;
         this.uploadCompleted = false;
+    }
+
+    public boolean isMission() {
+        return purpose == VideoPurpose.MISSION;
     }
 
     /** 브라우저가 저장소 업로드를 마쳤다고 알려왔을 때. */

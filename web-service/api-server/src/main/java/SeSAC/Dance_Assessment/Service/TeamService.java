@@ -1,6 +1,7 @@
 package SeSAC.Dance_Assessment.Service;
 
 import SeSAC.Dance_Assessment.Common.ApiException;
+import SeSAC.Dance_Assessment.Common.Constraints;
 import SeSAC.Dance_Assessment.Common.ErrorCode;
 import SeSAC.Dance_Assessment.Domain.Team;
 import SeSAC.Dance_Assessment.Domain.TeamMember;
@@ -15,14 +16,12 @@ import SeSAC.Dance_Assessment.Infrastructure.TeamMemberRepository;
 import SeSAC.Dance_Assessment.Infrastructure.TeamRepository;
 import SeSAC.Dance_Assessment.Infrastructure.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -198,23 +197,11 @@ public class TeamService {
         } catch (DataIntegrityViolationException e) {
             // 같은 사람의 참여 요청이 동시에 와서 다른 요청이 먼저 기록을 만든 경우다.
             // 다른 제약 위반(FK 등)은 원인이 다르므로 그대로 던진다.
-            if (violates(e, UK_TEAM_USER)) {
+            if (Constraints.violates(e, UK_TEAM_USER)) {
                 throw new ApiException(ErrorCode.ALREADY_MEMBER);
             }
             throw e;
         }
-    }
-
-    private static boolean violates(DataIntegrityViolationException e, String constraint) {
-        for (Throwable t = e; t != null; t = t.getCause()) {
-            String text = t instanceof ConstraintViolationException cve && cve.getConstraintName() != null
-                    ? cve.getConstraintName()
-                    : t.getMessage();
-            if (text != null && text.toLowerCase(Locale.ROOT).contains(constraint)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private String newJoinCode() {

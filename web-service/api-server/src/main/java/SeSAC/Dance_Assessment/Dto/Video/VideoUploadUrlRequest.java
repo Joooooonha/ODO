@@ -1,5 +1,6 @@
 package SeSAC.Dance_Assessment.Dto.Video;
 
+import SeSAC.Dance_Assessment.Domain.VideoPurpose;
 import SeSAC.Dance_Assessment.Domain.VideoType;
 
 /**
@@ -12,9 +13,12 @@ import SeSAC.Dance_Assessment.Domain.VideoType;
  * @param contentType 실제로 PUT할 Content-Type. <b>서명에 포함되므로 업로드 시
  *                    같은 값을 보내야 한다.</b> 다르면 저장소가 거부한다
  * @param type        기준 영상인지 연습 영상인지
+ * @param purpose     자유 연습(GENERAL, 기본값)인지 Mission(MISSION)인지. 보내지 않으면 GENERAL —
+ *                    기존 화면과 배포 전에 열려 있던 옛 탭은 그대로 동작한다
  */
 public record VideoUploadUrlRequest(
         String filename,
         String contentType,
-        VideoType type) {
+        VideoType type,
+        VideoPurpose purpose) {
 }
