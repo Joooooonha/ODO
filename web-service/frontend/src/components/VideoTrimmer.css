@@ -93,7 +93,7 @@
    .studio 조상이 있을 때만 이 아래 규칙이 적용되고, Practice 쪽은
    그대로 옛 다크 네온으로 남는다. */
 .studio .video-trimmer {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 45%), var(--st-glass);
+  background: linear-gradient(180deg, var(--bg-card-hover), transparent 45%), var(--st-glass);
   border: 1px solid var(--st-line);
   border-radius: 2px;
 }

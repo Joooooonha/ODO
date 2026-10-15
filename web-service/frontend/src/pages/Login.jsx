@@ -4,7 +4,6 @@ import { login, setCurrentUser, socialLoginUrl } from '../api/client';
 import { DEV_LOGIN } from '../devLogin';
 import './Auth.css';
 
-
 export default function Login() {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
