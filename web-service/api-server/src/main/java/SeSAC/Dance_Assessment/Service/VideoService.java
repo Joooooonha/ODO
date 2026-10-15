@@ -50,12 +50,6 @@ public class VideoService {
     private final StorageService storage;
 
     /**
-     * 영상 행을 만들고 저장소에 올릴 서명된 URL을 발급한다.
-     *
-     * <p>이 시점의 영상은 아직 <b>업로드 미완료</b> 상태다. 분석 대상이 되지 않는다.
-     */
-    @Transactional
-    /**
      * 다시 쓸 수 있는 내 영상 목록.
      *
      * <p><b>기준 영상을 매번 다시 올리지 않기 위한 것이다.</b> 같은 안무를 반복해
@@ -70,6 +64,18 @@ public class VideoService {
                 .toList();
     }
 
+    /**
+     * 영상 행을 만들고 저장소에 올릴 서명된 URL을 발급한다.
+     *
+     * <p>이 시점의 영상은 아직 <b>업로드 미완료</b> 상태다. 분석 대상이 되지 않는다.
+     *
+     * <p><b>{@code @Transactional}을 이 메서드에서 떼지 말 것.</b> 클래스 기본값이
+     * {@code readOnly = true}라, 빠지면 INSERT가 읽기 전용 트랜잭션에서 돈다.
+     * PostgreSQL은 이를 거부해 500이 나지만 H2(테스트)는 그대로 통과시킨다 —
+     * 9/9에 이 애너테이션과 메서드 사이에 다른 메서드가 끼어들어 운영 업로드가 깨졌고
+     * 테스트는 아무것도 잡지 못했다.
+     */
+    @Transactional
     public VideoUploadUrlResponse createUploadUrl(Long userId, VideoUploadUrlRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
