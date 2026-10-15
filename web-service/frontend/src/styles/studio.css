@@ -12,34 +12,36 @@
  */
 
 .studio {
-    /* 벽/거울 주변 — 형광등 아래 서늘한 회백색. 종이 세계관의 따뜻한 크림과
-       달리 의도적으로 차갑다: 연습실은 종이가 아니라 유리와 조명의 공간이다. */
-    --st-wall: #e9edf0;
-    --st-glass: #f4f7f8;
-    --st-ink: #22282c;
-    --st-ink-secondary: rgba(34, 40, 44, 0.68);
-    --st-ink-muted: rgba(34, 40, 44, 0.44);
-    --st-line: rgba(34, 40, 44, 0.14);
-    /* 형광등 반사 — 유일한 "장식" 액센트. 대시보드 칸의 단색 테이프에 쓴다. */
-    --st-fluoro: #d8ecf7;
-    --st-fluoro-wash: #eaf6fd;
-    /* 시안=기준·핑크=나의 시도 기능색 — 옛 세계관에서 이미 검증된 값을
-       그대로 들고 왔다(작은 배지 위 흰 글자 기준 4.8~7:1). */
-    --st-cyan: #026a7d;
-    --st-pink: #b81450;
-    /* 바닥 테이프 3색 — 실제 스튜디오에서 위치·구간을 색 다른 테이프로
-       표시하는 관행 그대로다. 장식이 아니라 "이 색은 이 뜻" 기능색이라
-       심각도 랭크(상/중/하)에 배정한다. 세 색 다 텍스트 대비를 계산해서
-       밝기를 맞췄다 — 파랑·빨강은 흰 글자용으로 어둡게, 노랑은 검은
-       글자용으로 밝게 조정했다(하나로 통일하면 한쪽이 4.5:1을 못 채운다). */
+    /* 색은 다크 네온 전역 토큰(index.css)에 맞춘다 (작업 지시서 D7).
+       이 화면만 밝은 "연습실 거울" 톤이라 헤더·다른 화면과 이질적이었다.
+       토큰 이름(--st-*)과 레이아웃·서체·거울 격자·반사 숫자는 그대로 두고
+       값만 전역 토큰으로 바꾼다 — 그래서 Dashboard.css·LogDetail.css는
+       대부분 손대지 않아도 따라온다. */
+    --st-wall: var(--bg-primary);
+    --st-glass: var(--bg-secondary);
+    --st-ink: var(--text-primary);
+    --st-ink-secondary: var(--text-secondary);
+    --st-ink-muted: var(--text-muted);
+    --st-line: var(--border-color);
+    /* 대시보드 칸의 테이프 바탕. 밝은 형광등 반사 대신 전역 카드 바탕. */
+    --st-fluoro: var(--bg-card);
+    --st-fluoro-wash: var(--bg-card-hover);
+    /* 시안=기준·핑크=나의 시도 기능색 — 전역 액센트와 같은 뜻이다. */
+    --st-cyan: var(--accent-cyan);
+    --st-pink: var(--accent-pink);
+    /* 바닥 테이프 3색 — "이 색은 이 뜻"인 심각도 기능색이라 값은 유지한다.
+       어두운 바탕에서도 세 색 모두 바탕과 구분되고, 각자 위의 글자색과의
+       대비는 바탕과 무관하다. 다만 노랑 위 글자는 예전에 --st-ink(어두운 잉크)를
+       따라갔는데 이제 --st-ink가 흰색이라, 어두운 바탕색을 직접 가리킨다. */
     --tape-mild: #1f5c94;
     --tape-moderate: #e8b91f;
     --tape-severe: #b8281d;
     --tape-mild-text: #ffffff;
-    --tape-moderate-text: var(--st-ink);
+    --tape-moderate-text: var(--bg-primary);
     --tape-severe-text: #ffffff;
-    --st-error: #b3261e;
-    --st-warning: #92600a;
+    /* 전역 .badge-error / .badge-warning과 같은 값 */
+    --st-error: #ef4444;
+    --st-warning: #f59e0b;
 
     font-family: 'Noto Sans KR', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background-color: var(--st-wall);
@@ -92,10 +94,10 @@
    흐린 glow가 아니라 선명한 1px 인셋 하이라이트 — 장식용 그림자가 아니라
    "빛이 이 모서리에 정확히 닿는다"는 물리적 신호다. */
 .studio .card {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 45%), var(--st-glass);
+    background: linear-gradient(180deg, var(--bg-card-hover), transparent 45%), var(--st-glass);
     border: 1px solid var(--st-line);
     border-radius: 2px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    box-shadow: inset 0 1px 0 var(--border-color);
     backdrop-filter: none;
     transition: none;
 }
@@ -106,8 +108,8 @@
 
 /* ========== .btn ========== */
 .studio .btn-primary {
-    background: var(--st-ink);
-    color: var(--st-wall);
+    background: var(--accent-gradient);
+    color: var(--text-primary);
 }
 
 .studio .btn-primary:hover {
@@ -147,7 +149,7 @@
     background: var(--st-glass);
 }
 
-.studio .badge-success { color: #1a6b3c; }
+.studio .badge-success { color: #10b981; } /* 전역 .badge-success와 같은 값 */
 .studio .badge-warning { color: var(--st-warning); }
 .studio .badge-error { color: var(--st-error); }
 .studio .badge-info { color: var(--st-cyan); }
@@ -169,7 +171,7 @@
 .studio .form-select:focus,
 .studio .form-textarea:focus {
     border-color: var(--st-cyan);
-    box-shadow: 0 0 0 3px rgba(2, 106, 125, 0.15);
+    box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.1); /* 전역 .form-input:focus와 같은 값 */
 }
 
 .studio .form-input::placeholder {
@@ -183,15 +185,16 @@
 
 /* ========== 에러 배너 ========== */
 .studio .auth-error {
-    background: rgba(179, 38, 30, 0.08);
-    border: 1px solid rgba(179, 38, 30, 0.3);
+    /* Auth.css의 .auth-error와 같은 값 */
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
     color: var(--st-error);
 }
 
 /* ========== 스피너 ========== */
 .studio .spinner {
     border-color: var(--st-line);
-    border-top-color: var(--st-ink);
+    border-top-color: var(--accent-pink);
 }
 
 /* ========== 유틸리티 ========== */
