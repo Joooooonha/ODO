@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Crown, Menu, User, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
+import { DEV_LOGIN } from '../devLogin';
 import './Header.css';
 
 export default function Header() {
@@ -45,7 +46,7 @@ export default function Header() {
                     <nav ref={navRef} className={`nav${menuOpen ? ' open' : ''}`}>
                         <Link to="/" className="nav-link" onClick={closeMenu}>대시보드</Link>
                         <Link to="/practice" className="nav-link" onClick={closeMenu}>자유 연습</Link>
-                        <Link to="/assignments" className="nav-link" onClick={closeMenu}>숙제</Link>
+                        <Link to="/teams" className="nav-link" onClick={closeMenu}>팀</Link>
                         <Link to="/logs" className="nav-link" onClick={closeMenu}>내 기록</Link>
                     </nav>
                 )}
@@ -54,14 +55,9 @@ export default function Header() {
                     {user ? (
                         <>
                             <div className="user-menu">
+                                {/* 팀 정보는 TEAM 탭에서만 보여준다 — 여러 팀에 속하므로 "내 팀" 하나를 말할 수 없다. */}
                                 <span className="user-info">
                                     <span className="user-name">{user.nickname}</span>
-                                    {user.teamName && (
-                                        <span className="user-team icon-inline">
-                                            {user.isLeader ? <Crown size={13} /> : <User size={13} />}
-                                            {user.teamName}
-                                        </span>
-                                    )}
                                 </span>
                                 <button onClick={handleLogout} className="btn btn-outline btn-sm">
                                     로그아웃
@@ -80,7 +76,9 @@ export default function Header() {
                     ) : (
                         <div className="auth-buttons">
                             <Link to="/login" className="btn btn-secondary btn-sm">로그인</Link>
-                            <Link to="/signup" className="btn btn-primary btn-sm">회원가입</Link>
+                            {DEV_LOGIN && (
+                                <Link to="/signup" className="btn btn-primary btn-sm">회원가입</Link>
+                            )}
                         </div>
                     )}
                 </div>

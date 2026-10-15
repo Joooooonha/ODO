@@ -44,12 +44,11 @@ export default function Dashboard() {
             link: '/practice',
         },
         {
+            // 여러 팀에 속할 수 있어 "내 팀" 하나를 말할 수 없으므로 문구는 고정이다.
             number: 'B',
-            title: '숙제',
-            desc: user?.teamName
-                ? '팀에서 부여한 숙제를 확인하고 제출하세요'
-                : '팀에 가입하면 팀 숙제에 참여할 수 있어요',
-            link: '/assignments',
+            title: '팀',
+            desc: '내 팀을 확인하고, 참여 코드로 새 팀에 들어가세요',
+            link: '/teams',
         },
         {
             number: 'C',
@@ -108,16 +107,6 @@ export default function Dashboard() {
                         </Link>
                     ))}
                 </section>
-
-                {user?.isLeader && (
-                    <section className="st-marks st-marks-leader">
-                        <Link to="/assignments/new" className="st-mark">
-                            <span className="st-mark-number">+</span>
-                            <span className="st-mark-title">숙제 생성</span>
-                            <span className="st-mark-desc">팀원들에게 새로운 연습 숙제를 부여하세요</span>
-                        </Link>
-                    </section>
-                )}
 
                 {/* 첫 기록이 없는 사용자에게만 — 코치가 거울에 붙여둔 메모처럼 */}
                 {logsLoaded && !hasAnyLog && (

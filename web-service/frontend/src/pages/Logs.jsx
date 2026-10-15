@@ -71,7 +71,7 @@ export default function Logs() {
                         <span className="empty-state-icon"><FileX size={48} /></span>
                         <h3 className="empty-state-title">아직 연습 기록이 없습니다</h3>
                         <p className="empty-state-text">
-                            자유 연습이나 숙제 제출을 통해 첫 기록을 남겨보세요
+                            자유 연습으로 첫 기록을 남겨보세요
                         </p>
                         <Link to="/practice" className="btn btn-primary mt-3">
                             연습 시작하기

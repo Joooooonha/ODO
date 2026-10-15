@@ -68,7 +68,18 @@ const fetchAPI = async (endpoint, options = {}) => {
       localStorage.removeItem('user');
     }
     const errorText = await response.text();
-    throw new Error(errorText || `HTTP ${response.status}`);
+    const error = new Error(errorText || `HTTP ${response.status}`);
+    // 화면이 오류를 구분해 안내할 수 있게 상태와 서버의 오류 코드를 붙인다.
+    // message는 예전처럼 응답 본문 그대로 둔다 — 기존 화면이 그 값을 보여준다.
+    error.status = response.status;
+    try {
+      const body = JSON.parse(errorText);
+      error.code = body.code;
+      error.serverMessage = body.error;
+    } catch {
+      // 본문이 JSON이 아니면 code 없이 둔다
+    }
+    throw error;
   }
 
   // 응답이 비어있는 경우 처리
@@ -142,17 +153,16 @@ export const deletePushSubscription = async (endpoint) => {
 };
 
 // ============ Team API ============
+//
+// 실패하면 Error에 status와 code(서버 ErrorCode)가 붙는다.
+// 예: 참여 시 404 JOIN_CODE_NOT_FOUND / 409 ALREADY_MEMBER / 403 KICKED_FROM_TEAM
 
-/**
- * 팀 목록 조회
- */
-export const getTeams = async () => {
+/** 내가 활동 중인 팀 목록: [{ teamId, name, myRole, memberCount }] */
+export const getMyTeams = async () => {
   return fetchAPI('/api/teams');
 };
 
-/**
- * 팀 생성
- */
+/** 팀 생성. 만든 사람이 팀장이 된다. */
 export const createTeam = async (name) => {
   return fetchAPI('/api/teams', {
     method: 'POST',
@@ -160,44 +170,43 @@ export const createTeam = async (name) => {
   });
 };
 
-// ============ Assignment API ============
-
-/**
- * 숙제 목록 조회
- */
-export const getAssignments = async () => {
-  return fetchAPI('/api/assignments');
-};
-
-/**
- * 숙제 상세 조회
- */
-export const getAssignment = async (id) => {
-  return fetchAPI(`/api/assignments/${id}`);
-};
-
-/**
- * 숙제 생성
- */
-export const createAssignment = async (data) => {
-  return fetchAPI('/api/assignments', {
+/** 참여 전 확인: { name, leaderNickname, memberCount } */
+export const previewJoin = async (code) => {
+  return fetchAPI('/api/teams/join-preview', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ code }),
   });
 };
 
-/**
- * 숙제 제출 현황 조회 (팀장용)
- */
-export const getSubmissions = async (assignmentId) => {
-  return fetchAPI(`/api/assignments/${assignmentId}/submissions`);
+/** 코드로 참여: { teamId, name, myRole, memberCount } */
+export const joinTeam = async (code) => {
+  return fetchAPI('/api/teams/join', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
 };
 
-/**
- * [NEW] 내 제출 이력 조회
- */
-export const getMySubmissions = async (assignmentId) => {
-  return fetchAPI(`/api/assignments/${assignmentId}/my-submissions`);
+/** Team Space 상단 한 줄: { teamId, name, myRole, memberCount } */
+export const getTeam = async (teamId) => {
+  return fetchAPI(`/api/teams/${teamId}`);
+};
+
+/** 활동 중 멤버: [{ userId, nickname, role }] — 팀장이 맨 앞 */
+export const getTeamMembers = async (teamId) => {
+  return fetchAPI(`/api/teams/${teamId}/members`);
+};
+
+/** 참여 코드 (팀장만): { joinCode } */
+export const getJoinCode = async (teamId) => {
+  return fetchAPI(`/api/teams/${teamId}/join-code`);
+};
+
+export const leaveTeam = async (teamId) => {
+  return fetchAPI(`/api/teams/${teamId}/leave`, { method: 'POST' });
+};
+
+export const kickMember = async (teamId, userId) => {
+  return fetchAPI(`/api/teams/${teamId}/members/${userId}/kick`, { method: 'POST' });
 };
 
 // ============ Video API ============

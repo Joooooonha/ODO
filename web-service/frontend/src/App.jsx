@@ -6,11 +6,13 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Practice from './pages/Practice';
-import Assignments from './pages/Assignments';
-import AssignmentDetail from './pages/AssignmentDetail';
-import AssignmentCreate from './pages/AssignmentCreate';
+import Teams from './pages/Teams';
+import TeamCreate from './pages/TeamCreate';
+import TeamJoin from './pages/TeamJoin';
+import TeamSpace from './pages/TeamSpace';
 import Logs from './pages/Logs';
 import LogDetail from './pages/LogDetail';
+import { DEV_LOGIN } from './devLogin';
 import './App.css';
 
 // 로그인 여부를 확인하는 동안 보여줄 화면.
@@ -61,14 +63,18 @@ function App() {
                 </PublicRoute>
               }
             />
-            <Route
-              path="/signup"
-              element={
-                <PublicRoute>
-                  <Signup />
-                </PublicRoute>
-              }
-            />
+            {/* 회원가입은 개발 전용. 운영 빌드에서는 라우트 자체가 없어서
+                주소로 직접 들어와도 아래 catch-all이 `/`로 보낸다. */}
+            {DEV_LOGIN && (
+              <Route
+                path="/signup"
+                element={
+                  <PublicRoute>
+                    <Signup />
+                  </PublicRoute>
+                }
+              />
+            )}
 
             {/* 보호된 라우트 */}
             <Route
@@ -88,26 +94,34 @@ function App() {
               }
             />
             <Route
-              path="/assignments"
+              path="/teams"
               element={
                 <ProtectedRoute>
-                  <Assignments />
+                  <Teams />
                 </ProtectedRoute>
               }
             />
             <Route
-              path="/assignments/new"
+              path="/teams/new"
               element={
                 <ProtectedRoute>
-                  <AssignmentCreate />
+                  <TeamCreate />
                 </ProtectedRoute>
               }
             />
             <Route
-              path="/assignments/:id"
+              path="/teams/join"
               element={
                 <ProtectedRoute>
-                  <AssignmentDetail />
+                  <TeamJoin />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teams/:teamId"
+              element={
+                <ProtectedRoute>
+                  <TeamSpace />
                 </ProtectedRoute>
               }
             />

@@ -1,0 +1,290 @@
+/*
+ * TEAM 탭 · 팀 만들기 · 팀 참여 · Team Space.
+ *
+ * 새 색을 만들지 않는다. index.css의 전역 토큰(다크 네온)과 공용 클래스
+ * (.card .btn .badge .form-* .empty-state .auth-error)를 그대로 쓰고,
+ * 여기는 배치만 정한다. 목록 카드는 내 기록(Logs.css의 .log-card)과 같은 문법이다.
+ */
+
+.team-container {
+    max-width: 820px;
+}
+
+.team-form-container {
+    max-width: 520px;
+}
+
+/* ===== TEAM 탭 ===== */
+.team-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-bottom: 20px;
+}
+
+.team-actions-center {
+    justify-content: center;
+}
+
+.team-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.team-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    text-decoration: none;
+    transition: var(--transition-normal);
+}
+
+.team-card:hover {
+    border-color: var(--accent-pink);
+    transform: translateX(4px);
+    box-shadow: var(--shadow-glow);
+}
+
+.team-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.team-card-name {
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+    overflow-wrap: anywhere;
+}
+
+.team-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.team-card-arrow {
+    color: var(--text-muted);
+    font-size: 1.2rem;
+}
+
+/* ===== 팀 만들기 · 팀 참여 ===== */
+.team-form:hover {
+    /* .card의 hover 들뜸은 링크 카드용이다. 입력 폼이 움직이면 산만하다. */
+    transform: none;
+    box-shadow: none;
+    background: var(--bg-card);
+    border-color: var(--border-color);
+}
+
+.team-form-hint {
+    display: block;
+    margin-top: 6px;
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.team-form-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.team-code-input {
+    font-size: 1.2rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.team-confirm-title {
+    font-size: 1.25rem;
+    margin-bottom: 12px;
+}
+
+.team-confirm-name {
+    color: var(--accent-pink);
+}
+
+.team-confirm-meta {
+    display: flex;
+    gap: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+}
+
+.team-inline-link {
+    color: var(--accent-cyan);
+    text-decoration: underline;
+}
+
+/* ===== Team Space ===== */
+.team-space-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+}
+
+.team-space-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.team-space-title h1 {
+    font-size: 1.8rem;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.team-space-leave,
+.team-member-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.team-confirm-text {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.team-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 24px;
+}
+
+.team-tab {
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.team-tab:hover {
+    color: var(--text-primary);
+}
+
+.team-tab.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent-pink);
+}
+
+/* ===== 멤버 탭 ===== */
+.team-code-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-accent);
+    border-radius: var(--border-radius);
+}
+
+.team-code-label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.team-code-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--accent-cyan);
+    user-select: all;
+}
+
+.team-members-count {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+}
+
+.team-member-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-card);
+}
+
+.team-member-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 14px 20px;
+}
+
+.team-member-row + .team-member-row {
+    border-top: 1px solid var(--border-color);
+}
+
+.team-member-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+}
+
+.team-member-leader {
+    font-size: 0.8rem;
+    color: #f59e0b; /* .badge-warning과 같은 값 */
+}
+
+@media (max-width: 768px) {
+    .team-actions {
+        justify-content: stretch;
+    }
+
+    .team-actions .btn {
+        flex: 1;
+    }
+
+    .team-card {
+        padding: 16px;
+    }
+
+    .team-space-title h1 {
+        font-size: 1.4rem;
+    }
+
+    .team-tab {
+        flex: 1;
+        padding: 12px 8px;
+    }
+
+    .team-code-box {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

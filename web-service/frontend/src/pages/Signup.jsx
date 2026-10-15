@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Crown, Sparkles, Users } from 'lucide-react';
-import { signup, setCurrentUser, getTeams } from '../api/client';
+import { Sparkles } from 'lucide-react';
+import { signup, setCurrentUser } from '../api/client';
 import './Auth.css';
 
 export default function Signup() {
@@ -12,25 +12,8 @@ export default function Signup() {
         passwordConfirm: '',
         nickname: ''
     });
-    const [teamMode, setTeamMode] = useState('none'); // 'none', 'join', 'create'
-    const [selectedTeamId, setSelectedTeamId] = useState(null);
-    const [newTeamName, setNewTeamName] = useState('');
-    const [teams, setTeams] = useState([]);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        // 팀 목록 불러오기
-        const loadTeams = async () => {
-            try {
-                const data = await getTeams();
-                setTeams(data);
-            } catch (err) {
-                console.error('팀 목록 로드 실패:', err);
-            }
-        };
-        loadTeams();
-    }, []);
 
     const handleChange = (e) => {
         setFormData({
@@ -55,9 +38,7 @@ export default function Signup() {
             const requestData = {
                 loginId: formData.loginId,
                 password: formData.password,
-                nickname: formData.nickname,
-                teamId: teamMode === 'join' ? selectedTeamId : null,
-                createTeamName: teamMode === 'create' ? newTeamName : null
+                nickname: formData.nickname
             };
 
             const user = await signup(requestData);
@@ -132,68 +113,6 @@ export default function Signup() {
                             onChange={handleChange}
                             required
                         />
-                    </div>
-
-                    <div className="form-group">
-                        <label className="form-label">팀 설정</label>
-                        <div className="team-options">
-                            <div
-                                className={`team-option ${teamMode === 'none' ? 'active' : ''}`}
-                                onClick={() => setTeamMode('none')}
-                            >
-                                <span className="team-option-label">무소속</span>
-                                <span className="team-option-desc">개인 연습</span>
-                            </div>
-                            <div
-                                className={`team-option ${teamMode === 'join' ? 'active' : ''}`}
-                                onClick={() => setTeamMode('join')}
-                            >
-                                <span className="team-option-label">팀 가입</span>
-                                <span className="team-option-desc">기존 팀</span>
-                            </div>
-                            <div
-                                className={`team-option ${teamMode === 'create' ? 'active' : ''}`}
-                                onClick={() => setTeamMode('create')}
-                            >
-                                <span className="team-option-label">팀 생성</span>
-                                <span className="team-option-desc">팀장 되기</span>
-                            </div>
-                        </div>
-
-                        {teamMode === 'join' && (
-                            <div className="team-list">
-                                {teams.length > 0 ? (
-                                    teams.map(team => (
-                                        <div
-                                            key={team.id}
-                                            className={`team-item ${selectedTeamId === team.id ? 'selected' : ''}`}
-                                            onClick={() => setSelectedTeamId(team.id)}
-                                        >
-                                            <span className="team-item-name">{team.name}</span>
-                                            <span className="team-item-info">
-                                                <span className="icon-inline"><Crown size={13} /> {team.leaderName || '팀장'}</span>
-                                                {' · '}
-                                                <span className="icon-inline"><Users size={13} /> {team.memberCount}명</span>
-                                            </span>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-center" style={{ color: 'var(--text-muted)' }}>
-                                        아직 생성된 팀이 없습니다
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        {teamMode === 'create' && (
-                            <input
-                                type="text"
-                                className="form-input mt-2"
-                                placeholder="새 팀 이름을 입력하세요"
-                                value={newTeamName}
-                                onChange={(e) => setNewTeamName(e.target.value)}
-                            />
-                        )}
                     </div>
 
                     <button

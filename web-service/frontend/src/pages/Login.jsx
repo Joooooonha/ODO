@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { login, setCurrentUser, socialLoginUrl } from '../api/client';
+import { DEV_LOGIN } from '../devLogin';
 import './Auth.css';
 
-// 개발용 로그인 폼 노출 여부. 운영 빌드(`VITE_ENABLE_DEV_LOGIN`을 주지 않음)에서는
-// 숨긴다. 백엔드도 `dev` 프로파일에서만 해당 엔드포인트를 등록한다.
-const DEV_LOGIN = import.meta.env.VITE_ENABLE_DEV_LOGIN === 'true';
 
 export default function Login() {
     const navigate = useNavigate();
@@ -104,12 +102,15 @@ export default function Login() {
                 </form>
                 </>}
 
-                <div className="auth-footer">
-                    <p>
-                        아직 계정이 없으신가요?{' '}
-                        <Link to="/signup">회원가입</Link>
-                    </p>
-                </div>
+                {/* 회원가입은 개발 전용이다. 운영에는 회원가입 API가 없어 눌러도 실패한다. */}
+                {DEV_LOGIN && (
+                    <div className="auth-footer">
+                        <p>
+                            아직 계정이 없으신가요?{' '}
+                            <Link to="/signup">회원가입</Link>
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -75,11 +75,6 @@
     font-size: 0.95rem;
 }
 
-.user-team {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-}
-
 .auth-buttons {
     display: flex;
     gap: 8px;
@@ -130,10 +125,6 @@
 
     .nav-link {
         padding: 14px 16px;
-    }
-
-    .user-team {
-        display: none;
     }
 
     .user-name {
