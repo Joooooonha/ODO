@@ -21,9 +21,8 @@ public class User {
     @Column(name = "user_id")
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "team_id")
-    private Team team;
+    // users.team_id는 매핑하지 않는다. 한 사용자가 여러 팀에 속하므로 소속은
+    // TeamMember가 갖는다. 컬럼은 롤백된 직전 jar를 위해 남겨 두고 다음 릴리스에서 지운다.
 
     private String loginId;
 
@@ -73,10 +72,6 @@ public class User {
                 .loginId(provider.name().toLowerCase() + "_" + providerId)
                 .nickname(nickname)
                 .build();
-    }
-
-    public void setTeam(Team team) {
-        this.team = team;
     }
 
     /**

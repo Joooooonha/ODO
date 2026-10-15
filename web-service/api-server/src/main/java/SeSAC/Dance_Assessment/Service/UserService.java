@@ -1,11 +1,9 @@
 package SeSAC.Dance_Assessment.Service;
 
-import SeSAC.Dance_Assessment.Domain.Team;
 import SeSAC.Dance_Assessment.Domain.User;
 import SeSAC.Dance_Assessment.Dto.User.LoginRequest;
 import SeSAC.Dance_Assessment.Dto.User.SignupRequest;
 import SeSAC.Dance_Assessment.Dto.User.UserResponse;
-import SeSAC.Dance_Assessment.Infrastructure.TeamRepository;
 import SeSAC.Dance_Assessment.Infrastructure.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,14 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final TeamRepository teamRepository;
     private final PasswordEncoder passwordEncoder;
 
     /**
-     * [NEW] 회원가입
-     * - teamId가 있으면 해당 팀에 가입
-     * - createTeamName이 있으면 새 팀 생성 후 팀장이 됨
-     * - 둘 다 없으면 무소속으로 가입
+     * 회원가입. 팀 설정은 하지 않는다 — 팀은 TEAM 탭에서만 만들고 참여한다.
      */
     @Transactional
     public UserResponse signup(SignupRequest request) {
@@ -52,30 +46,9 @@ public class UserService {
 
         // 3. 비밀번호 해싱. 평문은 절대 저장하지 않는다.
         user.setEncodedPassword(passwordEncoder.encode(request.password()));
+        userRepository.save(user);
 
-        // 4. 팀 처리
-        boolean isLeader = false;
-
-        if (request.createTeamName() != null && !request.createTeamName().isBlank()) {
-            // 새 팀 생성 - 팀장이 됨
-            Team newTeam = new Team(request.createTeamName());
-            teamRepository.save(newTeam);
-            user.setTeam(newTeam);
-            userRepository.save(user);
-            newTeam.changeLeader(user);
-            isLeader = true;
-        } else if (request.teamId() != null) {
-            // 기존 팀에 가입
-            Team team = teamRepository.findById(request.teamId())
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 팀입니다."));
-            user.setTeam(team);
-            userRepository.save(user);
-        } else {
-            // 무소속
-            userRepository.save(user);
-        }
-
-        return UserResponse.from(user, isLeader);
+        return UserResponse.from(user);
     }
 
     /**
@@ -98,7 +71,7 @@ public class UserService {
 
     /** 로그인 성공 후 응답 변환용. */
     public UserResponse toResponse(User user) {
-        return UserResponse.from(user, isTeamLeader(user));
+        return UserResponse.from(user);
     }
 
     /**
@@ -107,18 +80,6 @@ public class UserService {
     public UserResponse getCurrentUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
-
-        boolean isLeader = isTeamLeader(user);
-        return UserResponse.from(user, isLeader);
-    }
-
-    /**
-     * [NEW] 팀장 여부 확인
-     */
-    private boolean isTeamLeader(User user) {
-        if (user.getTeam() == null)
-            return false;
-        return user.getTeam().getLeader() != null
-                && user.getTeam().getLeader().getId().equals(user.getId());
+        return UserResponse.from(user);
     }
 }

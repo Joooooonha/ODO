@@ -2,7 +2,6 @@ package SeSAC.Dance_Assessment.Service;
 
 import SeSAC.Dance_Assessment.Domain.*;
 import SeSAC.Dance_Assessment.Dto.Video.*;
-import SeSAC.Dance_Assessment.Infrastructure.AssignmentRepository;
 import SeSAC.Dance_Assessment.Infrastructure.PracticeLogRepository;
 import SeSAC.Dance_Assessment.Infrastructure.UserRepository;
 import SeSAC.Dance_Assessment.Infrastructure.VideoRepository;
@@ -45,7 +44,6 @@ public class VideoService {
     private final VideoRepository videoRepository;
     private final UserRepository userRepository;
     private final PracticeLogRepository practiceLogRepository;
-    private final AssignmentRepository assignmentRepository;
     private final AnalysisResultWriter analysisResultWriter;
     private final StorageService storage;
 
@@ -124,25 +122,22 @@ public class VideoService {
             return new VideoUploadResponse(video.getId(), null, false);
         }
 
-        Assignment assignment = null;
-        if (request != null && request.assignmentId() != null) {
-            assignment = assignmentRepository.findById(request.assignmentId())
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 숙제입니다."));
-        }
-
         Video referenceVideo = null;
-        if (assignment != null) {
-            referenceVideo = assignment.getTargetVideo();
-        } else if (request != null && request.referenceVideoId() != null) {
+        if (request != null && request.referenceVideoId() != null) {
             referenceVideo = videoRepository.findById(request.referenceVideoId())
                     .orElseThrow(() -> new IllegalArgumentException("기준 영상을 찾을 수 없습니다."));
+            // 남의 영상을 기준으로 걸면 그 영상이 분석 서버로 넘어가 처리되고, 구간 비교
+            // 이미지에 남의 영상 장면이 들어갈 수 있다(비교 영상은 현재 만들지 않는다).
+            // 자유 연습은 나 혼자 하는 연습이라 기준 영상도 내 것만 쓸 수 있다.
+            if (!referenceVideo.getUploader().getId().equals(userId)) {
+                throw new IllegalStateException("본인이 올린 기준 영상만 사용할 수 있습니다.");
+            }
         }
 
         PracticeLog practiceLog = practiceLogRepository.save(PracticeLog.builder()
                 .user(user)
                 .practiceVideo(video)
                 .referenceVideo(referenceVideo)
-                .assignment(assignment)
                 .build());
 
         // 업로드 직후 분석을 시작하지 않는다. 사용자가 안무 시작 시각을 지정하기
@@ -178,21 +173,14 @@ public class VideoService {
     }
 
     /**
-     * 1. 본인이 올린 영상이면 OK.
-     * 2. 같은 팀원이 올린 <b>기준 영상</b>이면 OK — 함께 따라 출 대상이므로.
-     *    연습 영상은 팀원이라도 볼 수 없다.
+     * <b>본인이 올린 영상만</b> 볼 수 있다.
+     *
+     * <p>예전에는 같은 팀원이 올린 기준 영상도 허용했다. 자유 연습은 나 혼자 하는
+     * 연습이라 기준 영상이든 연습 영상이든 팀원에게도 보이지 않는다. 팀원끼리 보는
+     * 영상은 Mission의 영상뿐이고, 그 권한은 Mission을 만들 때 그쪽에서 따로 확인한다.
      */
     private boolean canView(Video video, User viewer) {
-        if (video.getUploader().getId().equals(viewer.getId())) {
-            return true;
-        }
-        if (video.getType() != VideoType.REFERENCE) {
-            return false;
-        }
-        Team uploaderTeam = video.getUploader().getTeam();
-        Team viewerTeam = viewer.getTeam();
-        return uploaderTeam != null && viewerTeam != null
-                && uploaderTeam.getId().equals(viewerTeam.getId());
+        return video.getUploader().getId().equals(viewer.getId());
     }
 
     @Transactional

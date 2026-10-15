@@ -34,8 +34,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 // - ai.server.url: 운영에서는 값이 없으면 **즉시 실패하는 편이 옳다**
 //   (맥미니 주소를 빠뜨린 채 뜨면 분석이 전부 실패한다). 그래서 기본값을 두지
 //   않았고, 대신 테스트에서만 채운다.
+// - flyway: 마이그레이션은 PostgreSQL 문법이라 H2에서는 돌지 않는다. V1만 있을 때는
+//   다른 테스트가 먼저 만든 테이블 때문에 baseline으로 건너뛰어져 우연히 통과했지만,
+//   V2부터는 실제로 실행되어 실패한다. 마이그레이션은 로컬 PostgreSQL에서 따로 검증한다.
 @TestPropertySource(properties = {
         "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.flyway.enabled=false",
         "ai.server.url=http://127.0.0.1:8000",
         // 저장소도 이 테스트의 관심사가 아니다. 운영은 r2지만 자격증명이 없으면
         // 뜨지 않는 것이 맞고(빠뜨린 채 배포되면 안 되므로), 여기서는 local로 둔다.

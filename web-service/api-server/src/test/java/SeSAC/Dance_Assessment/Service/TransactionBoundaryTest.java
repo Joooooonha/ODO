@@ -38,8 +38,10 @@ class TransactionBoundaryTest {
                 Arguments.of(UserService.class, "signup"),
                 Arguments.of(PracticeLogService.class, "requestAnalysis"),
                 Arguments.of(PracticeLogService.class, "updateTrimRange"),
-                Arguments.of(AssignmentService.class, "createAssignment"),
-                Arguments.of(TeamService.class, "createTeam"));
+                Arguments.of(TeamService.class, "createTeam"),
+                Arguments.of(TeamService.class, "join"),
+                Arguments.of(TeamService.class, "leave"),
+                Arguments.of(TeamService.class, "kick"));
     }
 
     @ParameterizedTest(name = "{0}.{1}는 쓰기 트랜잭션")

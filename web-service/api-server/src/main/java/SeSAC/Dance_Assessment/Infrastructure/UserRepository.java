@@ -4,7 +4,6 @@ import SeSAC.Dance_Assessment.Domain.AuthProvider;
 import SeSAC.Dance_Assessment.Domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -21,14 +20,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * 이메일은 동의 여부에 따라 못 받을 수 있지만 id는 항상 오고 바뀌지 않는다.
      */
     Optional<User> findByProviderAndProviderId(AuthProvider provider, String providerId);
-
-    /**
-     * [NEW] 특정 팀의 멤버 수 조회
-     */
-    int countByTeamId(Long teamId);
-
-    /**
-     * [NEW] 특정 팀의 모든 멤버 조회
-     */
-    List<User> findAllByTeamId(Long teamId);
 }
