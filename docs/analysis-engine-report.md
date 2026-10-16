@@ -2,8 +2,8 @@
 
 > 두 영상의 춤 동작을 비교하는 분석 엔진의 설계·구현·검증 과정을 정리한 문서입니다.
 > **어떤 조건을 가정했고, 무엇을 목표로 했으며, 어떤 근거로 무엇을 결정했는지**에
-> 초점을 맞췄습니다. 실행 방법과 프로젝트 개요는 [README](../README.md), 진행 상태와
-> 설계 결정 원본은 [`model-research/TASKS.md`](../model-research/TASKS.md)를 참고하세요.
+> 초점을 맞췄습니다. 실행 방법과 프로젝트 개요는 [README](../README.md)를 참고하세요.
+> 설계 결정 목록(D1~D25)은 [9.1](#91-설계-결정-요약)에 있습니다.
 
 | | |
 |---|---|
@@ -1185,4 +1185,3 @@ python -m src.main --pose-backend yolo --feature angle
 ### 9.4 관련 문서
 
 - [README](../README.md) — 프로젝트 개요, 실행 방법
-- [`model-research/TASKS.md`](../model-research/TASKS.md) — 진행 상태, 설계 결정 원본, 상세 실측 로그
