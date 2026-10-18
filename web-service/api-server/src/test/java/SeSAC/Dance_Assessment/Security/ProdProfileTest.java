@@ -108,4 +108,10 @@ class ProdProfileTest {
 
         assertThat(status).isEqualTo(204);
     }
+
+    @Test
+    @DisplayName("[read 5절] 운영에서는 Prometheus 레지스트리가 만들어지지 않는다(jar에는 들어 있지만 기본 꺼짐)")
+    void prometheusIsOffInProd() {
+        assertThat(context.getBeanNamesForType(io.micrometer.prometheusmetrics.PrometheusMeterRegistry.class)).isEmpty();
+    }
 }

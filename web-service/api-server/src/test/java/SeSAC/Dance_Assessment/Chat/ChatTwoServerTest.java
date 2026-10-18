@@ -26,6 +26,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -36,6 +37,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * 서버 2대(5.2): 같은 PostgreSQL·Redis를 쓰는 두 번째 서버를 이 JVM 안에 하나 더 띄운다.
@@ -136,6 +139,43 @@ class ChatTwoServerTest {
 
         onS2.sendMessage(room, UUID.randomUUID().toString(), "S2에서", false);
         assertThat(onS1.nextRoomMessage(room, WAIT).get("content").asText()).isEqualTo("S2에서");
+    }
+
+    @Test
+    @DisplayName("[read 9.1] S1에서 읽음 보고 → S2에 붙은 세션이 READ를 받고 구간이 맞다(구간은 받은 서버가 계산)")
+    void crossServerReadSnapshot() throws Exception {
+        LoggedIn a = users.create("읽는 사람");
+        LoggedIn b = users.create("보는 사람");
+        long room = chat.teamRoomId(a, teams.teamOf(a, b));
+        chat.send(a, room, "하나");
+        chat.send(a, room, "둘");
+        RawStompClient onS2 = connect(port2, b, room);
+        awaitRedisSubscribers(room, 1);
+        long last = chat.lastSeq(room);
+        long bPosition = (long) chat.member(room, b.id())[1];
+
+        mvc.perform(post("/api/chat/rooms/{id}/read", room).cookie(a.cookie())   // MockMvc = S1
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"seq\":" + last + "}"))
+                .andExpect(status().isNoContent());
+
+        JsonNode frame = onS2.expect(f -> "MESSAGE".equals(f.command())
+                && ChatDestinations.roomTopic(room).equals(f.destination())
+                && f.body().contains("\"type\":\"READ\""), WAIT).json(om);
+        assertThat(frame.get("roomId").asLong()).isEqualTo(room);
+        // a는 last까지, b는 가입 시점 위치 → last 메시지는 b 한 명이 안 읽음, b 위치 이하는 0명
+        JsonNode ranges = frame.get("ranges");
+        assertThat(unreadAt(ranges, last)).isEqualTo(1);
+        assertThat(unreadAt(ranges, bPosition)).isZero();
+        assertThat(unreadAt(ranges, last + 1)).as("아직 없는 번호는 전원").isEqualTo(2);
+    }
+
+    private static int unreadAt(JsonNode ranges, long seq) {
+        for (JsonNode r : ranges) {
+            if (r.get("toSeq").isNull() || seq <= r.get("toSeq").asLong()) {
+                return r.get("unread").asInt();
+            }
+        }
+        throw new AssertionError("마지막 구간 없음 " + ranges);
     }
 
     @Test
