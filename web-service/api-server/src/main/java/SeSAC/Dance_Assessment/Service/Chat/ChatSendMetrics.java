@@ -1,10 +1,11 @@
 package SeSAC.Dance_Assessment.Service.Chat;
 
+import SeSAC.Dance_Assessment.Common.LatencyTimers;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.sql.SQLException;
@@ -17,7 +18,7 @@ import java.util.TreeMap;
  * 0부터 다시 센다. 판단 근거용이지 정확성에 쓰지 않는다.
  *
  * <ul>
- *   <li>{@code chat.send.duration{outcome}} — 한 메시지의 저장 처리 시간(재시도·대기 포함)</li>
+ *   <li>{@code chat.send.duration{outcome}} — 한 메시지의 저장 처리 시간(재시도·대기 포함), p50·p95·p99</li>
  *   <li>{@code chat.send.retries{cause}} — 재시도 횟수(원인: SQLState 또는 예외 이름).
  *       교착({@code 40P01})은 잠금 순서를 지키면 0이어야 한다</li>
  *   <li>{@code chat.send.exhausted}, {@code chat.send.unclassified}, {@code chat.send.duplicates},
@@ -28,15 +29,18 @@ import java.util.TreeMap;
 public class ChatSendMetrics {
 
     private final MeterRegistry registry;
+    private final Duration percentileWindow;
 
     @Autowired
-    public ChatSendMetrics(MeterRegistry registry) {
+    public ChatSendMetrics(MeterRegistry registry,
+                           @Value("${chat.metrics.log-interval:60s}") Duration percentileWindow) {
         this.registry = registry;
+        this.percentileWindow = percentileWindow;
     }
 
     /** 단위 테스트용. */
     ChatSendMetrics() {
-        this(new SimpleMeterRegistry());
+        this(new SimpleMeterRegistry(), Duration.ofSeconds(60));
     }
 
     void retried(Throwable cause) {
@@ -60,7 +64,7 @@ public class ChatSendMetrics {
     }
 
     void recordDuration(SendOutcome outcome, Duration elapsed) {
-        Timer.builder("chat.send.duration")
+        LatencyTimers.builder("chat.send.duration", percentileWindow)
                 .tag("outcome", outcome.getClass().getSimpleName())
                 .register(registry)
                 .record(elapsed);

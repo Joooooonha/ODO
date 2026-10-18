@@ -4,6 +4,8 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.distribution.HistogramSnapshot;
+import io.micrometer.core.instrument.distribution.ValueAtPercentile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -17,8 +19,9 @@ import java.util.concurrent.TimeUnit;
  * 채팅·커넥션 풀·실행기 지표를 주기적으로 한 줄씩 로그에 남긴다(4.5 측정 준비).
  * 운영에서는 {@code journalctl -u dance-api | grep "채팅 지표"}로 본다.
  *
- * <p>값은 서버가 뜬 뒤 누적(횟수)이거나 지금 순간(게이지)이다. 시간은 평균/최대(ms). Micrometer의
- * 최대값은 최근 구간(기본 2분)의 최대다.
+ * <p>값은 서버가 뜬 뒤 누적(횟수)이거나 지금 순간(게이지)이다. 저장 처리 시간과 대기열 대기 시간은
+ * 평균/p50/p95/p99/최대(ms) — 백분위수·최대는 최근 한 간격 안팎이다({@code LatencyTimers}).
+ * 간격은 {@code chat.metrics.log-interval}(운영 60초, 측정 때 10초 등으로 바꾼다).
  *
  * <ul>
  *   <li>커넥션 풀(HikariCP, Boot 자동 연결): 획득 시간, 대기 스레드 수, 활성 커넥션 수</li>
@@ -86,11 +89,21 @@ public class ChatMetricsReporter {
         return sb.toString().trim() + "}";
     }
 
+    /**
+     * {@code 건수 평균/p50/p95/p99/최대ms}. 백분위수가 없는 타이머(Hikari 등)는 평균·최대만.
+     * 건수·평균은 서버가 뜬 뒤 누적, 백분위수·최대는 최근 한 간격 안팎.
+     */
     private static String timer(Timer t) {
         if (t == null || t.count() == 0) {
             return "0건";
         }
-        return String.format(Locale.ROOT, "%d건 평균%.1f/최대%.1fms", t.count(),
-                t.mean(TimeUnit.MILLISECONDS), t.max(TimeUnit.MILLISECONDS));
+        HistogramSnapshot snapshot = t.takeSnapshot();
+        StringBuilder sb = new StringBuilder(String.format(Locale.ROOT, "%d건 평균%.1f", t.count(),
+                t.mean(TimeUnit.MILLISECONDS)));
+        for (ValueAtPercentile p : snapshot.percentileValues()) {
+            sb.append(String.format(Locale.ROOT, "/p%d %.1f", Math.round(p.percentile() * 100),
+                    p.value(TimeUnit.MILLISECONDS)));
+        }
+        return sb.append(String.format(Locale.ROOT, "/최대%.1fms", t.max(TimeUnit.MILLISECONDS))).toString();
     }
 }

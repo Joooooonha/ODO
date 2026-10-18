@@ -197,9 +197,17 @@ REMOTE
 
 - `printf`·`echo`는 셸 내장 명령이라 비밀번호가 프로세스 목록에 나타나지 않는다. `/etc/dance-api.env`는
   처음 만들 때처럼 600(ubuntu 소유)으로 남는다. `/etc/redis/odo.conf`는 640(redis 소유)이다.
-- systemd 유닛(`deploy/systemd/dance-api.service`)의 `After=`에 `redis-server.service`를 더했다. 유닛 파일도
-  수동으로 반영한다: `sudo cp deploy/systemd/dance-api.service /etc/systemd/system/ && sudo systemctl daemon-reload`
 - nginx 웹소켓 블록(`location = /api/ws`)도 2절 방법으로 반영한다.
+
+systemd 유닛(`deploy/systemd/dance-api.service`)의 `After=`에 `redis-server.service`를 더했다. 유닛 파일은
+배포가 반영하지 않으므로 직접 바꾼다. **`daemon-reload`를 빠뜨리면 systemd가 예전 유닛을 계속 쓴다.**
+바뀐 순서는 다음 재시작(배포)부터 적용된다.
+
+```bash
+scp deploy/systemd/dance-api.service odo:/tmp/
+ssh odo 'sudo cp /tmp/dance-api.service /etc/systemd/system/ && sudo systemctl daemon-reload \
+  && systemctl show -p After dance-api | tr " " "\n" | grep -E "redis|postgres"'   # redis-server.service가 보이면 반영됨
+```
 
 배포 뒤 확인:
 

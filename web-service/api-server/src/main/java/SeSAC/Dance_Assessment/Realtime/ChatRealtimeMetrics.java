@@ -1,17 +1,20 @@
 package SeSAC.Dance_Assessment.Realtime;
 
+import SeSAC.Dance_Assessment.Common.LatencyTimers;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 /**
  * 실시간 전달 지표(10절, 4.5 측정 준비).
  *
  * <ul>
- *   <li>{@code chat.session.queue.wait} — SEND가 세션 대기열에서 기다린 시간(도착 → 처리 시작)</li>
+ *   <li>{@code chat.session.queue.wait} — SEND가 세션 대기열에서 기다린 시간(도착 → 처리 시작), p50·p95·p99</li>
  *   <li>{@code chat.session.disconnects{reason}} — 서버가 끊은 세션.
  *       {@code heartbeat}(하트비트 무신호 30초), {@code queue_limit}(대기열 상한 초과),
  *       {@code token_expired}, {@code protocol}(한 메시지에 프레임 여러 개 등)</li>
@@ -30,9 +33,10 @@ public class ChatRealtimeMetrics {
     private final MeterRegistry registry;
     private final Timer queueWait;
 
-    public ChatRealtimeMetrics(MeterRegistry registry) {
+    public ChatRealtimeMetrics(MeterRegistry registry,
+                               @Value("${chat.metrics.log-interval:60s}") Duration percentileWindow) {
         this.registry = registry;
-        this.queueWait = Timer.builder("chat.session.queue.wait").register(registry);
+        this.queueWait = LatencyTimers.builder("chat.session.queue.wait", percentileWindow).register(registry);
     }
 
     void queueWait(long nanos) {
