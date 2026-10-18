@@ -26,11 +26,31 @@ import org.testcontainers.containers.PostgreSQLContainer;
  */
 public class PostgresTestContainer implements ApplicationContextInitializer<ConfigurableApplicationContext> {
 
-    // 운영과 같은 메이저 버전(운영 16.15)
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
+    // 운영과 같은 메이저 버전(운영 16.15).
+    // max_connections는 테스트에서만 늘린다. 장애 주입용 스파이 빈 때문에 Spring 컨텍스트가 여러 개
+    // 생기고, 컨텍스트마다 커넥션 풀(기본 10개)을 따로 잡는다. 기본값 100이면 빠듯하다.
+    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16")
+            .withCommand("postgres", "-c", "max_connections=300");
 
     static {
         POSTGRES.start();
+    }
+
+    /** 같은 서버의 다른 데이터베이스 주소. 마이그레이션 테스트가 빈 DB를 따로 만들 때 쓴다. */
+    public static String jdbcUrl(String database) {
+        return "jdbc:postgresql://" + POSTGRES.getHost() + ":" + POSTGRES.getFirstMappedPort() + "/" + database;
+    }
+
+    public static String jdbcUrl() {
+        return POSTGRES.getJdbcUrl();
+    }
+
+    public static String username() {
+        return POSTGRES.getUsername();
+    }
+
+    public static String password() {
+        return POSTGRES.getPassword();
     }
 
     @Override

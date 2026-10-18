@@ -1,5 +1,7 @@
 package SeSAC.Dance_Assessment.Service;
 
+import SeSAC.Dance_Assessment.Service.Chat.ChatRoomService;
+import SeSAC.Dance_Assessment.Service.Chat.MessageWriter;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -47,7 +49,13 @@ class TransactionBoundaryTest {
                 Arguments.of(MissionService.class, "update"),
                 Arguments.of(MissionService.class, "delete"),
                 Arguments.of(MissionService.class, "submit"),
-                Arguments.of(MissionService.class, "addComment"));
+                Arguments.of(MissionService.class, "addComment"),
+                Arguments.of(ChatRoomService.class, "createTeamRoom"),
+                Arguments.of(ChatRoomService.class, "joinTeamRoom"),
+                Arguments.of(ChatRoomService.class, "leaveTeamRoom"),
+                Arguments.of(ChatRoomService.class, "openDm"),
+                Arguments.of(MessageWriter.class, "writeText"),
+                Arguments.of(MessageWriter.class, "writeSystem"));
     }
 
     @ParameterizedTest(name = "{0}.{1}는 쓰기 트랜잭션")
