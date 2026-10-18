@@ -29,17 +29,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 // 운영 설정 중 **인프라에 의존하는 항목만** 테스트용으로 덮어쓴다.
 // 이 테스트가 확인하려는 것은 "프로파일로 꺼지는 빈"이지 DB/네트워크가 아니다.
 //
-// - ddl-auto: 운영은 validate가 맞다(운영 DB 스키마를 앱이 멋대로 바꾸면 안 된다).
-//   다만 빈 H2에 대고 validate하면 스키마가 없어서 컨텍스트가 뜨지 않는다.
+// - DB는 덮어쓰지 않는다. 운영과 같이 Flyway + validate로 뜬다(테스트 DB는 PostgreSQL).
+//   그래서 이 테스트는 "운영 설정으로 마이그레이션과 엔티티가 맞는지"도 함께 확인한다.
+//   H2 시절에는 ddl-auto=create-drop으로 덮어썼는데, 공유 PostgreSQL에서 그러면
+//   Flyway가 만든 테이블을 전부 지우고 엔티티 기준으로 다시 만들어 버려서(부분 인덱스·
+//   CHECK가 사라짐) 뒤에 도는 테스트가 엉뚱한 스키마에서 통과했다.
 // - ai.server.url: 운영에서는 값이 없으면 **즉시 실패하는 편이 옳다**
 //   (맥미니 주소를 빠뜨린 채 뜨면 분석이 전부 실패한다). 그래서 기본값을 두지
 //   않았고, 대신 테스트에서만 채운다.
-// - flyway: 마이그레이션은 PostgreSQL 문법이라 H2에서는 돌지 않는다. V1만 있을 때는
-//   다른 테스트가 먼저 만든 테이블 때문에 baseline으로 건너뛰어져 우연히 통과했지만,
-//   V2부터는 실제로 실행되어 실패한다. 마이그레이션은 로컬 PostgreSQL에서 따로 검증한다.
 @TestPropertySource(properties = {
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.flyway.enabled=false",
         "ai.server.url=http://127.0.0.1:8000",
         // 저장소도 이 테스트의 관심사가 아니다. 운영은 r2지만 자격증명이 없으면
         // 뜨지 않는 것이 맞고(빠뜨린 채 배포되면 안 되므로), 여기서는 local로 둔다.

@@ -75,9 +75,8 @@ public class VideoService {
      *
      * <p><b>{@code @Transactional}을 이 메서드에서 떼지 말 것.</b> 클래스 기본값이
      * {@code readOnly = true}라, 빠지면 INSERT가 읽기 전용 트랜잭션에서 돈다.
-     * PostgreSQL은 이를 거부해 500이 나지만 H2(테스트)는 그대로 통과시킨다 —
-     * 9/9에 이 애너테이션과 메서드 사이에 다른 메서드가 끼어들어 운영 업로드가 깨졌고
-     * 테스트는 아무것도 잡지 못했다.
+     * PostgreSQL은 이를 거부해 500이 난다 — 9/9에 이 애너테이션과 메서드 사이에 다른
+     * 메서드가 끼어들어 운영 업로드가 깨졌고, 당시 테스트 DB(H2)는 이를 잡지 못했다.
      */
     @Transactional
     public VideoUploadUrlResponse createUploadUrl(Long userId, VideoUploadUrlRequest request) {

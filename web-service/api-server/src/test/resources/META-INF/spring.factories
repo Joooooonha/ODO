@@ -1,0 +1,2 @@
+# 모든 @SpringBootTest 컨텍스트에 Testcontainers PostgreSQL 접속 정보를 넣는다.
+org.springframework.context.ApplicationContextInitializer=SeSAC.Dance_Assessment.PostgresTestContainer

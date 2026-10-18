@@ -19,9 +19,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p><b>왜 이런 테스트가 필요한가.</b> 9/9에 {@code VideoService}의 {@code @Transactional}과
  * {@code createUploadUrl} 사이에 다른 메서드가 끼어들어, 애너테이션이 엉뚱한 메서드로
  * 옮겨갔다. {@code createUploadUrl}은 읽기 전용 트랜잭션에서 INSERT를 하게 됐고,
- * 운영(PostgreSQL)은 이를 거부해 업로드가 500이 됐다. 그런데 <b>테스트 DB인 H2는
- * 읽기 전용 트랜잭션의 INSERT를 그대로 받아준다</b> — API를 호출하는 통합 테스트로는
- * 이 실수를 잡을 수 없다.
+ * 운영(PostgreSQL)은 이를 거부해 업로드가 500이 됐다. 그런데 <b>당시 테스트 DB인 H2는
+ * 읽기 전용 트랜잭션의 INSERT를 그대로 받아줬다</b> — API를 호출하는 통합 테스트로는
+ * 이 실수를 잡지 못했다. 지금은 테스트도 PostgreSQL이지만, 그 경로를 타는 테스트가
+ * 없는 메서드도 있으므로 이 검사는 남겨 둔다.
  *
  * <p>그래서 동작이 아니라 <b>Spring이 실제로 해석하는 트랜잭션 속성</b>을 본다.
  * 메서드 단위 애너테이션이 빠지거나 다른 메서드로 옮겨가면 여기서 실패한다.

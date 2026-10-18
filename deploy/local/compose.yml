@@ -1,0 +1,27 @@
+# 로컬 개발·검증 전용. 운영은 jar + systemd 그대로다(Docker를 쓰지 않는다).
+#
+#   docker compose -f deploy/local/compose.yml up -d postgres   # 개발용 DB만
+#
+# 서버 2대 + Redis + nginx 구성은 채팅 실시간 전달 단계(2-2)에서 이 파일에 더한다.
+name: odo-local
+
+services:
+  postgres:
+    # 운영과 같은 메이저 버전(운영 16.15)
+    image: postgres:16
+    environment:
+      POSTGRES_DB: dance_db
+      POSTGRES_USER: dance
+      POSTGRES_PASSWORD: dance
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dance -d dance_db"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  postgres-data:
