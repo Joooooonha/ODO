@@ -4,6 +4,7 @@ import SeSAC.Dance_Assessment.Dto.Team.JoinCodeRequest;
 import SeSAC.Dance_Assessment.Dto.Team.JoinCodeResponse;
 import SeSAC.Dance_Assessment.Dto.Team.JoinPreviewResponse;
 import SeSAC.Dance_Assessment.Dto.Team.TeamCreateRequest;
+import SeSAC.Dance_Assessment.Dto.Team.TeamDetailResponse;
 import SeSAC.Dance_Assessment.Dto.Team.TeamMemberResponse;
 import SeSAC.Dance_Assessment.Dto.Team.TeamSummaryResponse;
 import SeSAC.Dance_Assessment.Security.CurrentUserId;
@@ -60,9 +61,9 @@ public class TeamController {
         return ResponseEntity.ok(teamService.join(userId, request.code()));
     }
 
-    /** Team Space 상단 한 줄. 활동 중 멤버만. */
+    /** Team Space 상단 한 줄 + 팀 채팅방 id. 활동 중 멤버만. */
     @GetMapping("/teams/{teamId}")
-    public ResponseEntity<TeamSummaryResponse> getTeam(
+    public ResponseEntity<TeamDetailResponse> getTeam(
             @PathVariable Long teamId,
             @CurrentUserId Long userId) {
         return ResponseEntity.ok(teamService.getTeam(teamId, userId));

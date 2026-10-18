@@ -3,6 +3,7 @@ package SeSAC.Dance_Assessment.Service;
 import SeSAC.Dance_Assessment.Common.ApiException;
 import SeSAC.Dance_Assessment.Common.Constraints;
 import SeSAC.Dance_Assessment.Common.ErrorCode;
+import SeSAC.Dance_Assessment.Domain.ChatMemberStatus;
 import SeSAC.Dance_Assessment.Domain.Team;
 import SeSAC.Dance_Assessment.Domain.TeamMember;
 import SeSAC.Dance_Assessment.Domain.TeamMemberStatus;
@@ -10,12 +11,16 @@ import SeSAC.Dance_Assessment.Domain.TeamRole;
 import SeSAC.Dance_Assessment.Domain.User;
 import SeSAC.Dance_Assessment.Dto.Team.JoinCodeResponse;
 import SeSAC.Dance_Assessment.Dto.Team.JoinPreviewResponse;
+import SeSAC.Dance_Assessment.Dto.Team.TeamDetailResponse;
 import SeSAC.Dance_Assessment.Dto.Team.TeamMemberResponse;
 import SeSAC.Dance_Assessment.Dto.Team.TeamSummaryResponse;
 import SeSAC.Dance_Assessment.Infrastructure.TeamMemberRepository;
 import SeSAC.Dance_Assessment.Infrastructure.TeamRepository;
 import SeSAC.Dance_Assessment.Infrastructure.UserRepository;
+import SeSAC.Dance_Assessment.Service.Chat.ChatRoomService;
+import SeSAC.Dance_Assessment.Service.Chat.TeamChatEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +39,11 @@ import java.util.stream.Collectors;
  * <p><b>상태를 바꾸는 경로(재참여·나가기·추방)는 모두 행 잠금 조회
  * ({@link TeamMemberRepository#findForUpdate})로 시작한다.</b> 같은 행을 두 요청이
  * 동시에 바꾸면 나중에 커밋한 쪽이 앞의 결과를 덮어쓰기 때문이다.
+ *
+ * <p><b>팀 채팅방은 같은 트랜잭션에서 따라간다.</b> 팀 생성 = 팀 + 팀 채팅방 + 팀장의 채팅 멤버,
+ * 참여·재활성화·나가기·추방 = 채팅 멤버 상태 변경({@link ChatRoomService}). 채팅방 생성이 실패하면
+ * 팀 생성도 실패한다. 잠금은 {@code team_member} 행을 먼저, 그다음 채팅방 행을 잡는다.
+ * 입장·나가기·추방 안내 메시지는 팀 트랜잭션이 커밋된 <b>뒤에</b> 따로 저장한다({@link TeamChatEvent}).
  */
 @Service
 @RequiredArgsConstructor
@@ -48,6 +58,8 @@ public class TeamService {
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
     private final JoinCodeGenerator joinCodeGenerator;
+    private final ChatRoomService chatRoomService;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public TeamSummaryResponse createTeam(Long userId, String rawName) {
@@ -56,7 +68,7 @@ public class TeamService {
 
         Team team = teamRepository.save(new Team(name, newJoinCode()));
         teamMemberRepository.save(TeamMember.leader(team, user));
-        // TODO(chat): 팀 채팅방 생성
+        chatRoomService.createTeamRoom(team.getId(), userId);
 
         return TeamSummaryResponse.of(team, TeamRole.LEADER, 1);
     }
@@ -79,10 +91,12 @@ public class TeamService {
                 .toList();
     }
 
-    public TeamSummaryResponse getTeam(Long teamId, Long userId) {
+    /** Team Space 상단 한 줄 + 채팅 탭이 쓰는 팀 채팅방 id. */
+    public TeamDetailResponse getTeam(Long teamId, Long userId) {
         Team team = findTeam(teamId);
         TeamMember me = requireActiveMember(teamId, userId);
-        return TeamSummaryResponse.of(team, me.getRole(), countActive(teamId));
+        return TeamDetailResponse.of(team, me.getRole(), countActive(teamId),
+                chatRoomService.getTeamRoomId(teamId));
     }
 
     /** 활동 중 멤버만. 팀장이 맨 앞, 나머지는 참여한 순서. */
@@ -135,7 +149,8 @@ public class TeamService {
                 case LEFT -> member.reactivate();
             }
         }
-        // TODO(chat): 팀 채팅방 멤버 추가 (신규 등록·재활성화 모두)
+        Long roomId = chatRoomService.joinTeamRoom(team.getId(), userId);
+        events.publishEvent(TeamChatEvent.of(roomId, userId, TeamChatEvent.Kind.JOIN));
 
         return TeamSummaryResponse.of(team, member.getRole(), countActive(team.getId()));
     }
@@ -151,7 +166,9 @@ public class TeamService {
             throw new ApiException(ErrorCode.LEADER_CANNOT_LEAVE);
         }
         me.leave();
-        // TODO(chat): 팀 채팅방 멤버 제외, 연결된 구독 해제
+        Long roomId = chatRoomService.leaveTeamRoom(teamId, userId, ChatMemberStatus.LEFT);
+        events.publishEvent(TeamChatEvent.of(roomId, userId, TeamChatEvent.Kind.LEAVE));
+        // TODO(chat): 다른 서버에 붙은 세션까지 그 방만 실시간 차단(REVOKED) — 권한·차단 단계(2-3)
     }
 
     /** 팀장만 추방할 수 있다. 팀장 자신은 추방할 수 없다. */
@@ -169,7 +186,9 @@ public class TeamService {
             throw new ApiException(ErrorCode.CANNOT_KICK_LEADER);
         }
         target.kick();
-        // TODO(chat): 팀 채팅방 멤버 제외, 연결된 구독 해제
+        Long roomId = chatRoomService.leaveTeamRoom(teamId, targetUserId, ChatMemberStatus.KICKED);
+        events.publishEvent(TeamChatEvent.of(roomId, targetUserId, TeamChatEvent.Kind.KICK));
+        // TODO(chat): 다른 서버에 붙은 세션까지 그 방만 실시간 차단(REVOKED) — 권한·차단 단계(2-3)
     }
 
     // ===== 권한 =====
