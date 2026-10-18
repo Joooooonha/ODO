@@ -144,6 +144,8 @@ class ChatWebSocketTest {
         RawStompClient tab2 = connect(me);
         tab1.subscribe(ChatDestinations.roomTopic(room));
         tab2.subscribe(ChatDestinations.roomTopic(room));
+        tab1.awaitSubscriptionsProcessed();
+        tab2.awaitSubscriptionsProcessed();
         awaitSubscribed(room, 2);
 
         String id = UUID.randomUUID().toString();

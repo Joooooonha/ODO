@@ -113,6 +113,7 @@ class ChatTwoServerTest {
         RawStompClient c = RawStompClient.connect(port, user.cookie());
         clients.add(c);
         c.subscribe(ChatDestinations.roomTopic(room));
+        c.awaitSubscriptionsProcessed();
         return c;
     }
 
@@ -190,6 +191,7 @@ class ChatTwoServerTest {
         clients.add(memberOnS2);
         memberOnS2.subscribe(ChatDestinations.roomTopic(teamRoom));
         memberOnS2.subscribe(ChatDestinations.roomTopic(dm));
+        memberOnS2.awaitSubscriptionsProcessed();
         awaitRedisSubscribers(teamRoom, 1);
         awaitRedisSubscribers(dm, 1);
 

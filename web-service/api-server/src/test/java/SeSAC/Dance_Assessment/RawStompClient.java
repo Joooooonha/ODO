@@ -81,7 +81,22 @@ public final class RawStompClient implements AutoCloseable {
         client.expect("CONNECTED", Duration.ofSeconds(10));
         client.subscribe("/user/queue/acks");
         client.subscribe("/user/queue/events");
+        client.awaitSubscriptionsProcessed();
         return client;
+    }
+
+    /**
+     * 앞서 보낸 SUBSCRIBE를 서버가 다 처리할 때까지 기다린다. 메모리 브로커는 SUBSCRIBE에 RECEIPT를 주지
+     * 않는다(DISCONNECT에만 — spring-websocket 확인). 대신 같은 세션의 메시지는 하나씩 처리되고, 앞 메시지를
+     * 브로커까지 모든 처리기가 끝내야 다음이 나간다. 그래서 일부러 읽을 수 없는 SEND를 보내 그 오류 응답이
+     * 오면 앞의 구독은 등록된 것이다. 이게 없으면 느린 CI에서 연결 직후의 개인 알림(GRANTED 등)이 구독
+     * 등록 전에 나가 버려진다.
+     */
+    public void awaitSubscriptionsProcessed() throws IOException, InterruptedException {
+        sendRaw(0, "sync");
+        expect(f -> "MESSAGE".equals(f.command()) && f.destination() != null
+                && f.destination().endsWith("/queue/acks") && f.body().contains("INVALID_MESSAGE"),
+                Duration.ofSeconds(10));
     }
 
     public String subscribe(String destination) throws IOException {

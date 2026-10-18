@@ -93,6 +93,7 @@ class ChatAccessTest {
         for (long room : rooms) {
             c.subscribe(ChatDestinations.roomTopic(room));
         }
+        c.awaitSubscriptionsProcessed();
         return c;
     }
 
@@ -182,6 +183,7 @@ class ChatAccessTest {
         assertThat(granted.get("roomId").asLong()).isEqualTo(room);
 
         memberWs.subscribe(ChatDestinations.roomTopic(room));
+        memberWs.awaitSubscriptionsProcessed();
         awaitRoomSessions(room, 1);
         chat.send(leader, room, "돌아온 걸 환영");
         assertThat(memberWs.nextRoomMessage(room, WAIT).get("content").asText()).isEqualTo("돌아온 걸 환영");
@@ -203,6 +205,8 @@ class ChatAccessTest {
 
         bWs.subscribe(ChatDestinations.roomTopic(dm));
         aWs.subscribe(ChatDestinations.roomTopic(dm));   // 만든 사람: GRANTED보다 먼저 와도 DB로 확인돼 통과
+        bWs.awaitSubscriptionsProcessed();
+        aWs.awaitSubscriptionsProcessed();
         awaitRoomSessions(dm, 2);
         aWs.sendMessage(dm, UUID.randomUUID().toString(), "첫 DM", false);
         assertThat(bWs.nextRoomMessage(dm, WAIT).get("content").asText()).isEqualTo("첫 DM");

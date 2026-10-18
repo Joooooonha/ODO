@@ -5,6 +5,7 @@ import SeSAC.Dance_Assessment.Realtime.ChatRealtimeMetrics;
 import SeSAC.Dance_Assessment.Realtime.ChatReplySender;
 import SeSAC.Dance_Assessment.Service.Chat.ChatMessageService;
 import SeSAC.Dance_Assessment.Service.Chat.ChatReply;
+import SeSAC.Dance_Assessment.Service.Chat.ChatSendError;
 import SeSAC.Dance_Assessment.Service.Chat.MessageWriter;
 import SeSAC.Dance_Assessment.TestChat;
 import SeSAC.Dance_Assessment.TestTeams;
@@ -178,7 +179,8 @@ class ChatWebSocketFaultTest {
         List<String> sent = ids(2);
         failFirstAttempts(Set.of(sent.get(0)), 4);
         doAnswer(inv -> {
-            if (inv.getArgument(1) instanceof ChatReply.Error) {
+            if (inv.getArgument(1) instanceof ChatReply.Error error
+                    && error.code() == ChatSendError.SERVER_RETRY_EXHAUSTED) {
                 throw new IllegalStateException("주입: 응답 전송 실패(이미 끊긴 세션 등)");
             }
             return inv.callRealMethod();

@@ -98,6 +98,7 @@ class ChatAccessRecheckTest {
         RawStompClient memberWs = RawStompClient.connect(port, member.cookie());
         clients.add(memberWs);
         memberWs.subscribe(ChatDestinations.roomTopic(room));
+        memberWs.awaitSubscriptionsProcessed();
         long before = metrics.recheckCorrections(ControlEvent.REVOKED);
 
         long kickedAt = System.currentTimeMillis();
