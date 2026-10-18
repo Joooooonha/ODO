@@ -44,6 +44,8 @@ class RedisStartupTest {
                         "--server.port=0",
                         "--" + TestContainers.INJECT_REDIS + "=false",
                         "--ai.server.url=http://127.0.0.1:8000",
+                        "--JWT_SECRET=test-only-jwt-secret-for-prod-profile-test-0123456789",
+                        "--KAKAO_CLIENT_ID=t", "--KAKAO_CLIENT_SECRET=t", "--NAVER_CLIENT_ID=t", "--NAVER_CLIENT_SECRET=t",
                         "--storage.type=local",
                         "--REDIS_HOST=127.0.0.1",
                         "--REDIS_PORT=6379"))

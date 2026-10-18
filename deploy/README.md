@@ -258,6 +258,23 @@ SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
 > **이 파일에만 키를 둔다.** 저장소에는 절대 커밋하지 않는다
 > (`application-secret.properties`도 gitignore에 있다).
 
+### merge 전 확인: 운영 필수 값이 모두 있는지
+
+운영 프로필은 아래 값에 기본값이 없다. 하나라도 비어 있으면 앱이 뜨지 않고(`ProdSecretsCheck`) 배포가
+직전 jar로 자동 롤백된다. 특히 `JWT_SECRET`은 예전에는 빠져도 저장소에 공개된 개발용 키로 떠서 토큰 위조가
+가능했다. **main에 merge하기 전에** 확인한다. 값은 출력하지 않고 이름과 있음·없음만 보여 준다.
+
+```bash
+ssh odo 'sudo bash -s' <<'REMOTE'
+for name in JWT_SECRET KAKAO_CLIENT_ID KAKAO_CLIENT_SECRET NAVER_CLIENT_ID NAVER_CLIENT_SECRET \
+            REDIS_HOST REDIS_PORT REDIS_PASSWORD AI_SERVER_URL SPRING_DATASOURCE_URL; do
+  if grep -qE "^${name}=.+" /etc/dance-api.env; then echo "있음  ${name}"; else echo "없음  ${name}  ← 채워야 함"; fi
+done
+REMOTE
+```
+
+`없음`이 하나라도 있으면 채운 뒤 merge한다(`REDIS_*`는 3-1 스크립트가 넣는다).
+
 ---
 
 ## 4-1. 알림 (Web Push)

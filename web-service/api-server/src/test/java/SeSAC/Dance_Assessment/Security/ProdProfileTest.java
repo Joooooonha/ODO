@@ -37,7 +37,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 // - ai.server.url: 운영에서는 값이 없으면 **즉시 실패하는 편이 옳다**
 //   (맥미니 주소를 빠뜨린 채 뜨면 분석이 전부 실패한다). 그래서 기본값을 두지
 //   않았고, 대신 테스트에서만 채운다.
+// - 비밀값: 운영 프로필은 기본값이 없다(ProdSecretsCheck). 테스트용 값을 환경 변수 이름으로 채운다.
 @TestPropertySource(properties = {
+        "JWT_SECRET=test-only-jwt-secret-for-prod-profile-test-0123456789",
+        "KAKAO_CLIENT_ID=test", "KAKAO_CLIENT_SECRET=test",
+        "NAVER_CLIENT_ID=test", "NAVER_CLIENT_SECRET=test",
         "ai.server.url=http://127.0.0.1:8000",
         // 저장소도 이 테스트의 관심사가 아니다. 운영은 r2지만 자격증명이 없으면
         // 뜨지 않는 것이 맞고(빠뜨린 채 배포되면 안 되므로), 여기서는 local로 둔다.
