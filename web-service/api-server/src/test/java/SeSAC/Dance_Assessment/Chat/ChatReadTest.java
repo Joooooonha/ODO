@@ -224,6 +224,33 @@ class ChatReadTest {
     }
 
     @Test
+    @DisplayName("[회귀] 커넥션 풀(10)보다 많은 동시 읽음 보고도 막히지 않는다 — 요청 하나가 커넥션 하나만 쓴다(OSIV에서 갱신 커넥션을 쥔 채 스냅샷이 두 번째를 기다리던 문제)")
+    void concurrentReportsBeyondPoolSizeDoNotStarve() throws Exception {
+        Room r = room(24, 3);
+        long last = chat.lastSeq(r.id());
+        List<LoggedIn> readers = new ArrayList<>(r.members());
+        readers.add(r.leader());
+
+        ExecutorService pool = Executors.newFixedThreadPool(readers.size());
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<Integer>> results = new ArrayList<>();
+        for (LoggedIn reader : readers) {
+            results.add(pool.submit(() -> {
+                start.await();
+                return report(reader, r.id(), Map.of("seq", last)).andReturn().getResponse().getStatus();
+            }));
+        }
+        long started = System.nanoTime();
+        start.countDown();
+        for (Future<Integer> f : results) {
+            assertThat(f.get(60, TimeUnit.SECONDS)).isEqualTo(204);
+        }
+        long millis = Duration.ofNanos(System.nanoTime() - started).toMillis();
+        pool.shutdown();
+        assertThat(millis).as("커넥션 획득 시간 제한(30초)에 걸리지 않는다").isLessThan(10_000);
+    }
+
+    @Test
     @DisplayName("[9.1] last_seq보다 큰 seq → 400, seq 없음·음수 → 400, 멤버 아님(방 없음 포함) → 403, 나간 멤버 → 403")
     void validation() throws Exception {
         Room r = room(1, 2);
