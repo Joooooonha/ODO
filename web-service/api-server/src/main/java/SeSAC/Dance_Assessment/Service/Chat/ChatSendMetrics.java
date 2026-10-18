@@ -1,76 +1,102 @@
 package SeSAC.Dance_Assessment.Service.Chat;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * 메시지 저장 지표(10절). 서버 메모리에만 있고 재시작하면 0부터 다시 센다 — 판단 근거용이지
- * 정확성에 쓰지 않는다.
+ * 메시지 저장 지표(10절, 4.5 측정 준비). Micrometer에 기록한다 — 서버 메모리에만 있고 재시작하면
+ * 0부터 다시 센다. 판단 근거용이지 정확성에 쓰지 않는다.
  *
  * <ul>
- *   <li>재시도 횟수(원인별: SQLState 또는 예외 이름). 교착({@code 40P01})은 잠금 순서를 지키면 0이어야 한다</li>
- *   <li>재시도 소진, 분류되지 않은 예외, 중복 메시지(재전송 빈도), 입력 오류(길이 초과 포함)</li>
+ *   <li>{@code chat.send.duration{outcome}} — 한 메시지의 저장 처리 시간(재시도·대기 포함)</li>
+ *   <li>{@code chat.send.retries{cause}} — 재시도 횟수(원인: SQLState 또는 예외 이름).
+ *       교착({@code 40P01})은 잠금 순서를 지키면 0이어야 한다</li>
+ *   <li>{@code chat.send.exhausted}, {@code chat.send.unclassified}, {@code chat.send.duplicates},
+ *       {@code chat.send.invalid}</li>
  * </ul>
  */
 @Component
 public class ChatSendMetrics {
 
-    private final Map<String, AtomicLong> retriesByCause = new ConcurrentHashMap<>();
-    private final AtomicLong exhausted = new AtomicLong();
-    private final AtomicLong unclassified = new AtomicLong();
-    private final AtomicLong duplicates = new AtomicLong();
-    private final AtomicLong invalid = new AtomicLong();
+    private final MeterRegistry registry;
+
+    @Autowired
+    public ChatSendMetrics(MeterRegistry registry) {
+        this.registry = registry;
+    }
+
+    /** 단위 테스트용. */
+    ChatSendMetrics() {
+        this(new SimpleMeterRegistry());
+    }
 
     void retried(Throwable cause) {
-        retriesByCause.computeIfAbsent(causeKey(cause), k -> new AtomicLong()).incrementAndGet();
+        registry.counter("chat.send.retries", "cause", causeKey(cause)).increment();
     }
 
     void exhausted() {
-        exhausted.incrementAndGet();
+        registry.counter("chat.send.exhausted").increment();
     }
 
     void unclassified() {
-        unclassified.incrementAndGet();
+        registry.counter("chat.send.unclassified").increment();
     }
 
     void duplicate() {
-        duplicates.incrementAndGet();
+        registry.counter("chat.send.duplicates").increment();
     }
 
     void invalid() {
-        invalid.incrementAndGet();
+        registry.counter("chat.send.invalid").increment();
+    }
+
+    void recordDuration(SendOutcome outcome, Duration elapsed) {
+        Timer.builder("chat.send.duration")
+                .tag("outcome", outcome.getClass().getSimpleName())
+                .register(registry)
+                .record(elapsed);
     }
 
     public long retries(String cause) {
-        AtomicLong n = retriesByCause.get(cause);
-        return n == null ? 0 : n.get();
+        Counter c = registry.find("chat.send.retries").tag("cause", cause).counter();
+        return c == null ? 0 : (long) c.count();
     }
 
     public Map<String, Long> retriesByCause() {
-        Map<String, Long> copy = new TreeMap<>();
-        retriesByCause.forEach((k, v) -> copy.put(k, v.get()));
-        return copy;
+        Map<String, Long> out = new TreeMap<>();
+        registry.find("chat.send.retries").counters()
+                .forEach(c -> out.put(c.getId().getTag("cause"), (long) c.count()));
+        return out;
     }
 
     public long exhaustedCount() {
-        return exhausted.get();
+        return count("chat.send.exhausted");
     }
 
     public long unclassifiedCount() {
-        return unclassified.get();
+        return count("chat.send.unclassified");
     }
 
     public long duplicateCount() {
-        return duplicates.get();
+        return count("chat.send.duplicates");
     }
 
     public long invalidCount() {
-        return invalid.get();
+        return count("chat.send.invalid");
+    }
+
+    private long count(String name) {
+        Counter c = registry.find(name).counter();
+        return c == null ? 0 : (long) c.count();
     }
 
     /** 원인 사슬에서 SQLState를 찾으면 그것을, 없으면 가장 바깥 예외 이름을 쓴다. */

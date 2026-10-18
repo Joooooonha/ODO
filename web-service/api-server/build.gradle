@@ -43,6 +43,14 @@ dependencies {
 
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
+	// 채팅 실시간 전달. STOMP over WebSocket(서버 메모리 브로커) + 서버 간 전달은 Redis Pub/Sub.
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+	// 지표(Micrometer). HTTP로는 아무것도 노출하지 않는다(management 엔드포인트 전부 끔).
+	// 커넥션 풀·실행기 지표가 자동으로 붙고, 채팅 지표와 함께 주기적으로 로그에 요약한다.
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
 	// 인증. 지금까지는 X-User-Id 헤더 하나로 사용자를 판별해서,
 	// 헤더 값만 바꾸면 남의 계정이 되는 상태였다.
 	implementation 'org.springframework.boot:spring-boot-starter-security'

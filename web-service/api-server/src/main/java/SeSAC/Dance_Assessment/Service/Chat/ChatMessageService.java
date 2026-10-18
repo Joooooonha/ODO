@@ -61,6 +61,12 @@ public class ChatMessageService {
 
     private SendOutcome withRetry(long roomId, UUID clientMessageId, Supplier<SavedMessage> attempt) {
         long startedAt = System.nanoTime();
+        SendOutcome outcome = attempts(roomId, clientMessageId, attempt, startedAt);
+        metrics.recordDuration(outcome, Duration.ofNanos(System.nanoTime() - startedAt));
+        return outcome;
+    }
+
+    private SendOutcome attempts(long roomId, UUID clientMessageId, Supplier<SavedMessage> attempt, long startedAt) {
         Throwable lastFailure = null;
         int attempts = 0;
 
