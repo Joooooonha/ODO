@@ -1,0 +1,217 @@
+import http from 'node:http';
+import { WebSocketServer } from 'ws';
+import { buildTopology } from './topology.mjs';
+import { createHistogram, recordNs, summarize } from './hist.mjs';
+
+/**
+ * 측정기를 먼저 측정하기 위한 가짜 서버(Task-chat-read 9.3, 단계 1 E1). 사용:
+ *   node src/fake-server.mjs --port 18080 --delay fixed:50 --topology '{"rooms":1,"members":20}'
+ *
+ * 실제 서버와 같은 목적지·응답 모양을 흉내 내되, 처리 대신 **정해 둔 지연**만 넣는다:
+ * - SEND /app/rooms/{id}/messages → d 뒤에 보낸 세션에 ACK, 방 구독자 전원에게 MESSAGE
+ * - POST /api/chat/rooms/{id}/read → 바로 204, d 뒤에 방 구독자 전원에게 READ
+ * - SEND /app/sync → 바로 SYNC / GET /rooms·messages·read-state → 바로 응답
+ * 지연 d: `fixed:50`(ms) / `uniform:20:80` / `fixed:0`.
+ *
+ * 넣은 지연과 타이머가 실제로 늦은 정도를 함께 기록한다(GET /fake/stats). 생성기가 잰 값 − 이 값 = 생성기 오차.
+ */
+const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) => {
+  if (a.startsWith('--')) acc.push([a.slice(2), all[i + 1]]);
+  return acc;
+}, []));
+const port = Number(args.port ?? 18080);
+const delaySpec = (args.delay ?? 'fixed:0').split(':');
+const topo = buildTopology(JSON.parse(args.topology ?? '{"rooms":1,"members":20}'));
+
+const sampleDelayMs = () => {
+  if (delaySpec[0] === 'uniform') {
+    const lo = Number(delaySpec[1]);
+    const hi = Number(delaySpec[2]);
+    return lo + Math.random() * (hi - lo);
+  }
+  return Number(delaySpec[1] ?? 0);
+};
+
+// 방 상태
+const rooms = new Map();   // roomId → { lastSeq, positions: Map(userId → seq), version, subscribers: Set(conn) }
+const room = (id) => {
+  let r = rooms.get(id);
+  if (!r) {
+    r = { lastSeq: 0, positions: new Map(), version: 0, subscribers: new Set() };
+    rooms.set(id, r);
+  }
+  return r;
+};
+for (const t of topo.teams) t.members.forEach((u) => room(t.roomId).positions.set(topo.userId(u), 0));
+for (const dm of topo.dms) [dm.a, dm.b].forEach((u) => room(dm.roomId).positions.set(topo.userId(u), 0));
+
+// 기록: 넣은 지연, 타이머가 예정보다 늦은 정도(넣은 지연 + 늦음 = 서버 쪽에서 실제로 걸린 시간)
+let stats;
+const resetStats = () => {
+  stats = { injected: createHistogram(), timerLate: createHistogram(), sent: 0, readBroadcasts: 0, framesOut: 0 };
+};
+resetStats();
+
+const later = (fn) => {
+  const d = sampleDelayMs();
+  const due = process.hrtime.bigint() + BigInt(Math.round(d * 1e6));
+  recordNs(stats.injected, BigInt(Math.round(d * 1e6)));
+  setTimeout(() => {
+    recordNs(stats.timerLate, process.hrtime.bigint() - due);
+    fn();
+  }, d);
+};
+
+const userOf = (cookie) => {
+  const token = /access_token=([^;]+)/.exec(cookie ?? '')?.[1];
+  if (!token) return null;
+  return Number(JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString()).sub);
+};
+
+const ranges = (positions) => {
+  const sorted = [...positions.values()].sort((a, b) => a - b);
+  const out = [];
+  let i = 0;
+  while (i < sorted.length) {
+    const p = sorted[i];
+    out.push({ toSeq: p, unread: i });
+    while (i < sorted.length && sorted[i] === p) i++;
+  }
+  out.push({ toSeq: null, unread: sorted.length });
+  return out;
+};
+const snapshot = (roomId, r) => ({
+  version: ++r.version,
+  positions: [...r.positions].map(([userId, lastReadSeq]) => ({ userId, lastReadSeq })),
+  ranges: ranges(r.positions),
+  roomId,
+});
+
+// ===== STOMP =====
+
+const frame = (command, headers, body = '') =>
+  `${command}\n${Object.entries(headers).map(([k, v]) => `${k}:${v}`).join('\n')}\n\n${body}\0`;
+
+function deliver(conn, destination, payload) {
+  const subId = conn.subs.get(destination);
+  if (subId == null || conn.ws.readyState !== 1) return;
+  stats.framesOut += 1;
+  conn.ws.send(frame('MESSAGE', {
+    destination, 'subscription': subId, 'message-id': String(++conn.messageIds), 'content-type': 'application/json',
+  }, JSON.stringify(payload)));
+}
+
+function broadcast(roomId, payload) {
+  const dest = `/topic/rooms.${roomId}`;
+  for (const conn of room(roomId).subscribers) deliver(conn, dest, payload);
+}
+
+function onFrame(conn, raw) {
+  const text = raw.replace(/^[\r\n]+/, '');
+  if (!text) return;
+  const end = text.indexOf('\n\n');
+  const lines = text.slice(0, end < 0 ? text.length : end).split('\n');
+  const body = end < 0 ? '' : text.slice(end + 2);
+  const command = lines[0].trim();
+  const headers = {};
+  for (const l of lines.slice(1)) {
+    const c = l.indexOf(':');
+    if (c > 0 && !(l.slice(0, c) in headers)) headers[l.slice(0, c)] = l.slice(c + 1);
+  }
+  if (command === 'CONNECT' || command === 'STOMP') {
+    conn.ws.send(frame('CONNECTED', { version: '1.2', 'heart-beat': '0,0' }));
+  } else if (command === 'SUBSCRIBE') {
+    conn.subs.set(headers.destination, headers.id);
+    const m = /^\/topic\/rooms\.(\d+)$/.exec(headers.destination);
+    if (m) room(Number(m[1])).subscribers.add(conn);
+  } else if (command === 'SEND' && headers.destination === '/app/sync') {
+    deliver(conn, '/user/queue/acks', { type: 'SYNC' });
+  } else if (command === 'SEND') {
+    const m = /^\/app\/rooms\/(\d+)\/messages$/.exec(headers.destination);
+    if (!m) return;
+    const roomId = Number(m[1]);
+    const msg = JSON.parse(body);
+    later(() => {
+      const r = room(roomId);
+      const seq = ++r.lastSeq;
+      const createdAt = new Date().toISOString();
+      stats.sent += 1;
+      deliver(conn, '/user/queue/acks', { type: 'ACK', clientMessageId: msg.clientMessageId, roomId, seq, createdAt, duplicate: false });
+      broadcast(roomId, {
+        roomId, seq, messageId: seq, senderId: conn.userId, senderNickname: 'lt', type: 'TEXT',
+        content: msg.content, createdAt, clientMessageId: msg.clientMessageId, targetNickname: null,
+      });
+    });
+  } else if (command === 'DISCONNECT') {
+    conn.ws.close();
+  }
+}
+
+// ===== HTTP =====
+
+const server = http.createServer((req, res) => {
+  const url = new URL(req.url, 'http://x');
+  const send = (status, payload) => {
+    res.writeHead(status, payload == null ? {} : { 'Content-Type': 'application/json' });
+    res.end(payload == null ? undefined : JSON.stringify(payload));
+  };
+  let body = '';
+  req.on('data', (c) => (body += c));
+  req.on('end', () => {
+    if (url.pathname === '/fake/stats') {
+      return send(200, { injected: summarize(stats.injected), timerLate: summarize(stats.timerLate), sent: stats.sent, readBroadcasts: stats.readBroadcasts, framesOut: stats.framesOut });
+    }
+    if (url.pathname === '/fake/reset') {
+      resetStats();
+      return send(204);
+    }
+    const userId = userOf(req.headers.cookie);
+    if (userId == null) return send(401, { code: 'UNAUTHORIZED' });
+    if (url.pathname === '/api/chat/rooms') {
+      const u = userId - topo.userId(0);
+      return send(200, (topo.userRooms[u] ?? []).map((roomId) => ({ roomId, type: 'TEAM', displayName: 'lt', lastSeq: room(roomId).lastSeq, lastMessage: null, myReadSeq: 0, unread: 0, empty: false })));
+    }
+    let m = /^\/api\/chat\/rooms\/(\d+)\/messages$/.exec(url.pathname);
+    if (m) return send(200, { roomId: Number(m[1]), lastSeq: room(Number(m[1])).lastSeq, messages: [] });
+    m = /^\/api\/chat\/rooms\/(\d+)\/read-state$/.exec(url.pathname);
+    if (m) {
+      const r = room(Number(m[1]));
+      return send(200, { ...snapshot(Number(m[1]), r), version: r.version });
+    }
+    m = /^\/api\/chat\/rooms\/(\d+)\/read$/.exec(url.pathname);
+    if (m && req.method === 'POST') {
+      const roomId = Number(m[1]);
+      const { seq } = JSON.parse(body || '{}');
+      send(204);
+      later(() => {
+        const r = room(roomId);
+        if ((r.positions.get(userId) ?? 0) >= seq) return;
+        r.positions.set(userId, seq);
+        stats.readBroadcasts += 1;
+        broadcast(roomId, { type: 'READ', ...snapshot(roomId, r) });
+      });
+      return undefined;
+    }
+    return send(404, { code: 'NOT_FOUND' });
+  });
+});
+
+const wss = new WebSocketServer({ noServer: true });
+server.on('upgrade', (req, socket, head) => {
+  if (!req.url.startsWith('/api/ws')) return socket.destroy();
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    const conn = { ws, userId: userOf(req.headers.cookie), subs: new Map(), messageIds: 0, buffer: '' };
+    ws.on('message', (data) => {
+      conn.buffer += data.toString();
+      let nul;
+      while ((nul = conn.buffer.indexOf('\0')) >= 0) {
+        const raw = conn.buffer.slice(0, nul);
+        conn.buffer = conn.buffer.slice(nul + 1);
+        onFrame(conn, raw);
+      }
+    });
+    ws.on('close', () => rooms.forEach((r) => r.subscribers.delete(conn)));
+  });
+});
+
+server.listen(port, () => console.log(`[가짜 서버] :${port} 지연=${delaySpec.join(':')} 방=${topo.rooms} 세션=${topo.userCount}`));

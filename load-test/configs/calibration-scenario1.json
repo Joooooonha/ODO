@@ -1,0 +1,66 @@
+{
+  "note": "시나리오 1(방 하나 = 한 프로세스)의 생성기 한계",
+  "errorLimitMs": 5,
+  "defaults": {
+    "topology": {
+      "rooms": 1,
+      "members": 20,
+      "teamsPerUser": 1,
+      "dmPairsPerRoom": 0,
+      "watchersPerRoom": 20,
+      "activeRoomRatio": 1
+    },
+    "workers": 1,
+    "connectRatePerSec": 200,
+    "rateMode": "perRoom",
+    "senders": "watchers",
+    "warmupSec": 5,
+    "measureSec": 20,
+    "contentLength": 40,
+    "loopDelayLimitMs": 5
+  },
+  "cases": [
+    {
+      "name": "시나리오1 20:0 r=10",
+      "delay": "fixed:50",
+      "r": 10
+    },
+    {
+      "name": "시나리오1 20:0 r=15",
+      "delay": "fixed:50",
+      "r": 15
+    },
+    {
+      "name": "시나리오1 10:10 r=20",
+      "delay": "fixed:50",
+      "r": 20,
+      "topology": {
+        "watchersPerRoom": 10
+      }
+    },
+    {
+      "name": "시나리오1 10:10 r=40",
+      "delay": "fixed:50",
+      "r": 40,
+      "topology": {
+        "watchersPerRoom": 10
+      }
+    },
+    {
+      "name": "시나리오1 1:19 r=50",
+      "delay": "fixed:50",
+      "r": 50,
+      "topology": {
+        "watchersPerRoom": 1
+      }
+    },
+    {
+      "name": "시나리오1 1:19 r=100",
+      "delay": "fixed:50",
+      "r": 100,
+      "topology": {
+        "watchersPerRoom": 1
+      }
+    }
+  ]
+}

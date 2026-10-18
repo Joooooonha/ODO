@@ -1,0 +1,4 @@
+node_modules/
+# 원본(지연 기록·단계별 원시 수치)은 커밋하지 않는다. 요약·캡처·환경 기록만 results/에 문서로 커밋한다
+results/raw/
+*.env

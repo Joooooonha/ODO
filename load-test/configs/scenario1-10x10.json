@@ -1,0 +1,37 @@
+{
+  "note": "8절 3번: 시나리오 1 × 10:10(절반) 낭비의 크기",
+  "rateMode": "perRoom",
+  "senders": "watchers",
+  "dmRatePerSec": 1,
+  "connectRatePerSec": 100,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "loopDelayLimitMs": 5,
+  "workers": 1,
+  "topology": {
+    "rooms": 1,
+    "members": 20,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 5,
+    "watchersPerRoom": 10,
+    "activeRoomRatio": 1
+  },
+  "stages": [
+    {
+      "r": 1
+    },
+    {
+      "r": 2
+    },
+    {
+      "r": 5
+    },
+    {
+      "r": 10
+    },
+    {
+      "r": 20
+    }
+  ]
+}

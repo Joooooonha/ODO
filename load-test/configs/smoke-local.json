@@ -1,0 +1,15 @@
+{
+  "note": "로컬 실제 서버(dev bootRun) 연기 확인 — 측정이 아니다",
+  "target": { "httpUrl": "http://localhost:8080", "wsUrl": "ws://localhost:8080/api/ws", "origin": "http://localhost:5173" },
+  "topology": { "rooms": 2, "members": 20, "teamsPerUser": 1, "dmPairsPerRoom": 1, "watchersPerRoom": 10, "activeRoomRatio": 1 },
+  "workers": 2,
+  "connectRatePerSec": 50,
+  "rateMode": "perRoom",
+  "senders": "watchers",
+  "dmRatePerSec": 1,
+  "stages": [{ "r": 2 }],
+  "warmupSec": 3,
+  "measureSec": 10,
+  "contentLength": 40,
+  "loopDelayLimitMs": 5
+}

@@ -1,0 +1,14 @@
+{
+  "note": "가짜 서버 상대 연기 확인",
+  "target": { "httpUrl": "http://127.0.0.1:18080", "wsUrl": "ws://127.0.0.1:18080/api/ws", "origin": "http://localhost:5173" },
+  "topology": { "rooms": 1, "members": 20, "teamsPerUser": 1, "dmPairsPerRoom": 0, "watchersPerRoom": 20, "activeRoomRatio": 1 },
+  "workers": 2,
+  "connectRatePerSec": 100,
+  "rateMode": "perRoom",
+  "senders": "watchers",
+  "stages": [{ "r": 5 }],
+  "warmupSec": 3,
+  "measureSec": 5,
+  "contentLength": 40,
+  "loopDelayLimitMs": 5
+}

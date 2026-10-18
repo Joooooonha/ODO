@@ -1,0 +1,25 @@
+{
+  "note": "8절 0번 보정: 세션 500개를 붙이고 메시지 없이 2분 유지 → 서버별 메모리·힙(Prometheus·docker stats)",
+  "rateMode": "perRoom",
+  "senders": "watchers",
+  "dmRatePerSec": 0,
+  "connectRatePerSec": 100,
+  "warmupSec": 10,
+  "measureSec": 120,
+  "contentLength": 40,
+  "loopDelayLimitMs": 5,
+  "workers": 1,
+  "topology": {
+    "rooms": 25,
+    "members": 20,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 0,
+    "watchersPerRoom": 0,
+    "activeRoomRatio": 1
+  },
+  "stages": [
+    {
+      "r": 0
+    }
+  ]
+}
