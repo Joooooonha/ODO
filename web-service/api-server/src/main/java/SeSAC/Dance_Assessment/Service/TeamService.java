@@ -43,7 +43,8 @@ import java.util.stream.Collectors;
  * <p><b>팀 채팅방은 같은 트랜잭션에서 따라간다.</b> 팀 생성 = 팀 + 팀 채팅방 + 팀장의 채팅 멤버,
  * 참여·재활성화·나가기·추방 = 채팅 멤버 상태 변경({@link ChatRoomService}). 채팅방 생성이 실패하면
  * 팀 생성도 실패한다. 잠금은 {@code team_member} 행을 먼저, 그다음 채팅방 행을 잡는다.
- * 입장·나가기·추방 안내 메시지는 팀 트랜잭션이 커밋된 <b>뒤에</b> 따로 저장한다({@link TeamChatEvent}).
+ * 커밋된 <b>뒤에</b> 제어 이벤트(REVOKED·GRANTED — 다른 서버에 붙은 세션까지 그 방만 실시간 차단·허용)를
+ * 발행하고 입장·나가기·추방 안내 메시지를 따로 저장한다({@link TeamChatEvent}).
  */
 @Service
 @RequiredArgsConstructor
@@ -168,7 +169,6 @@ public class TeamService {
         me.leave();
         Long roomId = chatRoomService.leaveTeamRoom(teamId, userId, ChatMemberStatus.LEFT);
         events.publishEvent(TeamChatEvent.of(roomId, userId, TeamChatEvent.Kind.LEAVE));
-        // TODO(chat): 다른 서버에 붙은 세션까지 그 방만 실시간 차단(REVOKED) — 권한·차단 단계(2-3)
     }
 
     /** 팀장만 추방할 수 있다. 팀장 자신은 추방할 수 없다. */
@@ -188,7 +188,6 @@ public class TeamService {
         target.kick();
         Long roomId = chatRoomService.leaveTeamRoom(teamId, targetUserId, ChatMemberStatus.KICKED);
         events.publishEvent(TeamChatEvent.of(roomId, targetUserId, TeamChatEvent.Kind.KICK));
-        // TODO(chat): 다른 서버에 붙은 세션까지 그 방만 실시간 차단(REVOKED) — 권한·차단 단계(2-3)
     }
 
     // ===== 권한 =====

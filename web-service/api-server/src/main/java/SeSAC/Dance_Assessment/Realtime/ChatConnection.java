@@ -4,10 +4,13 @@ import SeSAC.Dance_Assessment.Service.Chat.ChatSendSession;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -19,9 +22,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 그리고 연결 종료 메시지에도 그대로 넣는다). 그래서 연결이 끊긴 뒤 대기열에서 나오는 메시지도
  * 이 객체의 {@code closed}를 본다.
  *
- * <p>구독 표({@code subscriptionId → roomId})와 {@code closed}는 이 객체의 잠금 아래에서 함께
- * 바꾼다 — 끊긴 뒤 대기열에서 늦게 나온 SUBSCRIBE가 정리 뒤에 방 구독을 되살리지 못하게 한다.
+ * <p>구독 표({@code subscriptionId → roomId}), {@code closed}, 허용 방 캐시에서의 제거(REVOKED)는 이
+ * 객체의 잠금 아래에서 함께 바꾼다 — 끊긴 뒤 대기열에서 늦게 나온 SUBSCRIBE가 정리 뒤에 방 구독을
+ * 되살리지 못하고, 차단과 구독이 엇갈려 차단된 방의 구독이 남지 않게 한다.
  * 잠금 순서: 이 객체 → 방({@link RoomSubscriptions}).
+ *
+ * <p><b>허용 방 캐시</b>(6.1): CONNECT 때 DB의 ACTIVE 방 목록으로 채우고, 제어 이벤트(GRANTED/REVOKED)와
+ * 5초 재확인으로 고친다. 나가는 방 메시지는 이 캐시로 마지막에 걸러진다. 원본은 DB다 — 저장은 늘 DB로
+ * 판단하고, 이 캐시는 전달을 빠르게 막기 위한 것이다.
  */
 public class ChatConnection {
 
@@ -37,6 +45,7 @@ public class ChatConnection {
     private final ConcurrentLinkedQueue<Long> arrivals = new ConcurrentLinkedQueue<>();
 
     private final Map<String, Long> subscriptions = new HashMap<>();
+    private final Set<Long> allowedRooms = ConcurrentHashMap.newKeySet();
 
     private volatile String sessionId;
     private volatile WebSocketSession webSocket;
@@ -99,11 +108,52 @@ public class ChatConnection {
         return pendingSends.get();
     }
 
+    // ===== 허용 방 캐시 =====
+
+    /** CONNECT 때 DB에서 읽은 ACTIVE 방. 그사이 들어온 GRANTED를 지우지 않게 합친다. */
+    void loadAllowedRooms(Collection<Long> roomIds) {
+        allowedRooms.addAll(roomIds);
+    }
+
+    public boolean isAllowed(long roomId) {
+        return allowedRooms.contains(roomId);
+    }
+
+    /** @return 새로 허용됐으면 true */
+    boolean allow(long roomId) {
+        return allowedRooms.add(roomId);
+    }
+
+    public Set<Long> allowedRooms() {
+        return Set.copyOf(allowedRooms);
+    }
+
+    /**
+     * 그 방의 접근을 끊는다(6.3). <b>허용 방 캐시에서 먼저 뺀다</b> — 이 순간부터 나가는 메시지 검사가
+     * 막는다. 그다음 이 연결의 그 방 구독을 표와 방 구독표에서 뺀다.
+     *
+     * @return 브로커에서도 지워야 할 구독 id들. 캐시에 그 방이 없었으면 null(이미 막혀 있었다)
+     */
+    synchronized List<String> revoke(long roomId, RoomSubscriptions rooms) {
+        if (!allowedRooms.remove(roomId)) {
+            return null;
+        }
+        List<String> removed = subscriptions.entrySet().stream()
+                .filter(e -> e.getValue() == roomId)
+                .map(Map.Entry::getKey)
+                .toList();
+        removed.forEach(subscriptions::remove);
+        if (!removed.isEmpty()) {
+            rooms.leave(roomId, sessionId);
+        }
+        return removed;
+    }
+
     // ===== 구독 표 (이 객체의 잠금 아래에서만) =====
 
-    /** @return 이미 끊긴 연결이면 false(구독하지 않는다) */
+    /** @return 이미 끊긴 연결이거나 그사이 차단된 방이면 false(구독하지 않는다) */
     synchronized boolean addSubscription(String subscriptionId, long roomId, RoomSubscriptions rooms) {
-        if (isClosed()) {
+        if (isClosed() || !allowedRooms.contains(roomId)) {
             return false;
         }
         Long previous = subscriptions.put(subscriptionId, roomId);

@@ -14,6 +14,7 @@ import SeSAC.Dance_Assessment.Infrastructure.ChatRoomMemberRepository;
 import SeSAC.Dance_Assessment.Infrastructure.ChatRoomRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,7 @@ public class ChatRoomService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final ChatQueries chatQueries;
+    private final ApplicationEventPublisher events;
 
     // ===== 팀 연결 (TeamService의 트랜잭션 안에서 호출) =====
 
@@ -144,7 +146,8 @@ public class ChatRoomService {
         }
         chatQueries.insertDmMember(created.get(), low);
         chatQueries.insertDmMember(created.get(), high);
-        // 상대의 접속 세션에 새 방을 알리는 GRANTED는 권한·차단 단계(2-3)에서 붙인다.
+        // 커밋 뒤 두 사람의 접속 세션에 GRANTED → 상대가 재연결 없이 새 방을 구독한다(DmOpenedListener)
+        events.publishEvent(new DmOpenedEvent(created.get(), low, high));
         return new DmOpenResponse(created.get(), true);
     }
 

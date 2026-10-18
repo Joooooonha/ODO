@@ -23,15 +23,18 @@ import java.util.OptionalLong;
  *       버리고 대기열의 다음으로 넘어간다. 단 DISCONNECT는 통과시킨다 — Spring이 연결 종료 때 직접
  *       넣는 메시지라 막으면 브로커가 구독을 치우지 못한다</li>
  *   <li>SEND: 대기열 수를 하나 빼고 대기 시간을 기록한다(4.4). 목적지 형식이 다르면 버린다</li>
- *   <li>SUBSCRIBE: 목적지가 {@code /topic/rooms.{id}}면 ACTIVE 멤버인지 확인하고, 통과한 <b>직후</b>
- *       방 구독표를 갱신한다(P1 — Spring의 구독 이벤트는 대기열에 넣는 순간, 권한 확인 전에 발행된다).
- *       거부하면 버리고 그 세션에 REVOKED를 보낸다(P2 — 순서 보존 모드에서는 여기서 던진 예외가
- *       클라이언트에 전달되지 않는다). 개인 목적지 두 개 외의 다른 목적지는 버린다</li>
+ *   <li>CONNECT: DB에서 그 사용자의 ACTIVE 방 목록을 한 번 읽어 허용 방 캐시를 채운다(6.1)</li>
+ *   <li>SUBSCRIBE: 목적지가 {@code /topic/rooms.{id}}면 허용 방 캐시를 본다. <b>캐시에 없으면 DB로 한 번
+ *       더 확인</b>하고, 멤버면 캐시에 넣는다 — 방금 만든 DM이나 막 참여한 팀처럼 GRANTED 이벤트보다
+ *       구독이 먼저 도착하는 경우다. 통과한 <b>직후</b> 방 구독표를 갱신한다(P1 — Spring의 구독 이벤트는
+ *       대기열에 넣는 순간, 권한 확인 전에 발행된다). 거부하면 버리고 그 세션에 REVOKED를 보낸다(P2 —
+ *       순서 보존 모드에서는 여기서 던진 예외가 클라이언트에 전달되지 않는다). 개인 목적지 두 개 외의
+ *       다른 목적지는 버린다</li>
  *   <li>UNSUBSCRIBE: 구독 id로 방을 찾아 표에서 뺀다</li>
  * </ul>
  *
- * <p>구독 권한은 지금 DB로 바로 확인한다. 허용 방 캐시·제어 이벤트·5초 재확인은 권한·차단
- * 단계(2-3)에서 이 자리를 바꾼다.
+ * <p>캐시에 남아 있는 차단된 방(이벤트가 아직 안 온 경우)은 구독이 통과할 수 있다. 제어 이벤트(ms)나 5초
+ * 재확인이 오면 구독까지 걷어 내고, 그 전이라도 저장은 DB로 막힌다.
  */
 @Slf4j
 @Component
@@ -75,6 +78,13 @@ public class ChatInboundInterceptor implements ChannelInterceptor {
                 }
                 yield message;
             }
+            case CONNECT, STOMP -> {
+                if (connection.isClosed()) {
+                    yield null;
+                }
+                connection.loadAllowedRooms(members.findActiveRoomIds(connection.userId()));
+                yield message;
+            }
             default -> connection.isClosed() ? null : message;
         };
     }
@@ -106,10 +116,8 @@ public class ChatInboundInterceptor implements ChannelInterceptor {
             return null;
         }
         long roomId = room.getAsLong();
-        boolean member = members.findByRoomIdAndUserId(roomId, connection.userId())
-                .filter(m -> m.getStatus() == ChatMemberStatus.ACTIVE)
-                .isPresent();
-        if (!member) {
+        boolean allowed = connection.isAllowed(roomId) || allowFromDatabase(connection, roomId);
+        if (!allowed) {
             log.warn("[STOMP 구독 거부] 멤버 아님 roomId={} userId={}", roomId, connection.userId());
             metrics.subscribeDenied();
             replySender.revoked(connection, roomId);
@@ -119,6 +127,16 @@ public class ChatInboundInterceptor implements ChannelInterceptor {
             return null;   // 그사이 끊겼다
         }
         return message;
+    }
+
+    private boolean allowFromDatabase(ChatConnection connection, long roomId) {
+        boolean member = members.findByRoomIdAndUserId(roomId, connection.userId())
+                .filter(m -> m.getStatus() == ChatMemberStatus.ACTIVE)
+                .isPresent();
+        if (member) {
+            connection.allow(roomId);
+        }
+        return member;
     }
 
     @SuppressWarnings("unchecked")

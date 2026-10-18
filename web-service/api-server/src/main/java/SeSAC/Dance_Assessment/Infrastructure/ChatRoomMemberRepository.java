@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -16,6 +17,11 @@ import java.util.Optional;
 public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, Long> {
 
     Optional<ChatRoomMember> findByRoomIdAndUserId(Long roomId, Long userId);
+
+    /** 이 사용자가 ACTIVE인 방들. 웹소켓 CONNECT 때 허용 방 캐시를 채운다. */
+    @Query("select m.roomId from ChatRoomMember m where m.userId = :userId"
+            + " and m.status = SeSAC.Dance_Assessment.Domain.ChatMemberStatus.ACTIVE")
+    List<Long> findActiveRoomIds(@Param("userId") Long userId);
 
     /**
      * 팀 참여(신규)와 재활성화를 한 문장으로. 행이 없으면 만들고, 있으면 다시 ACTIVE로 만든다.

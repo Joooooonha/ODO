@@ -1,6 +1,5 @@
 package SeSAC.Dance_Assessment.Config;
 
-import SeSAC.Dance_Assessment.Realtime.ChatDestinations;
 import io.lettuce.core.ClientOptions;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.SmartInitializingSingleton;
@@ -10,7 +9,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
@@ -50,11 +48,8 @@ public class RedisConfig {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
         container.setTaskExecutor(dispatcher);
-        // 제어 채널은 켜질 때부터 구독한다(모든 서버). 처리는 권한·차단 단계(2-3)에서 붙는다.
-        // 덕분에 컨테이너가 처음부터 듣는 상태라, 방 채널 구독은 늘 "듣는 중에 채널 추가" 경로를 탄다.
-        container.addMessageListener((message, pattern) ->
-                        log.debug("[제어 채널] {}", new String(message.getBody())),
-                new ChannelTopic(ChatDestinations.CONTROL_CHANNEL));
+        // 제어 채널은 ControlChannelListener가 켜질 때 등록한다(모든 서버). 덕분에 컨테이너가 처음부터
+        // 듣는 상태라, 방 채널 구독은 늘 "듣는 중에 채널 추가" 경로를 탄다.
         return container;
     }
 

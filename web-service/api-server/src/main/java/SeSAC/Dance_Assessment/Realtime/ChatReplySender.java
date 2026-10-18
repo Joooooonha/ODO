@@ -42,6 +42,11 @@ public class ChatReplySender {
         toSession(connection, ChatDestinations.EVENTS, ChatFrames.Access.revoked(roomId));
     }
 
+    /** 새 방이 생겼다(참여·DM). 브라우저는 그 방을 구독하고 방 목록을 다시 읽는다. */
+    public void granted(ChatConnection connection, long roomId) {
+        toSession(connection, ChatDestinations.EVENTS, ChatFrames.Access.granted(roomId));
+    }
+
     private void toSession(ChatConnection connection, String destination, Object payload) {
         SimpMessageHeaderAccessor headers = SimpMessageHeaderAccessor.create(SimpMessageType.MESSAGE);
         headers.setSessionId(connection.sessionId());
