@@ -178,6 +178,36 @@ class ChatTwoServerTest {
         chat.assertContiguous(room);
     }
 
+    @Test
+    @DisplayName("[11.5] S1에서 추방 → S2에 붙은 그 사람이 그 방 메시지를 더 받지 않고(다른 방은 계속), 웹소켓은 유지되며 REVOKED 알림을 받는다")
+    void kickOnS1RevokesOnS2() throws Exception {
+        LoggedIn leader = users.create("팀장");
+        LoggedIn member = users.create("팀원");
+        Long teamId = teams.teamOf(leader, member);
+        long teamRoom = chat.teamRoomId(leader, teamId);
+        long dm = chat.openDm(leader, member);
+        RawStompClient memberOnS2 = RawStompClient.connect(port2, member.cookie());
+        clients.add(memberOnS2);
+        memberOnS2.subscribe(ChatDestinations.roomTopic(teamRoom));
+        memberOnS2.subscribe(ChatDestinations.roomTopic(dm));
+        awaitRedisSubscribers(teamRoom, 1);
+        awaitRedisSubscribers(dm, 1);
+
+        teams.kick(leader, teamId, member);            // S1(이 테스트의 서버)에서
+
+        JsonNode event = memberOnS2.nextEvent(WAIT);
+        assertThat(event.get("type").asText()).isEqualTo("REVOKED");
+        assertThat(event.get("roomId").asLong()).isEqualTo(teamRoom);
+        awaitRedisSubscribers(teamRoom, 0);           // S2에 그 방 구독자가 없어 채널도 해제
+
+        chat.send(leader, teamRoom, "추방 뒤");
+        chat.send(leader, dm, "DM은 계속");
+        assertThat(memberOnS2.nextRoomMessage(dm, WAIT).get("content").asText()).isEqualTo("DM은 계속");
+        memberOnS2.expectNone(f -> "MESSAGE".equals(f.command())
+                && ChatDestinations.roomTopic(teamRoom).equals(f.destination()), Duration.ofSeconds(1));
+        assertThat(memberOnS2.isOpen()).isTrue();
+    }
+
     private void awaitRedisSubscribers(long room, long expected) throws InterruptedException {
         String channel = ChatDestinations.roomChannel(room).getTopic();
         long deadline = System.currentTimeMillis() + WAIT.toMillis();
