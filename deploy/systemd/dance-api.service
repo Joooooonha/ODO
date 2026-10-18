@@ -9,7 +9,9 @@
 
 [Unit]
 Description=Dance Analyzer API (Spring Boot)
-After=network-online.target postgresql.service
+# Redis는 채팅 서버 간 전달용이다. 앱이 기동할 때 PING을 보내므로 먼저 떠 있어야 한다
+# (늦게 떠도 PING 실패 → Restart=on-failure로 다시 뜬다).
+After=network-online.target postgresql.service redis-server.service
 Wants=network-online.target
 
 [Service]

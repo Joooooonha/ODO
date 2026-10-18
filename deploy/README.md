@@ -146,6 +146,74 @@ SQL
 
 ---
 
+## 3-1. Redis (채팅 서버 간 전달)
+
+채팅 메시지를 서버끼리 넘기는 Pub/Sub에만 쓴다. 영속 데이터가 없어 저장(RDB·AOF)을 끈다.
+서버 안(127.0.0.1)에서만 받고, 비밀번호를 건다. 메모리는 작게(64MB) 잡는다 — t4g.small은 2GB 중
+약 1.6GB를 이미 쓴다. Docker가 아니라 apt로 설치한다.
+
+**앱보다 먼저 준비한다.** 앱은 기동할 때 Redis에 PING을 보내고, 실패하거나 `REDIS_*`가 빠져 있으면
+기동하지 않는다 → 배포 기동 확인 실패 → 직전 jar로 자동 롤백(직전 jar는 Redis를 쓰지 않는다).
+
+**비밀번호는 서버 안에서 만들고 파일 두 곳에만 쓴다.** 로컬에서 만들어 명령줄로 넘기지 않는다
+(셸 기록·프로세스 목록에 남는다). 아래 스크립트는 따옴표 친 heredoc(`<<'REMOTE'`)이라 로컬에서는
+아무것도 펼쳐지지 않는다. 확인할 때도 `redis-cli -a` 대신 `REDISCLI_AUTH` 환경 변수를 쓴다 — 명령줄
+인수가 아니라서 `ps`에 보이지 않는다. 이미 `REDIS_PASSWORD`가 있으면 새로 만들지 않는다(다시 돌려도 안전).
+
+```bash
+ssh odo 'sudo bash -s' <<'REMOTE'
+set -euo pipefail
+free -m | head -2
+apt-get update -q && apt-get install -y -q redis-server
+redis-server --version
+
+if ! grep -q '^REDIS_PASSWORD=' /etc/dance-api.env; then
+  PW="$(openssl rand -hex 32)"
+  install -m 640 -o redis -g redis /dev/null /etc/redis/odo.conf
+  cat > /etc/redis/odo.conf <<CONF
+bind 127.0.0.1 -::1
+protected-mode yes
+port 6379
+requirepass ${PW}
+maxmemory 64mb
+maxmemory-policy noeviction
+save ""
+appendonly no
+CONF
+  printf 'REDIS_HOST=127.0.0.1\nREDIS_PORT=6379\nREDIS_PASSWORD=%s\n' "$PW" >> /etc/dance-api.env
+  unset PW
+fi
+# 기본 redis.conf 맨 끝에서 덮어쓴다(뒤에 오는 설정이 이긴다)
+grep -qxF 'include /etc/redis/odo.conf' /etc/redis/redis.conf \
+  || echo 'include /etc/redis/odo.conf' >> /etc/redis/redis.conf
+
+systemctl enable redis-server
+systemctl restart redis-server
+REDISCLI_AUTH="$(sed -n 's/^REDIS_PASSWORD=//p' /etc/dance-api.env)" redis-cli -h 127.0.0.1 ping   # → PONG
+redis-cli -h 127.0.0.1 ping || true    # → NOAUTH (비밀번호 없이는 거부)
+ss -ltnp | grep 6379                   # 127.0.0.1·::1에서만
+REMOTE
+```
+
+- `printf`·`echo`는 셸 내장 명령이라 비밀번호가 프로세스 목록에 나타나지 않는다. `/etc/dance-api.env`는
+  처음 만들 때처럼 600(ubuntu 소유)으로 남는다. `/etc/redis/odo.conf`는 640(redis 소유)이다.
+- systemd 유닛(`deploy/systemd/dance-api.service`)의 `After=`에 `redis-server.service`를 더했다. 유닛 파일도
+  수동으로 반영한다: `sudo cp deploy/systemd/dance-api.service /etc/systemd/system/ && sudo systemctl daemon-reload`
+- nginx 웹소켓 블록(`location = /api/ws`)도 2절 방법으로 반영한다.
+
+배포 뒤 확인:
+
+```bash
+ssh odo 'journalctl -u dance-api --since "10 min ago" | grep -E "Redis 기동 확인|채팅 지표"'
+# 웹소켓 경로가 Spring까지 가는지: 쿠키 없이 → 401이면 정상. 200(HTML)이면 nginx가 화면으로 보낸 것
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+     -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' https://odostudio.site/api/ws
+```
+
+브라우저 개발자 도구 → 네트워크에서 `/api/ws`가 **101**로 뜨는지 본다(로그인한 상태).
+
+---
+
 ## 4. 비밀값
 
 ```bash
