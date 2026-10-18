@@ -256,6 +256,30 @@ class ChatDmAndListTest {
     }
 
     @Test
+    @DisplayName("시스템 메시지에는 대상의 현재 닉네임(targetNickname)이 실린다 — 추방돼 팀에 없는 사람도. 일반 글에는 없다")
+    void systemMessagesCarryTargetNickname() throws Exception {
+        LoggedIn leader = users.create("팀장");
+        LoggedIn kicked = users.create("떠난 사람");
+        Long teamId = teams.teamOf(leader, kicked);
+        long room = chat.teamRoomId(leader, teamId);
+        chat.send(leader, room, "일반 글");
+        teams.kick(leader, teamId, kicked);
+
+        JsonNode page = messages(leader, room, "");
+        List<String> system = new ArrayList<>();
+        for (JsonNode m : page.get("messages")) {
+            if ("SYSTEM".equals(m.get("type").asText())) {
+                system.add(m.get("targetNickname").asText());
+            } else {
+                assertThat(m.get("targetNickname").isNull()).isTrue();
+            }
+        }
+        assertThat(system).containsExactly("떠난 사람", "떠난 사람");   // JOIN, KICK
+        JsonNode rooms = json(mvc.perform(get("/api/chat/rooms").cookie(leader.cookie())).andExpect(status().isOk()));
+        assertThat(find(rooms, room).get("lastMessage").get("targetNickname").asText()).isEqualTo("떠난 사람");
+    }
+
+    @Test
     @DisplayName("본인이 보낸 메시지에만 clientMessageId가 실린다 (새로 고침 후 보낼 목록 정리용)")
     void clientMessageIdOnlyForOwnMessages() throws Exception {
         LoggedIn me = users.create("나");

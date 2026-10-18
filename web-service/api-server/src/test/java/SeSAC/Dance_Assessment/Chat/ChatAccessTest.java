@@ -147,6 +147,7 @@ class ChatAccessTest {
         JsonNode kickNotice = leaderWs.nextRoomMessage(teamRoom, WAIT);
         assertThat(kickNotice.get("type").asText()).as("팀장은 추방 안내를 받는다").isEqualTo("SYSTEM");
         assertThat(kickNotice.get("content").asText()).contains("KICK");
+        assertThat(kickNotice.get("targetNickname").asText()).as("화면이 문장을 만들 닉네임").isEqualTo("팀원");
 
         chat.send(leader, teamRoom, "추방 뒤 팀 방");
         chat.send(leader, dm, "DM은 계속");

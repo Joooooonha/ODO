@@ -1,10 +1,13 @@
 package SeSAC.Dance_Assessment.Realtime;
 
+import SeSAC.Dance_Assessment.Domain.ChatMessageType;
 import SeSAC.Dance_Assessment.Service.Chat.MessageSavedEvent;
+import SeSAC.Dance_Assessment.Service.Chat.SavedMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -26,10 +29,11 @@ public class MessageBroadcaster {
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
     private final ChatRealtimeMetrics metrics;
+    private final JdbcTemplate jdbc;
 
     @TransactionalEventListener
     public void onSaved(MessageSavedEvent event) {
-        RoomBroadcast broadcast = RoomBroadcast.of(event.message());
+        RoomBroadcast broadcast = RoomBroadcast.of(event.message(), targetNickname(event.message()));
         try {
             redis.convertAndSend(ChatDestinations.roomChannel(broadcast.roomId()).getTopic(),
                     objectMapper.writeValueAsString(broadcast));
@@ -37,6 +41,21 @@ public class MessageBroadcaster {
             metrics.publishFailed();
             log.error("[Redis 발행 실패] 저장·확정은 정상, 실시간 전달만 빠짐(브라우저가 빈틈으로 채움) roomId={} seq={} 원인={}",
                     broadcast.roomId(), broadcast.seq(), e.toString());
+        }
+    }
+
+    /** 시스템 메시지 대상의 지금 닉네임. 실패해도 방송은 한다(화면이 대체 문구를 쓴다). */
+    private String targetNickname(SavedMessage message) {
+        if (message.type() != ChatMessageType.SYSTEM) {
+            return null;
+        }
+        try {
+            long target = objectMapper.readTree(message.content()).path("targetUserId").asLong();
+            return jdbc.query("SELECT nickname FROM users WHERE user_id = ?",
+                    rs -> rs.next() ? rs.getString(1) : null, target);
+        } catch (Exception e) {
+            log.warn("[채팅 안내 닉네임 조회 실패] roomId={} seq={} 원인={}", message.roomId(), message.seq(), e.toString());
+            return null;
         }
     }
 }

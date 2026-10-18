@@ -43,7 +43,7 @@ public class ChatQueries {
             SELECT r.room_id, r.type, r.team_id, r.last_seq, r.created_at AS room_created_at,
                    m.last_read_seq,
                    msg.message_id, msg.seq, msg.type AS msg_type, msg.sender_id, s.nickname AS sender_nickname,
-                   msg.content, msg.client_message_id, msg.created_at,
+                   msg.content, msg.client_message_id, msg.created_at, tu.nickname AS target_nickname,
                    CASE WHEN r.type = 'TEAM' THEN t.team_name ELSE u.nickname END AS display_name,
                    CASE WHEN r.type = 'DM' THEN u.user_id END AS peer_user_id,
                    (r.type = 'DM' AND r.last_seq = 0) AS empty
@@ -51,6 +51,7 @@ public class ChatQueries {
             JOIN chat_room r      ON r.room_id = m.room_id
             LEFT JOIN message msg ON msg.room_id = r.room_id AND msg.seq = r.last_seq
             LEFT JOIN users s     ON s.user_id = msg.sender_id
+            LEFT JOIN users tu    ON tu.user_id = CASE WHEN msg.type = 'SYSTEM' THEN (msg.content::jsonb ->> 'targetUserId')::bigint END
             LEFT JOIN team t      ON r.type = 'TEAM' AND t.team_id = r.team_id
             LEFT JOIN users u     ON r.type = 'DM'
                                  AND u.user_id = CASE WHEN r.dm_user_low = ? THEN r.dm_user_high ELSE r.dm_user_low END
@@ -58,10 +59,19 @@ public class ChatQueries {
             ORDER BY COALESCE(msg.created_at, r.created_at) DESC, r.room_id DESC
             """;
 
+    /*
+     * 시스템 메시지(입장·나가기·추방)는 사건만 저장한다({"event":"KICK","targetUserId":7}). 화면이 문장을
+     * 만들 수 있게 대상의 "현재" 닉네임을 조회할 때 붙인다(target_nickname). 나간·추방된 사람은 팀 멤버
+     * 목록에 없어 브라우저가 따로 알 방법이 없다.
+     * JSON 변환은 CASE 안에 둔다 — PostgreSQL은 AND의 평가 순서를 보장하지 않아, 밖에 두면 일반 글의
+     * content까지 JSON으로 읽으려다 실패할 수 있다. CASE는 필요한 분기만 평가한다.
+     */
     private static final String MESSAGE_COLUMNS = """
             SELECT msg.message_id, msg.seq, msg.type AS msg_type, msg.sender_id, s.nickname AS sender_nickname,
-                   msg.content, msg.client_message_id, msg.created_at
-            FROM message msg LEFT JOIN users s ON s.user_id = msg.sender_id
+                   msg.content, msg.client_message_id, msg.created_at, tu.nickname AS target_nickname
+            FROM message msg
+            LEFT JOIN users s  ON s.user_id = msg.sender_id
+            LEFT JOIN users tu ON tu.user_id = CASE WHEN msg.type = 'SYSTEM' THEN (msg.content::jsonb ->> 'targetUserId')::bigint END
             WHERE msg.room_id = ?
             """;
 
@@ -153,7 +163,8 @@ public class ChatQueries {
                 rs.getString("content"),
                 // 남의 UUID는 싣지 않는다. 본인 탭이 재전송 판단에만 쓴다.
                 senderId != null && senderId == me ? clientMessageId : null,
-                instant(rs, "created_at"));
+                instant(rs, "created_at"),
+                rs.getString("target_nickname"));
     }
 
     private static Instant instant(ResultSet rs, String column) throws SQLException {
