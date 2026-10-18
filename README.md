@@ -289,10 +289,7 @@ flatten해서 넣고 있었고, 그러면 **프레임 경계가 사라집니다*
 |---|---|
 | [분석 엔진 기술 보고서](docs/analysis-engine-report.md) | 문제 정의, 검증 체계, 기술 선택 실험, 결과 종합 |
 | [엔지니어링 노트](docs/engineering-notes.md) | 서비스 구현·배포에서 겪은 것들, 회고 |
-| [제품 정의](PRODUCT.md) | 무엇을 만들고 무엇을 만들지 않는지 |
 | [배포 절차](deploy/README.md) | 서버 구성, 운영 점검 방법 |
-| [콘솔 작업 목록](DEPLOY-CONSOLE-TASKS.md) | 코드로 대신할 수 없는 설정 작업 |
-| [연구 과제 기록](model-research/TASKS.md) | 실험 단위 결정 기록 (D1~D25) |
 
 ---
 
