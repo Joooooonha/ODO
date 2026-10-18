@@ -1,8 +1,13 @@
 package SeSAC.Dance_Assessment.Config;
 
+import SeSAC.Dance_Assessment.Common.LatencyTimers;
 import io.lettuce.core.ClientOptions;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.data.redis.LettuceClientOptionsBuilderCustomizer;
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.context.annotation.Bean;
@@ -11,6 +16,9 @@ import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Redis — 채팅 서버 간 전달(Pub/Sub)에만 쓴다. 영속 데이터는 없다.
@@ -36,14 +44,30 @@ public class RedisConfig {
      * 받은 메시지를 넘기는 실행기는 <b>스레드 하나</b>다. 기본값({@code SimpleAsyncTaskExecutor})은
      * 메시지마다 스레드를 새로 만들어서 스레드가 계속 생겼다 사라지고, Redis가 보낸 순서도 서버 안에서
      * 섞인다. 넘기는 일은 메모리 브로커에 건네기뿐이라 하나로 충분하다.
+     *
+     * <p>읽음 구간 계산도 이 스레드에서 한다(RoomChannelListener). 메시지 전달과 같은 스레드라, 기다린 시간
+     * ({@code chat.redis.dispatch.wait}, 받은 메시지 하나마다 넘긴 순간 → 실행 시작)과 지금 기다리는 수
+     * ({@code chat.redis.dispatch.queued})를 잰다. 처리 시간은 각 리스너가 종류별로 잰다.
      */
     @Bean
-    RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory connectionFactory) {
+    RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory connectionFactory,
+                                                                MeterRegistry registry,
+                                                                @Value("${chat.metrics.log-interval:60s}") Duration window) {
+        Timer dispatchWait = LatencyTimers.builder("chat.redis.dispatch.wait", window).register(registry);
         ThreadPoolTaskExecutor dispatcher = new ThreadPoolTaskExecutor();
         dispatcher.setCorePoolSize(1);
         dispatcher.setMaxPoolSize(1);
         dispatcher.setThreadNamePrefix("redis-dispatch-");
+        dispatcher.setTaskDecorator(task -> {
+            long queuedAt = System.nanoTime();
+            return () -> {
+                dispatchWait.record(System.nanoTime() - queuedAt, TimeUnit.NANOSECONDS);
+                task.run();
+            };
+        });
         dispatcher.initialize();
+        Gauge.builder("chat.redis.dispatch.queued", dispatcher, d -> d.getThreadPoolExecutor().getQueue().size())
+                .register(registry);
 
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);

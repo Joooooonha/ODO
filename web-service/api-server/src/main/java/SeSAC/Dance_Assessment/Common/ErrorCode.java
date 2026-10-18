@@ -40,6 +40,9 @@ public enum ErrorCode {
     DM_NOT_ALLOWED(HttpStatus.FORBIDDEN, "같은 팀 멤버에게만 DM을 보낼 수 있습니다."),
 
     CANNOT_DM_SELF(HttpStatus.BAD_REQUEST, "자기 자신에게는 DM을 보낼 수 없습니다."),
+    // 읽음 보고: seq가 없거나 음수 / 그 방의 마지막 번호보다 크다(아직 없는 메시지는 읽을 수 없다)
+    INVALID_READ_SEQ(HttpStatus.BAD_REQUEST, "읽은 위치(seq)는 0 이상의 정수여야 합니다."),
+    READ_SEQ_AHEAD(HttpStatus.BAD_REQUEST, "아직 없는 메시지를 읽음으로 보고할 수 없습니다."),
 
     ALREADY_MEMBER(HttpStatus.CONFLICT, "이미 참여 중인 팀입니다."),
     LEADER_CANNOT_LEAVE(HttpStatus.CONFLICT, "팀장은 팀을 나갈 수 없습니다."),

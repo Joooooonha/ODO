@@ -66,6 +66,11 @@ public class SecurityConfig {
                                 // VAPID 공개키. 이름 그대로 공개해도 되는 값이고,
                                 // 알림 구독 UI를 그릴지 판단하려면 로그인 전에도 필요하다.
                                 "/api/push/public-key",
+                                // 측정 환경(loadtest 프로필)의 수집기. 관리 포트(9091, 컨테이너 네트워크 안)에만
+                                // 있다 — 운영과 기본 설정은 actuator를 아무것도 노출하지 않아 이 경로가 없다.
+                                // 관리 포트에도 이 보안 설정이 그대로 걸린다(테스트로 확인: 없으면 401).
+                                "/actuator/prometheus",
+                                "/actuator/health",
                                 "/error"
                         ).permitAll()
                         // 영상 재생은 <video src>로 불러서 쿠키가 실리지만,

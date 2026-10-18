@@ -34,6 +34,7 @@ public class ControlChannelListener implements MessageListener {
 
     @Override
     public void onMessage(Message message, byte[] pattern) {
+        long start = System.nanoTime();
         try {
             ControlEvent event = objectMapper.readValue(message.getBody(), ControlEvent.class);
             metrics.controlReceived(event.type());
@@ -48,6 +49,8 @@ public class ControlChannelListener implements MessageListener {
             log.debug("[제어 이벤트] {} → 이 서버 세션 {}개에 적용", event, changed);
         } catch (Exception e) {
             log.error("[제어 이벤트 처리 실패] 5초 재확인이 고친다 body={}", new String(message.getBody()), e);
+        } finally {
+            metrics.dispatched(ChatRealtimeMetrics.CONTROL, System.nanoTime() - start);
         }
     }
 }

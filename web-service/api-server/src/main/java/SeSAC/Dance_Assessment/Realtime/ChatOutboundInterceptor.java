@@ -22,6 +22,9 @@ import java.util.OptionalLong;
  * 그 세션의 허용 방 캐시에 <b>아직</b> 있는지 본다. 없으면 버린다. 추방·나가기의 제어 이벤트는 캐시에서
  * 먼저 지우므로, 브로커 구독 청소가 늦거나 실패해도 이 검사가 막는다. 목적지는 클라이언트가 고칠 수
  * 있으므로 서버 쪽 사실(캐시)로만 판단한다.
+ *
+ * <p><b>종류별로 센다</b>({@code chat.outbound.frames{type}}): 방 프레임은 받는 쪽이 붙인 종류 헤더(MESSAGE/READ),
+ * 개인 목적지는 acks → ACK, events → EVENT. 버린 프레임은 세지 않는다.
  */
 @Slf4j
 @Component
@@ -39,7 +42,8 @@ public class ChatOutboundInterceptor implements ChannelInterceptor {
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         SimpMessageType type = SimpMessageHeaderAccessor.getMessageType(message.getHeaders());
         if (type == SimpMessageType.MESSAGE) {
-            OptionalLong room = ChatDestinations.roomOfTopic(SimpMessageHeaderAccessor.getDestination(message.getHeaders()));
+            String destination = SimpMessageHeaderAccessor.getDestination(message.getHeaders());
+            OptionalLong room = ChatDestinations.roomOfTopic(destination);
             if (room.isPresent()) {
                 ChatConnection connection = registry.get(SimpMessageHeaderAccessor.getSessionId(message.getHeaders()));
                 if (connection == null || !connection.isAllowed(room.getAsLong())) {
@@ -48,6 +52,12 @@ public class ChatOutboundInterceptor implements ChannelInterceptor {
                             SimpMessageHeaderAccessor.getSessionId(message.getHeaders()));
                     return null;
                 }
+                Object frameType = message.getHeaders().get(RoomChannelListener.FRAME_TYPE_HEADER);
+                metrics.outboundFrame(frameType == null ? ChatRealtimeMetrics.MESSAGE : frameType.toString());
+            } else if (destination != null && destination.endsWith(ChatDestinations.ACKS)) {
+                metrics.outboundFrame(ChatRealtimeMetrics.ACK);
+            } else if (destination != null && destination.endsWith(ChatDestinations.EVENTS)) {
+                metrics.outboundFrame(ChatRealtimeMetrics.EVENT);
             }
             return message;
         }

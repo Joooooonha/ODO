@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -25,6 +27,12 @@ import java.util.concurrent.TimeUnit;
  *   <li>{@code chat.access.recheck.corrections{type}} — <b>5초 재확인이 이벤트보다 먼저 발견한 변경</b>
  *       (= 이벤트가 유실됐거나 늦은 수). 정상이면 0에 가깝다</li>
  *   <li>{@code chat.outbound.dropped} — 허용 방 캐시에 없어 나가기 직전에 버린 방 메시지</li>
+ *   <li>{@code chat.redis.publish{type=MESSAGE|READ|CONTROL}} — 종류별 Redis 발행 수(성공)</li>
+ *   <li>{@code chat.outbound.frames{type=MESSAGE|READ|ACK|EVENT}} — 종류별 브라우저로 나간 프레임 수.
+ *       {@code ACK}는 개인 응답 목적지(확정·오류·SYNC), {@code EVENT}는 차단·허용</li>
+ *   <li>{@code chat.redis.dispatch.wait} — Redis에서 받은 메시지가 받는 스레드(1개)를 기다린 시간,
+ *       {@code chat.redis.dispatch.duration{type}} — 그 스레드에서의 처리 시간(메시지 전달·읽음 구간 계산·제어),
+ *       {@code chat.redis.dispatch.queued} — 지금 기다리는 수. 메시지 전달과 읽음 계산이 같은 스레드다</li>
  * </ul>
  */
 @Component
@@ -35,13 +43,47 @@ public class ChatRealtimeMetrics {
     public static final String TOKEN_EXPIRED = "token_expired";
     public static final String PROTOCOL = "protocol";
 
+    // 프레임·발행·받는 스레드 처리의 종류
+    public static final String MESSAGE = "MESSAGE";
+    public static final String READ = "READ";
+    public static final String CONTROL = "CONTROL";
+    public static final String ACK = "ACK";
+    public static final String EVENT = "EVENT";
+
     private final MeterRegistry registry;
     private final Timer queueWait;
+    private final Duration window;
+    private final Map<String, Timer> dispatchDurations = new ConcurrentHashMap<>();
+    private final Map<String, Counter> outboundFrames = new ConcurrentHashMap<>();
 
     public ChatRealtimeMetrics(MeterRegistry registry,
                                @Value("${chat.metrics.log-interval:60s}") Duration percentileWindow) {
         this.registry = registry;
         this.queueWait = LatencyTimers.builder("chat.session.queue.wait", percentileWindow).register(registry);
+        this.window = percentileWindow;
+    }
+
+    void published(String type) {
+        registry.counter("chat.redis.publish", "type", type).increment();
+    }
+
+    void outboundFrame(String type) {
+        outboundFrames.computeIfAbsent(type, t -> registry.counter("chat.outbound.frames", "type", t)).increment();
+    }
+
+    void dispatched(String type, long nanos) {
+        dispatchDurations.computeIfAbsent(type, t -> LatencyTimers.builder("chat.redis.dispatch.duration", window)
+                .tag("type", t).register(registry)).record(nanos, TimeUnit.NANOSECONDS);
+    }
+
+    public long publishes(String type) {
+        Counter c = registry.find("chat.redis.publish").tag("type", type).counter();
+        return c == null ? 0 : (long) c.count();
+    }
+
+    public long outboundFrames(String type) {
+        Counter c = registry.find("chat.outbound.frames").tag("type", type).counter();
+        return c == null ? 0 : (long) c.count();
     }
 
     void queueWait(long nanos) {

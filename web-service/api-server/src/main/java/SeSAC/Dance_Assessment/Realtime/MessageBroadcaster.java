@@ -37,6 +37,7 @@ public class MessageBroadcaster {
         try {
             redis.convertAndSend(ChatDestinations.roomChannel(broadcast.roomId()).getTopic(),
                     objectMapper.writeValueAsString(broadcast));
+            metrics.published(ChatRealtimeMetrics.MESSAGE);
         } catch (Exception e) {
             metrics.publishFailed();
             log.error("[Redis 발행 실패] 저장·확정은 정상, 실시간 전달만 빠짐(브라우저가 빈틈으로 채움) roomId={} seq={} 원인={}",

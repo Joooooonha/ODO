@@ -1,6 +1,7 @@
 package SeSAC.Dance_Assessment.Realtime;
 
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -28,6 +29,9 @@ import java.util.concurrent.TimeUnit;
  *   <li>인바운드 실행기({@code clientInboundChannelExecutor}, Boot 자동 연결): 활성 스레드, 대기 작업</li>
  *   <li>저장: 처리 시간(결과별), 원인별 재시도, 소진, 분류되지 않은 예외</li>
  *   <li>세션: 대기열 대기 시간, 서버가 끊은 세션(이유별), 활성 세션, Redis 방 구독 수, 발행 실패</li>
+ *   <li>읽음: 보고 수(결과별), 처리 시간(결과별), 스냅샷 조회 시간·평균 행 수</li>
+ *   <li>Redis 받는 스레드(메시지 전달·읽음 계산·제어가 한 스레드): 기다린 시간, 처리 시간(종류별), 지금 기다리는 수</li>
+ *   <li>종류별 발행 수·나간 프레임 수</li>
  * </ul>
  */
 @Slf4j
@@ -59,6 +63,15 @@ public class ChatMetricsReporter {
                 .append(" 획득 ").append(timer(registry.find("hikaricp.connections.acquire").timer()));
         sb.append(" | 인바운드 활성=").append(gaugeTagged("executor.active", "clientInboundChannelExecutor"))
                 .append(" 대기=").append(gaugeTagged("executor.queued", "clientInboundChannelExecutor"));
+        sb.append(" | 읽음 ").append(countersByTag("chat.read.requests", "outcome"))
+                .append(" 처리 ").append(timers("chat.read.duration", "outcome"))
+                .append(" 스냅샷 ").append(timer(registry.find("chat.read.snapshot.duration").timer()))
+                .append(" 행평균=").append(summaryMean("chat.read.snapshot.rows"));
+        sb.append(" | Redis받기 대기 ").append(timer(registry.find("chat.redis.dispatch.wait").timer()))
+                .append(" 처리 ").append(timers("chat.redis.dispatch.duration", "type"))
+                .append(" 대기수=").append(gauge("chat.redis.dispatch.queued"));
+        sb.append(" | 발행=").append(countersByTag("chat.redis.publish", "type"))
+                .append(" 프레임=").append(countersByTag("chat.outbound.frames", "type"));
         return sb.toString();
     }
 
@@ -70,6 +83,11 @@ public class ChatMetricsReporter {
     private String gaugeTagged(String name, String executorName) {
         Gauge g = registry.find(name).tag("name", executorName).gauge();
         return g == null ? "-" : String.valueOf((long) g.value());
+    }
+
+    private String summaryMean(String name) {
+        DistributionSummary s = registry.find(name).summary();
+        return s == null || s.count() == 0 ? "-" : String.format(Locale.ROOT, "%.1f", s.mean());
     }
 
     private long counter(String name) {

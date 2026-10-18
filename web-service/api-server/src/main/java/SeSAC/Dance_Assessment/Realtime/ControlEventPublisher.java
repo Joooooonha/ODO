@@ -33,6 +33,7 @@ public class ControlEventPublisher {
         try {
             redis.convertAndSend(ChatDestinations.CONTROL_CHANNEL, objectMapper.writeValueAsString(event));
             metrics.controlPublished(event.type());
+            metrics.published(ChatRealtimeMetrics.CONTROL);
         } catch (Exception e) {
             metrics.controlPublishFailed();
             log.error("[제어 이벤트 발행 실패] 5초 재확인이 고친다 {} 원인={}", event, e.toString());
