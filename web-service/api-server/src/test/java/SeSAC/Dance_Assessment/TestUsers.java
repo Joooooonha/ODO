@@ -15,7 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * 테스트용 사용자를 dev 회원가입 API로 만들고 로그인 쿠키를 받는다.
  *
- * <p>테스트 전체가 PostgreSQL 컨테이너 하나를 공유하므로({@link PostgresTestContainer})
+ * <p>테스트 전체가 PostgreSQL 컨테이너 하나를 공유하므로({@link TestContainers})
  * 아이디는 매번 새로 만든다. 시드 계정(test, test2)을 쓰면 다른 테스트가 만든
  * 팀·영상과 섞인다.
  */

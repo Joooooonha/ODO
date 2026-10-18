@@ -1,6 +1,6 @@
 package SeSAC.Dance_Assessment.Chat;
 
-import SeSAC.Dance_Assessment.PostgresTestContainer;
+import SeSAC.Dance_Assessment.TestContainers;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -36,8 +36,8 @@ class V4MigrationTest {
     static void migrateV3ThenSeedThenV4() {
         // 컨테이너는 정적 초기화에서 시작된다(다른 테스트와 같은 컨테이너).
         String database = "v4check_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-        new JdbcTemplate(dataSource(PostgresTestContainer.jdbcUrl())).execute("CREATE DATABASE " + database);
-        DataSource ds = dataSource(PostgresTestContainer.jdbcUrl(database));
+        new JdbcTemplate(dataSource(TestContainers.jdbcUrl())).execute("CREATE DATABASE " + database);
+        DataSource ds = dataSource(TestContainers.jdbcUrl(database));
         jdbc = new JdbcTemplate(ds);
 
         Flyway.configure().dataSource(ds).target("3").load().migrate();
@@ -150,6 +150,6 @@ class V4MigrationTest {
     }
 
     private static DataSource dataSource(String url) {
-        return new DriverManagerDataSource(url, PostgresTestContainer.username(), PostgresTestContainer.password());
+        return new DriverManagerDataSource(url, TestContainers.username(), TestContainers.password());
     }
 }
