@@ -14,6 +14,8 @@ import './Chat.css';
  * - 내가 보낸 미확정 메시지는 아래에 보낸 순서대로: "전송 중" / "전송 실패 · 다시 보내기" /
  *   (새로 고침 뒤) "보내지 않은 메시지 · 다시 보내기". 말풍선마다 오류를 띄우지 않는다(9.1)
  * - 차단(REVOKED)되면 onRevoked로 알린다 — 부른 쪽이 안내 후 목록으로 보낸다
+ * - 메시지마다 안 읽은 사람 수(읽음 구간으로 찾는다). 0이면 숨기고, 시스템 메시지에는 붙이지 않는다(E2).
+ *   내 메시지도 같은 규칙이라 잠깐 나까지 센 수가 보였다가 내 읽음 보고 뒤 1 줄어든다(기준선의 알려진 동작)
  */
 export default function ChatRoomView({ roomId, onRevoked, compact = false }) {
     const chat = useChat();
@@ -128,6 +130,7 @@ export default function ChatRoomView({ roomId, onRevoked, compact = false }) {
                                     showName={!prev || prev.type === 'SYSTEM' || prev.senderId !== m.senderId || newDay}
                                     content={m.content}
                                     meta={formatTime(m.createdAt)}
+                                    unread={chat.unreadCount(roomId, m.seq)}
                                 />
                             )}
                         </Fragment>
@@ -177,7 +180,7 @@ export default function ChatRoomView({ roomId, onRevoked, compact = false }) {
     );
 }
 
-function MessageBubble({ mine, nickname, showName, content, meta, state, actions }) {
+function MessageBubble({ mine, nickname, showName, content, meta, state, actions, unread }) {
     return (
         <div className={`chat-row${mine ? ' mine' : ''}`}>
             {!mine && showName && <span className="chat-sender">{nickname}</span>}
@@ -185,7 +188,14 @@ function MessageBubble({ mine, nickname, showName, content, meta, state, actions
                 <div className={`chat-bubble${state && state !== 'pending' ? ' failed' : ''}${state === 'pending' ? ' pending' : ''}`}>
                     {content}
                 </div>
-                {meta && <span className="chat-meta">{meta}</span>}
+                {(meta || unread > 0) && (
+                    <span className="chat-meta">
+                        {unread > 0 && (
+                            <span className="chat-read-count" aria-label={`안 읽은 사람 ${unread}명`}>{unread}</span>
+                        )}
+                        {meta}
+                    </span>
+                )}
             </div>
             {actions}
         </div>

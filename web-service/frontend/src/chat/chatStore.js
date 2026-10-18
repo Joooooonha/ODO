@@ -1,5 +1,5 @@
 import { Client } from '@stomp/stompjs';
-import { getChatMessages, getChatRooms } from '../api/client';
+import { getChatMessages, getChatRooms, getReadState, reportRead } from '../api/client';
 import { loadOutbox, saveOutbox } from './outbox';
 import { MAX_MESSAGE_LENGTH, codePointLength, newClientMessageId } from './format';
 
@@ -16,6 +16,9 @@ import { MAX_MESSAGE_LENGTH, codePointLength, newClientMessageId } from './forma
  *   곳까지 그린 결과"다. 빈틈은 1초 기다렸다가 afterSeq로 채운다(9.4)
  * - 보낼 목록(outbox): 확정 응답을 받아야만 지운다. 확정을 기다리지 않고 연달아 보내되 미확정 50개(전송
  *   창)에서 멈춘다. 재전송은 재연결과 SERVER_RETRY_EXHAUSTED 두 경우뿐이다(9.5)
+ * - 읽음(Task-chat-read 4절, 기준선): 방이 열려 있고 탭이 보이고 contiguousTo가 마지막 보고값보다 커지면
+ *   **바로** 보고한다(디바운스·묶기 없음). 보고 값은 contiguousTo — 빈틈 너머를 보고하면 안 본 메시지까지
+ *   읽음이 된다. READ 프레임·read-state는 방마다 마지막 적용 version보다 작으면 버린다
  */
 
 export const SEND_WINDOW = 50;
@@ -25,6 +28,8 @@ const AUTO_RESEND_MS = 5 * 60 * 1000;
 const HEARTBEAT_MS = 10_000;
 const MAX_RECONNECT_MS = 30_000;
 const MAX_RESUME_MS = 30_000;
+
+const isTabVisible = () => typeof document === 'undefined' || document.visibilityState === 'visible';
 
 /** 메시지 한 건(서버 응답·방송·확정을 같은 모양으로). */
 const normalize = (m) => ({
@@ -97,12 +102,14 @@ export class ChatStore {
         this.user = user;
         this.running = true;
         this.outbox = loadOutbox(user.id).map((item) => (item.state === 'pending' ? { ...item, state: 'held' } : item));
+        if (typeof document !== 'undefined') document.addEventListener('visibilitychange', this.onVisibilityChange);
         this.connect();
     }
 
     /** 연결을 끊는다(로그아웃·화면 종료). 쿠키 삭제만으로는 열린 연결이 남으므로 직접 끊는다. */
     stop() {
         this.running = false;
+        if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', this.onVisibilityChange);
         clearTimeout(this.reconnectTimer);
         clearTimeout(this.resumeTimer);
         this.rejectSyncWaiters();
@@ -202,7 +209,7 @@ export class ChatStore {
         this.emit();
         // 보낼 목록 전체를 원래 순서대로, 같은 UUID로, 새 메시지보다 먼저(9.5 ①)
         this.transmitAll(false);
-        this.openRooms.forEach((_, roomId) => this.catchUp(roomId));
+        this.openRooms.forEach((_, roomId) => this.syncOpenRoom(roomId));
     }
 
     /** 구독 장벽: SEND /app/sync → SYNC가 오면 그 전에 보낸 구독은 모두 등록됐다. */
@@ -258,6 +265,8 @@ export class ChatStore {
                 lastSeq: 0, myReadSeq: null, preview: null, previewSeq: 0,
                 messages: new Map(), baseline: null, contiguousTo: 0, hasOlder: false,
                 loading: false, loadingOlder: false, error: '', gapTimer: null, fetching: new Set(),
+                // 읽음: 마지막으로 적용한 스냅샷 { version, positions, ranges } / 이 탭이 마지막으로 보고한 번호
+                read: null, reportedSeq: 0,
             };
             this.rooms.set(roomId, room);
         }
@@ -328,7 +337,14 @@ export class ChatStore {
         } catch {
             return;
         }
-        await this.catchUp(roomId);
+        await this.syncOpenRoom(roomId);
+    }
+
+    /** 열린 방의 기록과 읽음 상태를 받아 온다(구독 → SYNC 뒤에만 부른다). 그 뒤 읽음 보고. */
+    async syncOpenRoom(roomId) {
+        await Promise.all([this.catchUp(roomId), this.loadReadState(roomId)]);
+        const room = this.rooms.get(roomId);
+        if (room) this.maybeReport(room);
     }
 
     closeRoom(roomId) {
@@ -452,6 +468,7 @@ export class ChatStore {
         let to = Math.max(room.contiguousTo, room.baseline.from - 1);
         while (room.messages.has(to + 1)) to += 1;
         room.contiguousTo = to;
+        this.maybeReport(room);
         const hasGap = [...room.messages.keys()].some((seq) => seq > to + 1)
             || room.lastSeq > to;
         if (hasGap && !room.gapTimer) {
@@ -477,9 +494,77 @@ export class ChatStore {
         return out;
     }
 
+    // ===== 읽음 (기준선) =====
+
+    /** 방을 열 때·재연결할 때의 읽음 상태. 구독 → SYNC 뒤에 부른다(그 사이 READ는 version으로 정리된다). */
+    async loadReadState(roomId) {
+        try {
+            const state = await getReadState(roomId);
+            this.applyRead(roomId, state);
+            this.emit();
+        } catch (err) {
+            const room = this.rooms.get(roomId);
+            if (room && err?.status === 403) this.onRoomLoadError(room, err);
+            // 그 밖의 실패: 다음 READ 프레임이 전체 상태를 다시 실어 온다
+        }
+    }
+
+    onRead(frame) {
+        if (this.applyRead(frame.roomId, frame)) this.emit();
+    }
+
+    /** 스냅샷 적용. 마지막으로 적용한 version보다 작으면 버린다(같거나 크면 적용). @return 적용했으면 true */
+    applyRead(roomId, snapshot) {
+        const room = this.rooms.get(roomId);
+        if (!room) return false;
+        if (room.read && snapshot.version < room.read.version) return false;
+        room.read = { version: snapshot.version, positions: snapshot.positions, ranges: snapshot.ranges };
+        // 방 목록의 안 읽은 수: 내 위치(다른 기기에서 읽은 것 포함)에 맞춘다 — 서버 목록과 같은 공식
+        const mine = snapshot.positions.find((p) => p.userId === this.user?.id);
+        if (mine && (room.myReadSeq == null || mine.lastReadSeq > room.myReadSeq)) room.myReadSeq = mine.lastReadSeq;
+        return true;
+    }
+
+    /**
+     * 조건이 맞으면 바로 보고한다: 방이 열려 있고, 탭이 보이고, contiguousTo가 마지막 보고값보다 크다.
+     * 실패는 다시 보내지 않는다(다음 보고가 더 큰 값으로 덮는다).
+     */
+    maybeReport(room) {
+        if (!this.running || !this.openRooms.has(room.roomId) || !isTabVisible()) return;
+        const seq = room.contiguousTo;
+        if (!room.baseline || seq <= room.reportedSeq) return;
+        room.reportedSeq = seq;
+        if (room.myReadSeq == null || seq > room.myReadSeq) room.myReadSeq = seq;
+        reportRead(room.roomId, seq).catch(() => {});
+    }
+
+    /** 탭이 다시 보이면 열린 방마다 보고(가려진 동안 붙은 메시지). */
+    onVisibilityChange = () => {
+        if (!isTabVisible()) return;
+        this.openRooms.forEach((_, roomId) => {
+            const room = this.rooms.get(roomId);
+            if (room) this.maybeReport(room);
+        });
+        this.emit();
+    };
+
+    /** 메시지 번호의 안 읽은 사람 수. 읽음 상태를 아직 모르면 null(표시하지 않는다). */
+    unreadCount(roomId, seq) {
+        const ranges = this.rooms.get(roomId)?.read?.ranges;
+        if (!ranges) return null;
+        for (const r of ranges) {
+            if (r.toSeq == null || seq <= r.toSeq) return r.unread;
+        }
+        return null;
+    }
+
     // ===== 소켓 프레임 =====
 
     onRoomMessage(message) {
+        if (message.type === 'READ') {
+            this.onRead(message);
+            return;
+        }
         const room = this.rooms.get(message.roomId);
         if (!room) return;
         const m = normalize(message);
@@ -562,7 +647,7 @@ export class ChatStore {
         } catch {
             return;
         }
-        if (this.openRooms.has(roomId)) await this.catchUp(roomId);
+        if (this.openRooms.has(roomId)) await this.syncOpenRoom(roomId);
     }
 
     // ===== 보내기 =====

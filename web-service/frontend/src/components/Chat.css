@@ -294,8 +294,21 @@
 
 .chat-meta {
     flex: none;
+    display: flex;
+    flex-direction: column;
     font-size: 0.7rem;
+    line-height: 1.3;
     color: var(--text-muted);
+}
+
+.chat-row.mine .chat-meta {
+    align-items: flex-end;
+}
+
+/* 안 읽은 사람 수 */
+.chat-read-count {
+    color: var(--accent-cyan);
+    font-weight: 700;
 }
 
 .chat-bubble-actions {

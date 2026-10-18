@@ -471,3 +471,22 @@ export const openDm = async (userId) => {
     body: JSON.stringify({ userId }),
   });
 };
+
+/**
+ * 읽음 보고: 이 방을 seq(빈틈 없이 이어진 마지막 번호)까지 읽었다. 204.
+ * 사용자는 쿠키에서 서버가 꺼낸다. 실패해도 다시 보내지 않는다 — 다음 보고(더 큰 값)가 덮는다.
+ */
+export const reportRead = async (roomId, seq) => {
+  return fetchAPI(`/api/chat/rooms/${roomId}/read`, {
+    method: 'POST',
+    body: JSON.stringify({ seq }),
+  });
+};
+
+/**
+ * 방의 읽음 상태: { version, positions: [{ userId, lastReadSeq }], ranges: [{ toSeq, unread }] }.
+ * 방송되는 READ 프레임과 같은 계산 결과. 구독 → SYNC 뒤에 조회한다.
+ */
+export const getReadState = async (roomId) => {
+  return fetchAPI(`/api/chat/rooms/${roomId}/read-state`);
+};
