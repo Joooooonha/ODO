@@ -208,6 +208,21 @@ class ChatWebSocketTest {
         assertThat(c.nextAck(WAIT).get("type").asText()).isEqualTo("ACK");
     }
 
+    // ===== 구독 장벽 =====
+
+    @Test
+    @DisplayName("[9.2] SEND /app/sync → 보낸 세션에만 SYNC. 멈춘 세션에도 답한다(저장하는 메시지가 아니다)")
+    void syncBarrier() throws Exception {
+        LoggedIn me = users.create("나");
+        RawStompClient a = connect(me);
+        RawStompClient b = connect(me);
+
+        a.sendFrame("SEND", Map.of("destination", "/app/sync"), "");
+        JsonNode sync = a.nextAck(WAIT);
+        assertThat(sync.get("type").asText()).isEqualTo("SYNC");
+        b.expectNone(f -> f.body().contains("SYNC"), Duration.ofMillis(500));
+    }
+
     // ===== 구독 =====
 
     @Test

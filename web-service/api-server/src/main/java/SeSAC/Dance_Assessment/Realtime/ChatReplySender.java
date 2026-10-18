@@ -38,6 +38,11 @@ public class ChatReplySender {
         // ChatReply.None: 응답 없이 버린다
     }
 
+    /** 구독 장벽 응답. 이 응답이 왔다면 그 전에 보낸 구독은 모두 등록됐다. */
+    public void sync(ChatConnection connection) {
+        toSession(connection, ChatDestinations.ACKS, ChatFrames.SYNC);
+    }
+
     public void revoked(ChatConnection connection, long roomId) {
         toSession(connection, ChatDestinations.EVENTS, ChatFrames.Access.revoked(roomId));
     }

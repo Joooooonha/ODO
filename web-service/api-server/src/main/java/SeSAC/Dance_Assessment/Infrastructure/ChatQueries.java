@@ -34,7 +34,9 @@ public class ChatQueries {
      *       메시지가 어긋나지 않는다(번호와 메시지는 같은 트랜잭션에서 커밋된다)</li>
      *   <li>정렬은 시각 기준 — seq는 방마다 따로라 방끼리 비교할 수 없다. 메시지가 없는 방은
      *       방을 만든 시각</li>
-     *   <li>메시지 없는 DM은 양쪽 모두에서 숨긴다([DM]을 누르기만 하고 대화하지 않은 방)</li>
+     *   <li>메시지 없는 DM도 돌려주고 {@code empty}로 표시한다. <b>숨기는 것은 화면이다</b>(E1: 양쪽 목록에서
+     *       숨김). 브라우저가 빈 DM의 존재를 알아야 구독할 수 있다 — 연결 직후 GRANTED를 놓쳐도 목록 조회가
+     *       복구 경로가 된다(10/19)</li>
      * </ul>
      */
     private static final String MY_ROOMS = """
@@ -43,7 +45,8 @@ public class ChatQueries {
                    msg.message_id, msg.seq, msg.type AS msg_type, msg.sender_id, s.nickname AS sender_nickname,
                    msg.content, msg.client_message_id, msg.created_at,
                    CASE WHEN r.type = 'TEAM' THEN t.team_name ELSE u.nickname END AS display_name,
-                   CASE WHEN r.type = 'DM' THEN u.user_id END AS peer_user_id
+                   CASE WHEN r.type = 'DM' THEN u.user_id END AS peer_user_id,
+                   (r.type = 'DM' AND r.last_seq = 0) AS empty
             FROM chat_room_member m
             JOIN chat_room r      ON r.room_id = m.room_id
             LEFT JOIN message msg ON msg.room_id = r.room_id AND msg.seq = r.last_seq
@@ -52,7 +55,6 @@ public class ChatQueries {
             LEFT JOIN users u     ON r.type = 'DM'
                                  AND u.user_id = CASE WHEN r.dm_user_low = ? THEN r.dm_user_high ELSE r.dm_user_low END
             WHERE m.user_id = ? AND m.status = 'ACTIVE'
-              AND NOT (r.type = 'DM' AND r.last_seq = 0)
             ORDER BY COALESCE(msg.created_at, r.created_at) DESC, r.room_id DESC
             """;
 
@@ -79,7 +81,8 @@ public class ChatQueries {
                     lastSeq,
                     last,
                     myReadSeq,
-                    lastSeq - myReadSeq);
+                    lastSeq - myReadSeq,
+                    rs.getBoolean("empty"));
         }, me, me);
     }
 

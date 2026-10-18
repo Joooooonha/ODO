@@ -94,7 +94,8 @@ public class ChatInboundInterceptor implements ChannelInterceptor {
         if (connection.isClosed()) {
             return null;
         }
-        if (ChatDestinations.roomOfSend(accessor.getDestination()).isEmpty()) {
+        if (!ChatDestinations.SYNC.equals(accessor.getDestination())
+                && ChatDestinations.roomOfSend(accessor.getDestination()).isEmpty()) {
             log.warn("[STOMP] 알 수 없는 전송 목적지 destination={} userId={}", accessor.getDestination(), connection.userId());
             return null;
         }

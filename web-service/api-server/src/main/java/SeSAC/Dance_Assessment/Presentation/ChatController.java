@@ -24,7 +24,7 @@ public class ChatController {
 
     private final ChatRoomService chatRoomService;
 
-    /** 내 방 목록. 팀 방과 DM을 한 목록에 최근 순으로. 메시지 없는 DM은 나오지 않는다. */
+    /** 내 방 목록. 팀 방과 DM을 한 목록에 최근 순으로. 메시지 없는 DM은 {@code empty: true}(화면이 숨긴다). */
     @GetMapping("/chat/rooms")
     public ResponseEntity<List<ChatRoomSummaryResponse>> getMyRooms(@CurrentUserId Long userId) {
         return ResponseEntity.ok(chatRoomService.getMyRooms(userId));

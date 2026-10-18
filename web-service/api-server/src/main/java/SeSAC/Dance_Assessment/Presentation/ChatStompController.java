@@ -47,6 +47,25 @@ public class ChatStompController {
     }
 
     /**
+     * 구독 장벽({@code SEND /app/sync} → 보낸 세션의 {@code /user/queue/acks}로 {@code {type: SYNC}}).
+     *
+     * <p>메모리 브로커는 SUBSCRIBE에 확인(RECEIPT)을 주지 않는다. 그런데 세션의 메시지는 차례대로, 앞
+     * 메시지를 브로커까지 모든 처리기가 끝낸 뒤에야 다음이 처리된다. 그래서 브라우저가 SYNC를 받았다면
+     * 그 전에 보낸 구독은 모두 등록됐다. 브라우저는 "구독 → SYNC → HTTP 조회" 순서로 써서, 구독 등록 전에
+     * 나간 메시지·알림을 조회가 채우게 한다(9.2·9.4).
+     *
+     * <p>멈춘 세션에도 답한다 — 저장하는 메시지가 아니다. 끊긴 세션의 것은 인터셉터가 이미 버렸다.
+     */
+    @MessageMapping("/sync")
+    public void sync(SimpMessageHeaderAccessor headers) {
+        Map<String, Object> attributes = headers.getSessionAttributes();
+        ChatConnection connection = attributes == null ? null : (ChatConnection) attributes.get(ChatConnection.ATTRIBUTE);
+        if (connection != null) {
+            replySender.sync(connection);
+        }
+    }
+
+    /**
      * 본문은 변환기를 거치지 않고 직접 읽는다 — 변환에 실패하면 메서드가 불리지 않아 멈춤·오류 응답 규칙을
      * 적용할 수 없다. 읽지 못하는 본문은 빈 요청으로 넘긴다 → 멈춤 중이면 버려지고, 아니면 INVALID_MESSAGE.
      */

@@ -25,6 +25,12 @@ public final class ChatFrames {
         }
     }
 
+    /** 구독 장벽 응답({@code /app/sync}). */
+    public record Sync(String type) {
+    }
+
+    public static final Sync SYNC = new Sync("SYNC");
+
     /** 방 접근이 끊김(REVOKED)·생김(GRANTED). */
     public record Access(String type, long roomId) {
         public static Access revoked(long roomId) {

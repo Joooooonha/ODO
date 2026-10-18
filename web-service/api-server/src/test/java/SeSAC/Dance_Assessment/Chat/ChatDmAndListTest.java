@@ -174,19 +174,26 @@ class ChatDmAndListTest {
     }
 
     @Test
-    @DisplayName("[E1] 메시지 없는 DM은 양쪽 목록에 모두 안 보이고, 첫 메시지 뒤에는 양쪽에 보인다")
-    void emptyDmHidden() throws Exception {
+    @DisplayName("[E1·10/19] 메시지 없는 DM은 양쪽 목록에 empty: true로 온다(화면이 숨긴다, 구독은 한다). 첫 메시지 뒤에는 empty: false")
+    void emptyDmIsFlagged() throws Exception {
         LoggedIn a = users.create("가");
         LoggedIn b = users.create("나");
-        teams.teamOf(a, b);
+        Long teamId = teams.teamOf(a, b);
         long dm = chat.openDm(a, b);
+        long teamRoom = chat.teamRoomId(a, teamId);
 
-        assertThat(roomIds(a)).doesNotContain(dm);
-        assertThat(roomIds(b)).doesNotContain(dm);
+        assertThat(emptyFlag(a, dm)).isTrue();
+        assertThat(emptyFlag(b, dm)).isTrue();
+        assertThat(emptyFlag(a, teamRoom)).as("팀 방은 메시지가 없어도 empty가 아니다").isFalse();
 
         chat.send(b, dm, "첫 메시지");
-        assertThat(roomIds(a)).contains(dm);
-        assertThat(roomIds(b)).contains(dm);
+        assertThat(emptyFlag(a, dm)).isFalse();
+        assertThat(emptyFlag(b, dm)).isFalse();
+    }
+
+    private boolean emptyFlag(LoggedIn user, long roomId) throws Exception {
+        JsonNode rooms = json(mvc.perform(get("/api/chat/rooms").cookie(user.cookie())).andExpect(status().isOk()));
+        return find(rooms, roomId).get("empty").asBoolean();
     }
 
     @Test
