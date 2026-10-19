@@ -72,7 +72,7 @@ async function main() {
       case: i + 1, name: c.name, delay: c.delay, sessions: topology.rooms * topology.members, workers: config.workers,
       sessionsPerWorker: Math.ceil((topology.rooms * topology.members) / config.workers), r: c.r, valid: s.valid,
       delivery: s.delivery, ack: s.ack, read: s.read, readHttp: s.readHttp,
-      server: { injected: server.injected, timerLate: server.timerLate, framesOut: server.framesOut },
+      server,
       error: {
         delivery: { p50: err(s.delivery, 'p50'), p95: err(s.delivery, 'p95'), p99: err(s.delivery, 'p99') },
         ack: { p50: err(s.ack, 'p50'), p95: err(s.ack, 'p95'), p99: err(s.ack, 'p99') },

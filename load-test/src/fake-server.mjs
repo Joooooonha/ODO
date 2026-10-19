@@ -54,8 +54,9 @@ resetRooms();
 
 // 기록: 넣은 지연, 타이머가 예정보다 늦은 정도(넣은 지연 + 늦음 = 서버 쪽에서 실제로 걸린 시간)
 let stats;
+let pendingTimers = 0;
 const resetStats = () => {
-  stats = { injected: createHistogram(), timerLate: createHistogram(), sent: 0, readBroadcasts: 0, framesOut: 0 };
+  stats = { injected: createHistogram(), timerLate: createHistogram(), sent: 0, readBroadcasts: 0, readSkipped: 0, readPosts: 0, framesOut: 0, pending: 0 };
 };
 resetStats();
 
@@ -63,7 +64,9 @@ const later = (fn) => {
   const d = sampleDelayMs();
   const due = process.hrtime.bigint() + BigInt(Math.round(d * 1e6));
   recordNs(stats.injected, BigInt(Math.round(d * 1e6)));
+  pendingTimers += 1;
   setTimeout(() => {
+    pendingTimers -= 1;
     recordNs(stats.timerLate, process.hrtime.bigint() - due);
     fn();
   }, d);
@@ -166,7 +169,7 @@ const server = http.createServer((req, res) => {
   req.on('data', (c) => (body += c));
   req.on('end', () => {
     if (url.pathname === '/fake/stats') {
-      return send(200, { injected: summarize(stats.injected), timerLate: summarize(stats.timerLate), sent: stats.sent, readBroadcasts: stats.readBroadcasts, framesOut: stats.framesOut });
+      return send(200, { injected: summarize(stats.injected), timerLate: summarize(stats.timerLate), sent: stats.sent, readPosts: stats.readPosts, readBroadcasts: stats.readBroadcasts, readSkipped: stats.readSkipped, pendingTimers, framesOut: stats.framesOut });
     }
     if (url.pathname === '/fake/reset') {
       resetStats();
@@ -199,10 +202,14 @@ const server = http.createServer((req, res) => {
     if (m && req.method === 'POST') {
       const roomId = Number(m[1]);
       const { seq } = JSON.parse(body || '{}');
+      stats.readPosts += 1;
       send(204);
       later(() => {
         const r = room(roomId);
-        if ((r.positions.get(userId) ?? 0) >= seq) return;
+        if ((r.positions.get(userId) ?? 0) >= seq) {
+          stats.readSkipped += 1;
+          return;
+        }
         r.positions.set(userId, seq);
         stats.readBroadcasts += 1;
         broadcast(roomId, { type: 'READ', ...snapshot(roomId, r) });
