@@ -1,0 +1,31 @@
+{
+  "note": "개선 R0 기준선 재확인(Task-chat-read-improve 4절): 시나리오 2 (나)와 같은 설정, 묶기 끔(W=0)·벌크헤드 끔(K=0). 새 코드를 끈 상태가 기준선과 같은지 + 과부하 때 스레드 풀별 CPU",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 400
+    },
+    {
+      "r": 800
+    },
+    {
+      "r": 1200
+    }
+  ],
+  "readThrottleMs": 0
+}

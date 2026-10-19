@@ -2,6 +2,7 @@ import { Client } from '@stomp/stompjs';
 import { getChatMessages, getChatRooms, getReadState, reportRead } from '../api/client';
 import { loadOutbox, saveOutbox } from './outbox';
 import { MAX_MESSAGE_LENGTH, codePointLength, newClientMessageId } from './format';
+import { ReadThrottle } from './readThrottle';
 
 /**
  * 브라우저 쪽 채팅 상태와 연결(9절). React 밖의 단순 저장소이고, 화면은 useSyncExternalStore로 구독한다.
@@ -16,9 +17,9 @@ import { MAX_MESSAGE_LENGTH, codePointLength, newClientMessageId } from './forma
  *   곳까지 그린 결과"다. 빈틈은 1초 기다렸다가 afterSeq로 채운다(9.4)
  * - 보낼 목록(outbox): 확정 응답을 받아야만 지운다. 확정을 기다리지 않고 연달아 보내되 미확정 50개(전송
  *   창)에서 멈춘다. 재전송은 재연결과 SERVER_RETRY_EXHAUSTED 두 경우뿐이다(9.5)
- * - 읽음(Task-chat-read 4절, 기준선): 방이 열려 있고 탭이 보이고 contiguousTo가 마지막 보고값보다 커지면
- *   **바로** 보고한다(디바운스·묶기 없음). 보고 값은 contiguousTo — 빈틈 너머를 보고하면 안 본 메시지까지
- *   읽음이 된다. READ 프레임·read-state는 방마다 마지막 적용 version보다 작으면 버린다
+ * - 읽음(Task-chat-read 4절): 방이 열려 있고 탭이 보이고 contiguousTo가 마지막 보고값보다 커지면 보고한다.
+ *   보고 값은 contiguousTo — 빈틈 너머를 보고하면 안 본 메시지까지 읽음이 된다. 언제 보낼지는 readThrottle.js
+ *   (묶기 간격 W, 기본 0 = 기준선처럼 바로). READ 프레임·read-state는 방마다 마지막 적용 version보다 작으면 버린다
  */
 
 export const SEND_WINDOW = 50;
@@ -45,8 +46,10 @@ const normalize = (m) => ({
 });
 
 export class ChatStore {
-    constructor({ socketUrl }) {
+    /** @param readThrottleMs 읽음 보고 묶기 간격 W(ms, 0 = 묶지 않음). 빌드 환경 변수 VITE_CHAT_READ_THROTTLE_MS */
+    constructor({ socketUrl, readThrottleMs = 0 }) {
         this.socketUrl = socketUrl;
+        this.readThrottleMs = readThrottleMs;
         this.listeners = new Set();
         this.version = 0;
 
@@ -117,7 +120,10 @@ export class ChatStore {
         this.client = null;
         client?.deactivate();
         this.roomSubscriptions.clear();
-        this.rooms.forEach((room) => clearTimeout(room.gapTimer));
+        this.rooms.forEach((room) => {
+            clearTimeout(room.gapTimer);
+            room.reporter?.dispose();
+        });
         this.rooms = new Map();
         this.roomsLoaded = false;
         this.status = 'idle';
@@ -265,8 +271,8 @@ export class ChatStore {
                 lastSeq: 0, myReadSeq: null, preview: null, previewSeq: 0,
                 messages: new Map(), baseline: null, contiguousTo: 0, hasOlder: false,
                 loading: false, loadingOlder: false, error: '', gapTimer: null, fetching: new Set(),
-                // 읽음: 마지막으로 적용한 스냅샷 { version, positions, ranges } / 이 탭이 마지막으로 보고한 번호
-                read: null, reportedSeq: 0,
+                // 읽음: 마지막으로 적용한 스냅샷 { version, positions, ranges } / 이 탭의 보고 규칙(readThrottle, 처음 보고할 때)
+                read: null, reporter: null,
             };
             this.rooms.set(roomId, room);
         }
@@ -349,8 +355,13 @@ export class ChatStore {
 
     closeRoom(roomId) {
         const n = (this.openRooms.get(roomId) ?? 1) - 1;
-        if (n <= 0) this.openRooms.delete(roomId);
-        else this.openRooms.set(roomId, n);
+        if (n <= 0) {
+            this.openRooms.delete(roomId);
+            // 사용자가 실제로 본 위치라 묶기 창을 기다리지 않고 보낸다
+            this.rooms.get(roomId)?.reporter?.flush();
+        } else {
+            this.openRooms.set(roomId, n);
+        }
     }
 
     /** 기준이 없으면 최신 50, 있으면 마지막으로 받은 번호 이후. 너무 벌어졌으면 최신 50부터 다시. */
@@ -526,21 +537,24 @@ export class ChatStore {
     }
 
     /**
-     * 조건이 맞으면 바로 보고한다: 방이 열려 있고, 탭이 보이고, contiguousTo가 마지막 보고값보다 크다.
-     * 실패는 다시 보내지 않는다(다음 보고가 더 큰 값으로 덮는다).
+     * 조건이 맞으면 보고한다: 방이 열려 있고, 탭이 보이고, contiguousTo가 마지막 보고값보다 크다.
+     * 보내는 시점·실패 재전송은 readThrottle.js(W = 0이면 바로 보낸다).
      */
     maybeReport(room) {
         if (!this.running || !this.openRooms.has(room.roomId) || !isTabVisible()) return;
         const seq = room.contiguousTo;
-        if (!room.baseline || seq <= room.reportedSeq) return;
-        room.reportedSeq = seq;
+        room.reporter ??= new ReadThrottle({ windowMs: this.readThrottleMs, send: (s) => reportRead(room.roomId, s) });
+        if (!room.baseline || seq <= room.reporter.target) return;
         if (room.myReadSeq == null || seq > room.myReadSeq) room.myReadSeq = seq;
-        reportRead(room.roomId, seq).catch(() => {});
+        room.reporter.offer(seq);
     }
 
-    /** 탭이 다시 보이면 열린 방마다 보고(가려진 동안 붙은 메시지). */
+    /** 탭이 숨겨지면 남은 보고를 바로 보내고, 다시 보이면 열린 방마다 보고(가려진 동안 붙은 메시지). */
     onVisibilityChange = () => {
-        if (!isTabVisible()) return;
+        if (!isTabVisible()) {
+            this.openRooms.forEach((_, roomId) => this.rooms.get(roomId)?.reporter?.flush());
+            return;
+        }
         this.openRooms.forEach((_, roomId) => {
             const room = this.rooms.get(roomId);
             if (room) this.maybeReport(room);

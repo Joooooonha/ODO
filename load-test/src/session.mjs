@@ -1,13 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from '@stomp/stompjs';
+// 화면과 같은 파일(브라우저를 흉내 내므로 읽음 보고 규칙이 같아야 한다). 컨테이너에서는 compose가 같은 경로에 붙인다
+import { ReadThrottle } from '../../web-service/frontend/src/chat/readThrottle.js';
 
 /**
  * 세션 하나 = 브라우저 탭 하나의 **기준선 동작**(Task-chat-core 9절, Task-chat-read 4절)을 그대로 흉내 낸다.
  *
  * - 연결 순서: CONNECT → 개인 목적지 2개·내 모든 방 구독 → SEND /app/sync → SYNC → GET /rooms →
  *   (보고 있는 방이면) 최신 메시지 + read-state → 읽음 보고
- * - 보고 있는 방: 받은 메시지로 contiguousTo를 갱신하고, 커지면 **바로** 읽음 보고(HTTP). 빈틈은 1초 기다렸다가
- *   afterSeq로 채운다. 보고 값은 contiguousTo
+ * - 보고 있는 방: 받은 메시지로 contiguousTo를 갱신하고, 커지면 읽음 보고(HTTP). 빈틈은 1초 기다렸다가
+ *   afterSeq로 채운다. 보고 값은 contiguousTo. 보내는 시점·재전송은 화면과 같은 readThrottle.js
+ *   (설정 readThrottleMs = 화면의 W, 기본 0 = 바로)
+ * - 읽음 반영 지연의 시작점은 **contiguousTo가 그 번호에 닿은 순간**(화면에 붙은 순간)이다(Task-chat-read-improve 2.4).
+ *   보낸 순간부터 재면 묶기로 기다린 시간이 빠진다. 보낸 순간부터 잰 값(readSend)도 함께 남긴다 — W = 0이면 둘이 같다
  * - 전송 창 50(미확정 50개면 그 전송은 막힌 것으로 센다 — 일정표대로 보내는 open-loop라 미뤄 보내지 않는다)
  * - 재연결: 1초 → 2초 → … 최대 30초, 절반~전부 무작위
  *
@@ -68,6 +73,7 @@ export class Session {
     this.running = false;
     clearTimeout(this.reconnectTimer);
     clearTimeout(this.view?.gapTimer);
+    this.reporter?.dispose();
     this.client?.deactivate();
   }
 
@@ -139,8 +145,12 @@ export class Session {
       this.http('GET', `/api/chat/rooms/${roomId}/messages`),
       this.http('GET', `/api/chat/rooms/${roomId}/read-state`),
     ]);
-    const view = this.view ?? { received: new Set(), contiguousTo: 0, reported: 0, gapTimer: null, fetching: false };
+    const view = this.view ?? { received: new Set(), contiguousTo: 0, visibleTo: 0, gapTimer: null, fetching: false };
     this.view = view;
+    this.reporter ??= new ReadThrottle({
+      windowMs: this.ctx.config.readThrottleMs ?? 0,
+      send: (seq) => this.postRead(seq),
+    });
     for (const m of page?.messages ?? []) view.received.add(m.seq);
     // 최신 50개를 기준으로 이어 본다(그 앞은 화면에 없다 — 브라우저와 같다)
     const from = page?.messages?.length ? page.messages[0].seq : (page?.lastSeq ?? 0) + 1;
@@ -157,7 +167,11 @@ export class Session {
       to += 1;
     }
     view.contiguousTo = to;
-    if (to > view.reported) this.reportRead(to);
+    if (to > view.visibleTo) {
+      view.visibleTo = to;
+      this.ctx.readVisible(this.watched, this.userId, to, process.hrtime.bigint());
+    }
+    if (to > this.reporter.target) this.reporter.offer(to);
     const gap = view.received.size > 0;
     if (gap && !view.gapTimer) {
       view.gapTimer = setTimeout(() => {
@@ -187,19 +201,29 @@ export class Session {
     this.advance();
   }
 
-  /** 바로 보고(디바운스 없음). 실패는 다시 보내지 않는다 — 다음 보고가 덮는다. */
-  reportRead(seq) {
-    this.view.reported = seq;
+  /** 읽음 보고 HTTP 한 건(언제 부를지는 readThrottle). 실패는 상태를 담아 다시 던진다 — 재전송 여부는 readThrottle이 정한다 */
+  postRead(seq) {
     const t0 = process.hrtime.bigint();
-    this.ctx.readReported(this.watched, this.userId, seq, t0);
+    this.ctx.readSent(this.watched, this.userId, seq, t0);
+    this.ctx.count('readPosts');
     // 보고 HTTP 왕복(요청 시작 → 응답). 읽음 반영 지연이 HTTP에서 늘었는지 READ 방송에서 늘었는지 나눠 보려고
-    this.http('POST', `/api/chat/rooms/${this.watched}/read`, { seq }).then(
+    return this.http('POST', `/api/chat/rooms/${this.watched}/read`, { seq }).then(
       () => {
         this.ctx.count('readReports');
+        this.ctx.roomCount(this.watched, 'reports');
         this.ctx.record('readHttp', process.hrtime.bigint() - t0);
       },
-      () => this.ctx.count('readReportErrors'),
+      (err) => {
+        this.ctx.count(err?.status === 429 ? 'readRejected' : 'readReportErrors');
+        throw err;
+      },
     );
+  }
+
+  /** 측정용: 보고 있는 방의 읽음 보고 상태 */
+  readStatus() {
+    if (!this.reporter || !this.view) return null;
+    return { behind: this.view.contiguousTo > this.reporter.acked, stuck: this.reporter.isStuck() };
   }
 
   applyReadState(roomId, state) {
@@ -297,7 +321,7 @@ export class Session {
     if (!res.ok) {
       this.ctx.count(`http${res.status}:${method}`);
       await res.arrayBuffer().catch(() => {});
-      throw new Error(`HTTP ${res.status} ${method} ${path}`);
+      throw Object.assign(new Error(`HTTP ${res.status} ${method} ${path}`), { status: res.status });
     }
     const text = await res.text();
     return text ? JSON.parse(text) : null;

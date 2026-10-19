@@ -1,0 +1,40 @@
+{
+  "note": "개선 R1 B만(W=500): 시나리오 1 20:0 유효 범위(r ≤ 10) + 생성기 한계 안에서 더 올림(READ 프레임이 줄어 생성기 한계가 오른다)",
+  "rateMode": "perRoom",
+  "senders": "watchers",
+  "dmRatePerSec": 1,
+  "connectRatePerSec": 100,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 1,
+  "topology": {
+    "rooms": 1,
+    "members": 20,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 5,
+    "watchersPerRoom": 20,
+    "activeRoomRatio": 1
+  },
+  "stages": [
+    {
+      "r": 1
+    },
+    {
+      "r": 5
+    },
+    {
+      "r": 10
+    },
+    {
+      "r": 20
+    },
+    {
+      "r": 30
+    },
+    {
+      "r": 40
+    }
+  ],
+  "readThrottleMs": 500
+}

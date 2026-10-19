@@ -15,7 +15,10 @@ import { ChatStore } from './chatStore';
  */
 export function ChatProvider({ children }) {
     const { user, checking, refresh } = useAuth();
-    const [store] = useState(() => new ChatStore({ socketUrl: chatSocketUrl() }));
+    const [store] = useState(() => new ChatStore({
+        socketUrl: chatSocketUrl(),
+        readThrottleMs: Number(import.meta.env.VITE_CHAT_READ_THROTTLE_MS ?? 0) || 0,
+    }));
 
     useEffect(() => {
         let inFlight = false;

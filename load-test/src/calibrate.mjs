@@ -73,15 +73,19 @@ async function main() {
     let metricKind = null;
     const span = (p) => (server.spanByKind?.[KIND[metricKind]]?.[p] ?? server.serverSpan[p]);
     const err = (m, p) => (m[p] == null ? null : Math.round((m[p] - server.injected[p] - span(p)) * 100) / 100);
+    // 묶기(readThrottleMs > 0)를 켜면 읽음 반영(화면에 붙은 순간부터)에 묶기 대기가 들어간다 — 그건 설계의 대가지
+    // 생성기 오차가 아니므로, 오차는 보낸 순간부터 잰 값(readSend)으로 계산한다. W = 0이면 둘이 같다
+    const readKey = (config.readThrottleMs ?? 0) > 0 ? 'readSend' : 'read';
     const errOf = (k, p) => {
       metricKind = k;
-      return err(s[k], p);
+      return err(s[k === 'read' ? readKey : k], p);
     };
     const errTimerOnly = (m, p) => (m[p] == null ? null : Math.round((m[p] - server.injected[p] - server.timerLate[p]) * 100) / 100);
     const row = {
       case: i + 1, name: c.name, delay: c.delay, sessions: topology.rooms * topology.members, workers: config.workers,
       sessionsPerWorker: Math.ceil((topology.rooms * topology.members) / config.workers), r: c.r, valid: s.valid,
-      delivery: s.delivery, ack: s.ack, read: s.read, readHttp: s.readHttp,
+      readThrottleMs: config.readThrottleMs ?? 0, readErrorFrom: readKey,
+      delivery: s.delivery, ack: s.ack, read: s.read, readSend: s.readSend, readHttp: s.readHttp,
       server,
       error: {
         delivery: { p50: errOf('delivery', 'p50'), p95: errOf('delivery', 'p95'), p99: errOf('delivery', 'p99') },

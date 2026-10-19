@@ -251,6 +251,32 @@ class ChatReadTest {
     }
 
     @Test
+    @DisplayName("[개선 A 끔] 벌크헤드 기본값 0 — 동시 보고 30건이 모두 처리되고 거절 0(기준선과 같다)")
+    void bulkheadOffNeverRejects() throws Exception {
+        Room r = room(29, 2);
+        long last = chat.lastSeq(r.id());
+        List<LoggedIn> readers = new ArrayList<>(r.members());
+        readers.add(r.leader());
+        long rejected = readMetrics.requests(ChatReadMetrics.REJECTED);
+
+        ExecutorService pool = Executors.newFixedThreadPool(readers.size());
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<Integer>> results = new ArrayList<>();
+        for (LoggedIn reader : readers) {
+            results.add(pool.submit(() -> {
+                start.await();
+                return report(reader, r.id(), Map.of("seq", last)).andReturn().getResponse().getStatus();
+            }));
+        }
+        start.countDown();
+        for (Future<Integer> f : results) {
+            assertThat(f.get(60, TimeUnit.SECONDS)).isEqualTo(204);
+        }
+        pool.shutdown();
+        assertThat(readMetrics.requests(ChatReadMetrics.REJECTED)).isEqualTo(rejected);
+    }
+
+    @Test
     @DisplayName("[9.1] last_seq보다 큰 seq → 400, seq 없음·음수 → 400, 멤버 아님(방 없음 포함) → 403, 나간 멤버 → 403")
     void validation() throws Exception {
         Room r = room(1, 2);

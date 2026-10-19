@@ -92,10 +92,27 @@ export async function run(config, { log = console.log, onMeasureStart } = {}) {
     writeFileSync(path.join(outDir, 'stages.json'), JSON.stringify(stages, null, 2));
   }
   await Promise.all(workers.map((w) => w.call({ cmd: 'rates', rooms: [] })));
+  // 보내기를 멈춘 뒤 화면 위치를 서버가 모두 받아들이는지(읽음 위치가 멈추지 않는지, Task-chat-read-improve 5절 4번)
+  const drain = await readDrain(workers, config.readDrainSec ?? 60);
+  log(`[생성기] 읽음 보고 정리: 보는 세션 ${drain.watched}, 서버보다 앞선 화면 ${drain.behind}, 멈춤 ${drain.stuck} (${drain.waitedSec}초)`);
+  writeFileSync(path.join(outDir, 'read-drain.json'), JSON.stringify(drain, null, 2));
   await Promise.all(workers.map((w) => w.call({ cmd: 'stop' }).catch(() => {})));
   writeFileSync(path.join(outDir, 'summary.csv'), toCsv(stages));
   log(`[생성기] 결과: ${outDir}`);
   return { outDir, stages, clock };
+}
+
+/** 보내기를 멈춘 뒤 모든 보는 세션의 화면 위치가 서버에 반영될 때까지(최대 timeoutSec) 기다린다. */
+async function readDrain(workers, timeoutSec) {
+  const t0 = Date.now();
+  let last;
+  for (;;) {
+    const st = await Promise.all(workers.map((w) => w.call({ cmd: 'readStatus' })));
+    last = st.reduce((a, s) => ({ watched: a.watched + s.watched, behind: a.behind + s.behind, stuck: a.stuck + s.stuck }), { watched: 0, behind: 0, stuck: 0 });
+    if (last.behind === 0 || Date.now() - t0 > timeoutSec * 1000) break;
+    await sleep(1000);
+  }
+  return { ...last, waitedSec: Math.round((Date.now() - t0) / 1000) };
 }
 
 /** 방마다 보내기 속도. perRoom이면 활발한 방마다 r건/초, total이면 r을 활발한 방 수로 나눈다. DM 배경은 따로. */
@@ -126,7 +143,7 @@ function sendRates(topo, config, r) {
 }
 
 function summarizeStage(r, results, machineCpu, config, cgroup) {
-  const kinds = ['delivery', 'ack', 'read', 'readHttp', 'lag'];
+  const kinds = ['delivery', 'ack', 'read', 'readSend', 'readHttp', 'lag'];
   const merged = Object.fromEntries(kinds.map((k) => [k, merge(results.map((x) => x.histograms[k]))]));
   const counters = {};
   for (const x of results) for (const [k, v] of Object.entries(x.counters)) counters[k] = (counters[k] ?? 0) + v;
@@ -172,7 +189,9 @@ function summarizeStage(r, results, machineCpu, config, cgroup) {
     delivery: summarize(merged.delivery),
     ack: summarize(merged.ack),
     read: summarize(merged.read),
+    readSend: summarize(merged.readSend),
     readHttp: summarize(merged.readHttp),
+    readStatus: results.reduce((a, x) => ({ behind: a.behind + (x.readStatus?.behind ?? 0), stuck: a.stuck + (x.readStatus?.stuck ?? 0) }), { behind: 0, stuck: 0 }),
     scheduleLag: summarize(merged.lag),
     counters,
     generator: { machineCpuPercent: machineCpu, worstLoopDelayP99Ms: worstLoop, worstEventLoopUtilization: worstElu, workers: workerSelf },
@@ -197,6 +216,8 @@ function formatStage(s) {
     `  전달  ${f(s.delivery)}`,
     `  확정  ${f(s.ack)}`,
     `  읽음  ${f(s.read)}`,
+    `  읽음(보낸 순간부터) ${f(s.readSend)}`,
+    `  읽음 보고 상태(단계 끝): 서버보다 앞선 화면 ${s.readStatus.behind}, 멈춤 ${s.readStatus.stuck}`,
     `  읽음 보고 HTTP ${f(s.readHttp)}`,
     `  예약 늦음 ${f(s.scheduleLag)}`,
     ...(s.cgroup ? [`  생성기 cgroup ${s.cgroup.cpusUsed}/${s.cgroup.cpusLimit} CPU, throttle ${s.cgroup.nrThrottled}/${s.cgroup.nrPeriods}주기 ${s.cgroup.throttledMs}ms`] : []),
@@ -208,13 +229,13 @@ function formatStage(s) {
 function toCsv(stages) {
   const head = ['r', 'valid', 'delivery_count', 'delivery_p50', 'delivery_p95', 'delivery_p99', 'delivery_max',
     'ack_count', 'ack_p50', 'ack_p95', 'ack_p99', 'ack_max', 'read_count', 'read_p50', 'read_p95', 'read_p99', 'read_max',
-    'lag_p99', 'gen_machine_cpu', 'gen_worst_loop_p99', 'loop_review', 'saturated', 'frames_ratio', 'worst_elu', 'gen_cgroup_cpus', 'gen_throttled_periods', 'gen_throttled_ms', 'sent', 'blocked', 'disconnects', 'read_reports', 'read_report_errors'];
+    'read_send_p95', 'read_stuck', 'lag_p99', 'gen_machine_cpu', 'gen_worst_loop_p99', 'loop_review', 'saturated', 'frames_ratio', 'worst_elu', 'gen_cgroup_cpus', 'gen_throttled_periods', 'gen_throttled_ms', 'sent', 'blocked', 'disconnects', 'read_reports', 'read_report_errors', 'read_posts', 'read_rejected'];
   const rows = stages.map((s) => [s.r, s.valid,
     ...['delivery', 'ack', 'read'].flatMap((k) => [s[k].count, s[k].p50, s[k].p95, s[k].p99, s[k].max]),
-    s.scheduleLag.p99, s.generator.machineCpuPercent, s.generator.worstLoopDelayP99Ms, s.loopReview, s.saturated, s.frames.ratio ?? '', s.generator.worstEventLoopUtilization,
+    s.readSend.p95, s.readStatus.stuck, s.scheduleLag.p99, s.generator.machineCpuPercent, s.generator.worstLoopDelayP99Ms, s.loopReview, s.saturated, s.frames.ratio ?? '', s.generator.worstEventLoopUtilization,
     s.cgroup?.cpusUsed ?? '', s.cgroup?.nrThrottled ?? '', s.cgroup?.throttledMs ?? '',
     s.counters.sent ?? 0, s.counters['send:blocked'] ?? 0, s.counters.disconnects ?? 0,
-    s.counters.readReports ?? 0, s.counters.readReportErrors ?? 0]);
+    s.counters.readReports ?? 0, s.counters.readReportErrors ?? 0, s.counters.readPosts ?? 0, s.counters.readRejected ?? 0]);
   return [head, ...rows].map((r) => r.join(',')).join('\n') + '\n';
 }
 

@@ -11,6 +11,11 @@ import { readFileSync } from 'node:fs';
  * - 한도를 넘어도 |측정 p95 − 기준| > 보정 오차 p99 이면 통과/실패 판정은 유효(guard band). 그 안이면 "판정 보류"
  * - 개선 전후 비교는 차이가 그 단계 보정 오차보다 클 때만 개선 효과로 본다(이 스크립트는 값만 낸다)
  * - app·PG 밖의 컨테이너가 throttle되면(그 단계 주기의 1% 이상) 그 단계는 무효 표시
+ * - 포화(Task-chat-read-improve 4절, 준하 승인 — 결과를 본 뒤 바꾼 규칙이라 원래 규칙의 판정도 함께 낸다):
+ *   서버 쪽 신호가 작다 = 앱 throttle < 5%(두 대 모두) 이고 인바운드 대기 p99 < 100ms 이고 보내기 대기열 최대 < 100
+ *   생성기 포화 = 이벤트 루프 사용률 ≥ 0.9, 또는 (받은 방 프레임 < 99% 이면서 서버 쪽 신호가 작음)
+ *   서버 포화 = 받은 방 프레임 < 99% 이면서 서버 쪽 신호가 큼. 생성기 포화(루프 사용률)와 서버 포화가 함께면 판정 불가
+ *   원래 규칙(2-4): 루프 사용률 ≥ 0.9 또는 받은 방 프레임 < 99% → 생성기 포화
  */
 const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) => {
   if (a.startsWith('--')) acc.push([a.slice(2), all[i + 1]]);
@@ -26,8 +31,31 @@ const env = JSON.parse(readFileSync(args.stages.replace(/stages\.json$/, 'env.js
 const { watchersPerRoom: watchers, members } = env.config.topology;
 const calib = (args.calib ?? '').split(',').filter(Boolean).flatMap((f) => JSON.parse(readFileSync(f, 'utf8')));
 // 같은 배치(세션 수 · 시청 비율) · 같은 r · 고정 50ms 보정 경우. 없으면 "보정 없음"(포화 판정만)
+// 읽음 보고 묶기(readThrottleMs)도 같아야 같은 설정이다(없는 옛 보정 = 0)
+const throttle = env.config.readThrottleMs ?? 0;
 const calibFor = (r) => calib.filter((c) => c.delay === 'fixed:50' && c.r === r && c.sessions === env.sessions
+  && (c.readThrottleMs ?? 0) === throttle
   && (c.name.includes(`${watchers}:${members - watchers}`))).at(-1) ?? null;
+const SMALL = { appThrottle: 0.05, inboundWaitP99Ms: 100, outboundQueuedMax: 100 };
+
+/** 포화 판정: 원래 규칙과 수정 규칙(머리말) */
+function saturation(s, server, cg) {
+  const elu = s.generator?.worstEventLoopUtilization ?? 0;
+  const ratio = s.frames?.ratio;
+  const short = ratio != null && ratio < 0.99;
+  const appThrottle = Math.max(cg.app1?.ratio ?? 0, cg.app2?.ratio ?? 0);
+  const inboundWait = Math.max(0, ...Object.values(server.inboundWaitP99Ms).filter(Number.isFinite));
+  const outboundQueued = Math.max(0, ...Object.values(server.outboundQueuedMax).filter(Number.isFinite));
+  const serverSmall = appThrottle < SMALL.appThrottle && inboundWait < SMALL.inboundWaitP99Ms && outboundQueued < SMALL.outboundQueuedMax;
+  const generator = elu >= 0.9 || (short && serverSmall);
+  const serverSat = short && !serverSmall;
+  const verdict = generator && serverSat ? '판정 불가' : generator ? '생성기 포화' : serverSat ? '서버 포화' : '포화 아님';
+  return {
+    original: elu >= 0.9 || short ? '생성기 포화' : '포화 아님',
+    revised: verdict,
+    signals: { elu, framesRatio: ratio ?? null, appThrottle: round(appThrottle, 3), inboundWaitP99Ms: inboundWait, outboundQueuedMax: outboundQueued, serverSmall },
+  };
+}
 
 const cgRows = new Map();
 for (const line of readFileSync(args.cgroup, 'utf8').split('\n')) {
@@ -99,6 +127,22 @@ for (const s of stagesDoc) {
     redisQueuedMax: await one(`max_over_time(chat_redis_dispatch_queued[${w}])`, to),
     redisDurP99Ms: Object.fromEntries((await prom(`max by (server, type) (max_over_time(chat_redis_dispatch_duration_seconds{quantile="0.99"}[${w}])) * 1000`, to))
       .map((r) => [`${r.labels.server}:${r.labels.type}`, round(r.value)])),
+    // 개선(Task-chat-read-improve): 스레드 풀별 CPU(코어), Tomcat 사용 중 스레드, 읽음 거절·동시 처리, K 계산 근거
+    threadCores: Object.fromEntries((await prom(`sum by (server, pool) (rate(chat_threads_cpu_seconds_total[${w}]))`, to))
+      .map((r) => [`${r.labels.server}:${r.labels.pool}`, round(r.value, 3)])),
+    tomcatBusyMax: await one(`max_over_time(tomcat_threads_busy_threads[${w}])`, to),
+    tomcatBusyAvg: await one(`avg_over_time(tomcat_threads_busy_threads[${w}])`, to),
+    readPerSec: Object.fromEntries((await prom(`sum by (server, outcome) (increase(chat_read_requests_total[${w}])) / ${(to - from) / 1000}`, to))
+      .map((r) => [`${r.labels.server}:${r.labels.outcome}`, round(r.value, 1)])),
+    readInflightMax: await one(`max_over_time(chat_read_inflight[${w}])`, to),
+    readInflightAvg: await one(`avg_over_time(chat_read_inflight[${w}])`, to),
+    readP50Ms: await one(`avg_over_time(chat_read_duration_seconds{quantile="0.5", outcome="advanced"}[${w}]) * 1000`, to),
+    readP95Ms: await one(`max_over_time(chat_read_duration_seconds{quantile="0.95", outcome="advanced"}[${w}]) * 1000`, to),
+    bulkheadLimit: await one(`max_over_time(chat_read_bulkhead_limit[${w}])`, to),
+    outboundQueuedMax: await one(`max_over_time(executor_queued_tasks{name="clientOutboundChannelExecutor"}[${w}])`, to),
+    inboundQueuedMax: await one(`max_over_time(executor_queued_tasks{name="clientInboundChannelExecutor"}[${w}])`, to),
+    hikariActiveAvg: await one(`avg_over_time(hikaricp_connections_active[${w}])`, to),
+    hikariPendingAvg: await one(`avg_over_time(hikaricp_connections_pending[${w}])`, to),
     framesPerSec: await one(`sum by (type) (increase(chat_outbound_frames_total[${w}])) / ${(to - from) / 1000}`, to, 'type'),
     publishPerSec: await one(`sum by (type) (increase(chat_redis_publish_total[${w}])) / ${(to - from) / 1000}`, to, 'type'),
   };
@@ -112,12 +156,13 @@ for (const s of stagesDoc) {
   const throttledOthers = Object.entries(cg).filter(([n, v]) => !SERVER_SIDE.has(n) && v.ratio >= 0.01).map(([n, v]) => `${n} ${round(v.ratio * 100, 1)}%`);
   rows.push({
     r: s.r, startedAt: s.startedAt, endedAt: s.endedAt,
-    delivery: s.delivery, ack: s.ack, read: s.read, readHttp: s.readHttp,
+    delivery: s.delivery, ack: s.ack, read: s.read, readSend: s.readSend ?? null, readHttp: s.readHttp, readStatus: s.readStatus ?? null,
     judge: { delivery: judge('delivery', s.delivery, cal), ack: judge('ack', s.ack, cal), read: judge('read', s.read, cal) },
     calibCase: cal?.name ?? null,
     counters: s.counters, generator: { cgroup: s.cgroup, worstLoopP99: s.generator.worstLoopDelayP99Ms, loopReview: s.loopReview },
     server, db, cgroup: cg,
     saturated: s.saturated ?? null, saturatedReasons: s.saturatedReasons ?? [], frames: s.frames ?? null,
+    saturation: saturation(s, server, cg),
     unexpectedLock: (db.lockByTarget.other ?? 0) > 0,
     invalidThrottle: throttledOthers,
   });

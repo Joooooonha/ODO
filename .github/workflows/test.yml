@@ -59,6 +59,11 @@ jobs:
           npm ci
           npx eslint src --max-warnings=0
 
+      # 읽음 보고 묶기 규칙(화면과 부하 생성기가 같이 쓰는 파일)
+      - name: 프론트엔드 단위 테스트
+        working-directory: web-service/frontend
+        run: node --test src/chat/readThrottle.test.js
+
       # deploy.yml과 같은 조건으로 빌드한다. 빌드가 깨지는 것도 merge 전에 알아야 한다.
       - name: 프론트엔드 빌드
         working-directory: web-service/frontend

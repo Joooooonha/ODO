@@ -81,3 +81,14 @@ test('JWT: HS256 서명이 같은 키로 검증된다, 32바이트 미만 키는
   assert.equal(JSON.parse(Buffer.from(p, 'base64url')).sub, '1000001');
   assert.throws(() => signToken('short', 1));
 });
+
+test('읽음 보고 묶기: 생성기 세션이 화면과 같은 파일(readThrottle.js)을 가져온다', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../src/session.mjs', import.meta.url), 'utf8');
+  assert.match(src, /from '\.\.\/\.\.\/web-service\/frontend\/src\/chat\/readThrottle\.js'/);
+  const { ReadThrottle } = await import('../../web-service/frontend/src/chat/readThrottle.js');
+  const sent = [];
+  const t = new ReadThrottle({ windowMs: 0, send: (s) => { sent.push(s); return Promise.resolve(); } });
+  t.offer(3);
+  assert.deepEqual(sent, [3]);
+});

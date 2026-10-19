@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
  * <ul>
  *   <li>{@code chat.read.requests{outcome}} — 읽음 보고 수와 결과.
  *       {@code advanced}(위치가 올라감 → 스냅샷·발행) / {@code noop}(같거나 작은 값) / {@code forbidden}(멤버 아님) /
- *       {@code invalid}(seq 없음·음수·마지막 번호보다 큼)</li>
+ *       {@code invalid}(seq 없음·음수·마지막 번호보다 큼) / {@code rejected}(읽음 벌크헤드가 거절 → 429, DB를 쓰기 전)</li>
  *   <li>{@code chat.read.duration{outcome}} — 읽음 보고 처리 시간(갱신 + 스냅샷 + 발행), p50·p95·p99</li>
  *   <li>{@code chat.read.snapshot.duration}, {@code chat.read.snapshot.rows} — 스냅샷 조회 시간·행 수
  *       (읽음 보고와 read-state 조회 모두)</li>
@@ -32,6 +32,7 @@ public class ChatReadMetrics {
     public static final String NOOP = "noop";
     public static final String FORBIDDEN = "forbidden";
     public static final String INVALID = "invalid";
+    public static final String REJECTED = "rejected";
 
     private final MeterRegistry registry;
     private final Duration window;

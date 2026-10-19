@@ -1,0 +1,74 @@
+{
+  "note": "개선 R1 보정(W=500): 시나리오 1 20:0, 압축 보정과 같은 조건(가짜 서버 4 + stress 4). 읽음 오차는 보낸 순간부터 잰 값으로",
+  "errorLimitMs": 5,
+  "defaults": {
+    "workers": 1,
+    "connectRatePerSec": 100,
+    "rateMode": "perRoom",
+    "senders": "watchers",
+    "dmRatePerSec": 1,
+    "warmupSec": 5,
+    "measureSec": 20,
+    "contentLength": 40,
+    "topology": {
+      "rooms": 1,
+      "members": 20,
+      "teamsPerUser": 1,
+      "dmPairsPerRoom": 5,
+      "watchersPerRoom": 20,
+      "activeRoomRatio": 1
+    },
+    "readThrottleMs": 500
+  },
+  "cases": [
+    {
+      "name": "시나리오1 20:0 W=500 r=1 고정 50ms",
+      "delay": "fixed:50",
+      "r": 1,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 20:0 W=500 r=5 고정 50ms",
+      "delay": "fixed:50",
+      "r": 5,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 20:0 W=500 r=10 고정 50ms",
+      "delay": "fixed:50",
+      "r": 10,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 20:0 W=500 r=20 고정 50ms",
+      "delay": "fixed:50",
+      "r": 20,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 20:0 W=500 r=30 고정 50ms",
+      "delay": "fixed:50",
+      "r": 30,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 20:0 W=500 r=40 고정 50ms",
+      "delay": "fixed:50",
+      "r": 40,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    }
+  ],
+  "readErrorLimitMs": 50
+}

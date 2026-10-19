@@ -10,7 +10,8 @@ import { createHistogram, encode, recordNs } from './hist.mjs';
  * (monitorEventLoopDelay), 예약 대비 실제 전송 늦음(lag 히스토그램)을 함께 보낸다. 루프 지연이 기준을
  * 넘으면 조정자가 그 단계를 "생성기 포화, 무효"로 표시한다.
  */
-const KINDS = ['delivery', 'ack', 'read', 'readHttp', 'lag'];
+// read = 화면에 붙은 순간 → 다른 사람의 READ에서 반영을 본 순간(2.4의 정의), readSend = 보낸 순간부터(기준선 정의)
+const KINDS = ['delivery', 'ack', 'read', 'readSend', 'readHttp', 'lag'];
 const REPORT_TTL_NS = 60_000_000_000n;
 
 let config;
@@ -24,7 +25,9 @@ let counters = new Map();
 let perRoom = new Map();
 let schedule = { rooms: [] };
 let sendTimer = null;
-const reports = new Map();   // 방:사용자 → [{ seq, t0 }] 보고 순(번호 오름차순)
+// 방:사용자 → [{ seq, t0 }] 번호 오름차순. visible = contiguousTo가 그 번호에 닿은 순간, sent = 그 번호를 보낸 순간
+const visible = new Map();
+const sentReports = new Map();
 const loopDelay = monitorEventLoopDelay({ resolution: 1 });
 loopDelay.enable();
 
@@ -52,32 +55,23 @@ const ctx = {
     if (!c) perRoom.set(roomId, (c = { sent: 0, reports: 0 }));
     c[kind] += 1;
   },
-  readReported(roomId, userId, seq, t0) {
-    ctx.roomCount(roomId, 'reports');
-    const key = `${roomId}:${userId}`;
-    let list = reports.get(key);
-    if (!list) reports.set(key, (list = []));
-    list.push({ seq, t0 });
+  readVisible(roomId, userId, seq, t) {
+    push(visible, `${roomId}:${userId}`, seq, t);
   },
-  /** 받은 READ에서 그 사용자의 위치가 prev → pos로 올랐다: 그 사이 번호를 보고한 시각부터 잰다. */
+  readSent(roomId, userId, seq, t0) {
+    push(sentReports, `${roomId}:${userId}`, seq, t0);
+  },
+  /** 받은 READ에서 그 사용자의 위치가 prev → pos로 올랐다: 그 사이 번호가 화면에 붙은 시각(read)·보낸 시각(readSend)부터 잰다. */
   readReflected(roomId, userId, prev, pos, at, readyAt) {
-    const list = reports.get(`${roomId}:${userId}`);
+    const key = `${roomId}:${userId}`;
+    const list = visible.get(key);
     if (!list) {
       // 보고한 세션이 다른 작업 프로세스에 있다(1인 2팀) — 재지 않고 센다(단계 1 C7)
       ctx.count('readUnmeasured');
       return;
     }
-    // 보고는 번호가 커지는 순서로 쌓인다 → prev보다 큰 첫 보고를 이분 탐색으로 찾고 pos까지만 본다
-    let lo = 0;
-    let hi = list.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (list[mid].seq <= prev) lo = mid + 1;
-      else hi = mid;
-    }
-    for (let i = lo; i < list.length && list[i].seq <= pos; i++) {
-      if (list[i].t0 >= readyAt) ctx.record('read', at - list[i].t0);
-    }
+    recordBetween('read', list, prev, pos, at, readyAt);
+    recordBetween('readSend', sentReports.get(key) ?? [], prev, pos, at, readyAt);
   },
   sessionReady() {
     readyCount += 1;
@@ -98,6 +92,41 @@ const ctx = {
 };
 const parsed = new Map();
 
+function push(map, key, seq, t) {
+  let list = map.get(key);
+  if (!list) map.set(key, (list = []));
+  list.push({ seq, t0: t });
+}
+
+/** 번호가 커지는 순서로 쌓인 목록에서 prev보다 큰 첫 항목을 이분 탐색으로 찾고 pos까지 잰다 */
+function recordBetween(kind, list, prev, pos, at, readyAt) {
+  let lo = 0;
+  let hi = list.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (list[mid].seq <= prev) lo = mid + 1;
+    else hi = mid;
+  }
+  for (let i = lo; i < list.length && list[i].seq <= pos; i++) {
+    if (list[i].t0 >= readyAt) ctx.record(kind, at - list[i].t0);
+  }
+}
+
+/** 보고 있는 방의 읽음 보고 상태: 서버가 아직 받아들이지 않은 화면 위치(behind), 예약 없이 멈춘 것(stuck) */
+function readStatus() {
+  let watched = 0;
+  let behind = 0;
+  let stuck = 0;
+  for (const s of sessions) {
+    const st = s.readStatus();
+    if (!st) continue;
+    watched += 1;
+    if (st.behind) behind += 1;
+    if (st.stuck) stuck += 1;
+  }
+  return { watched, behind, stuck };
+}
+
 /** 이 프로세스의 세션이 구독한 방별 세션 수(세션은 자기 모든 방을 구독한다) */
 function subscriptionsByRoom() {
   const m = new Map();
@@ -107,10 +136,12 @@ function subscriptionsByRoom() {
 
 function pruneReports() {
   const limit = process.hrtime.bigint() - REPORT_TTL_NS;
-  for (const [key, list] of reports) {
-    const kept = list.filter((r) => r.t0 >= limit);
-    if (kept.length === 0) reports.delete(key);
-    else reports.set(key, kept);
+  for (const map of [visible, sentReports]) {
+    for (const [key, list] of map) {
+      const kept = list.filter((r) => r.t0 >= limit);
+      if (kept.length === 0) map.delete(key);
+      else map.set(key, kept);
+    }
   }
 }
 setInterval(pruneReports, 5_000).unref();
@@ -190,6 +221,7 @@ async function measure(durationMs) {
     perRoom: Object.fromEntries(perRoom),
     subscriptions: Object.fromEntries(subscriptionsByRoom()),
     loopDelayMs: { p50: loopDelay.percentile(50) / 1e6, p99: loopDelay.percentile(99) / 1e6, max: loopDelay.max / 1e6 },
+    readStatus: readStatus(),
     heapMb: Math.round(process.memoryUsage().heapUsed / 1e6),
   };
 }
@@ -207,6 +239,8 @@ process.on('message', async (msg) => {
     } else if (msg.cmd === 'connect') {
       await connectAll(msg.ratePerSec);
       process.send({ id: msg.id, ok: true });
+    } else if (msg.cmd === 'readStatus') {
+      process.send({ id: msg.id, ok: true, ...readStatus() });
     } else if (msg.cmd === 'status') {
       process.send({ id: msg.id, ok: true, ready: readyCount, live: sessions.filter((s) => s.ready).length, total: sessions.length });
     } else if (msg.cmd === 'rates') {

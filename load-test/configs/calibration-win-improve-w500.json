@@ -1,0 +1,61 @@
+{
+  "note": "개선 R1·R3 보정(W=500): (나) 같은 배치·K, 묶기를 켜면 READ 프레임이 줄어 가짜 서버가 감당하는 메시지 속도가 오른다. 읽음 오차는 보낸 순간부터 잰 값으로(묶기 대기는 설계의 대가라 오차가 아니다)",
+  "errorLimitMs": 5,
+  "readErrorLimitMs": 50,
+  "defaults": {
+    "rateMode": "total",
+    "senders": "watchers",
+    "dmRatePerSec": 10,
+    "connectRatePerSec": 300,
+    "warmupSec": 10,
+    "measureSec": 30,
+    "contentLength": 40,
+    "workers": 4,
+    "topology": {
+      "rooms": 1000,
+      "members": 4,
+      "teamsPerUser": 1,
+      "dmPairsPerRoom": 1,
+      "watchersPerRoom": 2,
+      "activeRoomRatio": 0.1
+    },
+    "readThrottleMs": 500
+  },
+  "cases": [
+    {
+      "name": "시나리오2 2:2 1000x4 W=500 r=50 고정 50ms",
+      "delay": "fixed:50",
+      "r": 50
+    },
+    {
+      "name": "시나리오2 2:2 1000x4 W=500 r=100 고정 50ms",
+      "delay": "fixed:50",
+      "r": 100
+    },
+    {
+      "name": "시나리오2 2:2 1000x4 W=500 r=200 고정 50ms",
+      "delay": "fixed:50",
+      "r": 200
+    },
+    {
+      "name": "시나리오2 2:2 1000x4 W=500 r=400 고정 50ms",
+      "delay": "fixed:50",
+      "r": 400
+    },
+    {
+      "name": "시나리오2 2:2 1000x4 W=500 r=800 고정 50ms",
+      "delay": "fixed:50",
+      "r": 800
+    },
+    {
+      "name": "시나리오2 2:2 1000x4 W=500 r=1200 고정 50ms",
+      "delay": "fixed:50",
+      "r": 1200
+    },
+    {
+      "name": "시나리오2 2:2 1000x4 W=500 r=1600 고정 50ms",
+      "delay": "fixed:50",
+      "r": 1600
+    }
+  ]
+}

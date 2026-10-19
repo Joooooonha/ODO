@@ -37,3 +37,12 @@ docker compose -f deploy/loadtest/compose.yml --profile tools run --rm generator
 - Grafana `127.0.0.1:3000`, Prometheus `127.0.0.1:9090`에만 열린다. 맥에서 보기: `ssh -L 3000:127.0.0.1:3000 junha@<윈도우>`
 - 데이터 되돌리기: 앱을 멈춘 뒤 `PSQL="docker compose -f deploy/loadtest/compose.yml exec -T postgres psql -U dance" load-test/seed/db-template.sh reset`
 - 끝나면 `docker compose -f deploy/loadtest/compose.yml --profile calib --profile tools down`(볼륨은 남는다. 지우려면 `-v`)
+
+## 개선 측정(Task-chat-read-improve)
+
+- 개선 B(읽음 보고 묶기): 생성기 설정 `readThrottleMs`(화면의 `VITE_CHAT_READ_THROTTLE_MS`와 같은 뜻, 기본 0). 규칙은 화면 파일
+  `web-service/frontend/src/chat/readThrottle.js`를 생성기 컨테이너에 그대로 붙여 쓴다(compose `x-node` volumes)
+- 개선 A(읽음 벌크헤드): 앱 환경 변수 `CHAT_READ_BULKHEAD`(= `chat.read.bulkhead.max-concurrent`, 기본 0). 실행마다
+  `set READ_BULKHEAD_K=6&& docker compose -f deploy/loadtest/compose.yml up -d app1 app2` — 적용 값은 Prometheus `chat_read_bulkhead_limit`로 확인
+- 측정에서만: 스레드 풀별 CPU `chat_threads_cpu_seconds_total{pool}`, Tomcat 사용 중 스레드 `tomcat_threads_busy_threads`(loadtest 프로필)
+

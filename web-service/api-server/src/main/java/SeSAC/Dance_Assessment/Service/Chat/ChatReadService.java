@@ -29,15 +29,23 @@ public class ChatReadService {
     private final ReadSnapshotReader reader;
     private final ReadPublisher publisher;
     private final ChatReadMetrics metrics;
+    private final ReadBulkhead bulkhead;
 
     /**
      * 읽음 보고. 사용자는 인증 정보에서만 온다.
      *
+     * <p>맨 앞에서 벌크헤드 허가를 기다리지 않고 받는다(꺼져 있으면 항상 통과). 못 받으면 DB를 쓰기 전에(커넥션도
+     * 잡지 않고) 429로 끝낸다.
+     *
      * @throws ApiException 400 {@code INVALID_READ_SEQ}·{@code READ_SEQ_AHEAD} / 403 {@code NOT_CHAT_MEMBER}
-     *                      (방이 없거나, 멤버가 아니거나, 나간 멤버)
+     *                      (방이 없거나, 멤버가 아니거나, 나간 멤버) / 429 {@code READ_BUSY}(벌크헤드 거절)
      */
     public void report(long me, long roomId, Long seq) {
         long start = System.nanoTime();
+        if (!bulkhead.tryAcquire()) {
+            metrics.request(ChatReadMetrics.REJECTED, System.nanoTime() - start);
+            throw new ApiException(ErrorCode.READ_BUSY);
+        }
         String outcome = ChatReadMetrics.INVALID;
         try {
             if (seq == null || seq < 0) {
@@ -59,6 +67,7 @@ public class ChatReadService {
             }
             outcome = ChatReadMetrics.NOOP;   // 같거나 작은 값: 스냅샷·발행 없이 끝
         } finally {
+            bulkhead.release();
             metrics.request(outcome, System.nanoTime() - start);
         }
     }
