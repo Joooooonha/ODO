@@ -1,4 +1,4 @@
-import { monitorEventLoopDelay } from 'node:perf_hooks';
+import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
 import { Session } from './session.mjs';
 import { createHistogram, encode, recordNs } from './hist.mjs';
 
@@ -20,6 +20,8 @@ let readyCount = 0;
 let measuring = false;
 let histograms = {};
 let counters = new Map();
+// 받아야 할 프레임 수를 조정자가 계산하도록 방별로 센다(측정 구간만): 보낸 메시지·읽음 보고 수
+let perRoom = new Map();
 let schedule = { rooms: [] };
 let sendTimer = null;
 const reports = new Map();   // 방:사용자 → [{ seq, t0 }] 보고 순(번호 오름차순)
@@ -29,6 +31,7 @@ loopDelay.enable();
 const resetMeasures = () => {
   histograms = Object.fromEntries(KINDS.map((k) => [k, createHistogram()]));
   counters = new Map();
+  perRoom = new Map();
 };
 resetMeasures();
 
@@ -43,7 +46,14 @@ const ctx = {
   record(kind, diffNs) {
     if (measuring) recordNs(histograms[kind], diffNs, () => ctx.count(`negative:${kind}`));
   },
+  roomCount(roomId, kind) {
+    if (!measuring) return;
+    let c = perRoom.get(roomId);
+    if (!c) perRoom.set(roomId, (c = { sent: 0, reports: 0 }));
+    c[kind] += 1;
+  },
   readReported(roomId, userId, seq, t0) {
+    ctx.roomCount(roomId, 'reports');
     const key = `${roomId}:${userId}`;
     let list = reports.get(key);
     if (!list) reports.set(key, (list = []));
@@ -88,6 +98,13 @@ const ctx = {
 };
 const parsed = new Map();
 
+/** 이 프로세스의 세션이 구독한 방별 세션 수(세션은 자기 모든 방을 구독한다) */
+function subscriptionsByRoom() {
+  const m = new Map();
+  for (const s of sessions) for (const r of s.rooms ?? []) m.set(r, (m.get(r) ?? 0) + 1);
+  return m;
+}
+
 function pruneReports() {
   const limit = process.hrtime.bigint() - REPORT_TTL_NS;
   for (const [key, list] of reports) {
@@ -128,6 +145,7 @@ function tick() {
       ctx.record('lag', now - room.next);
       const sender = room.senders[room.turn++ % room.senders.length];
       const result = sender.send(room.roomId);
+      if (result === 'sent') ctx.roomCount(room.roomId, 'sent');
       ctx.count(result === 'sent' ? 'sent' : `send:${result}`);
       room.next += room.interval;
     }
@@ -152,10 +170,13 @@ async function measure(durationMs) {
   resetMeasures();
   loopDelay.reset();
   const cpu0 = process.cpuUsage();
+  const elu0 = performance.eventLoopUtilization();
   const t0 = process.hrtime.bigint();
   measuring = true;
   await new Promise((r) => setTimeout(r, durationMs));
   measuring = false;
+  // 이벤트 루프 사용률: 루프가 일한 시간 / 전체. 1에 가까우면 받은 데이터를 제때 꺼내지 못한다(루프 지연으로는 안 보인다)
+  const elu = performance.eventLoopUtilization(elu0).utilization;
   const elapsedUs = Number((process.hrtime.bigint() - t0) / 1000n);
   const cpu = process.cpuUsage(cpu0);
   return {
@@ -165,6 +186,9 @@ async function measure(durationMs) {
     histograms: Object.fromEntries(KINDS.map((k) => [k, encode(histograms[k])])),
     counters: Object.fromEntries(counters),
     cpuPercentOfCore: Math.round(((cpu.user + cpu.system) / elapsedUs) * 1000) / 10,
+    eventLoopUtilization: Math.round(elu * 1000) / 1000,
+    perRoom: Object.fromEntries(perRoom),
+    subscriptions: Object.fromEntries(subscriptionsByRoom()),
     loopDelayMs: { p50: loopDelay.percentile(50) / 1e6, p99: loopDelay.percentile(99) / 1e6, max: loopDelay.max / 1e6 },
     heapMb: Math.round(process.memoryUsage().heapUsed / 1e6),
   };

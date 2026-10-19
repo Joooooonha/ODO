@@ -234,7 +234,10 @@ const server = http.createServer((req, res) => {
   });
 });
 
-const wss = new WebSocketServer({ noServer: true });
+// 실제 서버(Tomcat)와 같게 permessage-deflate를 협상한다(--deflate off로 끌 수 있음). Tomcat은 크기와 상관없이 모든 메시지를
+// 압축하므로 threshold 0. 2-4 첫 보정은 압축 없이 해서 생성기의 압축 해제 비용을 놓쳤다(보정 조건 불일치)
+const deflate = args.deflate !== 'off';
+const wss = new WebSocketServer({ noServer: true, perMessageDeflate: deflate ? { threshold: 0 } : false });
 server.on('upgrade', (req, socket, head) => {
   if (!req.url.startsWith('/api/ws')) return socket.destroy();
   wss.handleUpgrade(req, socket, head, (ws) => {
@@ -252,4 +255,4 @@ server.on('upgrade', (req, socket, head) => {
   });
 });
 
-server.listen(port, () => console.log(`[가짜 서버] :${port} 지연=${delaySpec.join(':')} 방=${topo.rooms} 세션=${topo.userCount}`));
+server.listen(port, () => console.log(`[가짜 서버] :${port} 압축=${deflate ? 'permessage-deflate' : '없음'} 지연=${delaySpec.join(':')} 방=${topo.rooms} 세션=${topo.userCount}`));

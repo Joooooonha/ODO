@@ -133,7 +133,34 @@ function summarizeStage(r, results, machineCpu, config, cgroup) {
   const workerSelf = results.map((x) => ({
     worker: x.workerIndex, sessions: x.sessions, ready: x.ready, cpuPercentOfCore: x.cpuPercentOfCore,
     loopDelayP99Ms: round(x.loopDelayMs.p99), loopDelayMaxMs: round(x.loopDelayMs.max), heapMb: x.heapMb,
+    eventLoopUtilization: x.eventLoopUtilization,
   }));
+  // 생성기 포화(준하 결정, 2-4): 이벤트 루프 사용률 ≥ 0.9 또는 받은 방 프레임 < 받아야 할 것의 99%.
+  // 받아야 할 것 = 방마다 (보낸 메시지 + 읽음 보고) × 그 방을 구독한 세션 수(전 작업 프로세스 합). 프로세스 CPU는 압축 해제
+  // 백그라운드 스레드 때문에 1코어를 넘을 수 있어 단독 기준으로 쓰지 않는다(기록만)
+  const rooms = new Map();
+  for (const x of results) {
+    for (const [r, c] of Object.entries(x.perRoom ?? {})) {
+      const e = rooms.get(r) ?? { sent: 0, reports: 0, subs: 0 };
+      e.sent += c.sent;
+      e.reports += c.reports;
+      rooms.set(r, e);
+    }
+    for (const [r, n] of Object.entries(x.subscriptions ?? {})) {
+      const e = rooms.get(r) ?? { sent: 0, reports: 0, subs: 0 };
+      e.subs += n;
+      rooms.set(r, e);
+    }
+  }
+  let expectedFrames = 0;
+  for (const e of rooms.values()) expectedFrames += (e.sent + e.reports) * e.subs;
+  const receivedFrames = results.reduce((a, x) => a + (x.counters.messagesReceived ?? 0) + (x.counters.readFramesReceived ?? 0), 0);
+  const receivedRatio = expectedFrames ? Math.round((receivedFrames / expectedFrames) * 10000) / 10000 : null;
+  const worstElu = Math.max(...workerSelf.map((w) => w.eventLoopUtilization ?? 0));
+  const saturatedReasons = [
+    ...(worstElu >= 0.9 ? [`이벤트 루프 사용률 ${worstElu} ≥ 0.9`] : []),
+    ...(receivedRatio != null && receivedRatio < 0.99 ? [`받은 방 프레임 ${Math.round(receivedRatio * 1000) / 10}% < 99%`] : []),
+  ];
   const worstLoop = Math.max(...workerSelf.map((w) => w.loopDelayP99Ms));
   // 유효 판정(준하 결정 A): 같은 설정의 보정에서 직접 잰 오차로 한다 → 여기서는 루프 지연을 기록만 한다.
   // loopDelayLimitMs를 준 설정(맥 보정 때의 C4 기준)만 그 값으로 무효를 표시한다. 20ms(loopDelayReviewMs)를 넘으면 "검토"
@@ -148,7 +175,10 @@ function summarizeStage(r, results, machineCpu, config, cgroup) {
     readHttp: summarize(merged.readHttp),
     scheduleLag: summarize(merged.lag),
     counters,
-    generator: { machineCpuPercent: machineCpu, worstLoopDelayP99Ms: worstLoop, workers: workerSelf },
+    generator: { machineCpuPercent: machineCpu, worstLoopDelayP99Ms: worstLoop, worstEventLoopUtilization: worstElu, workers: workerSelf },
+    frames: { expected: expectedFrames, received: receivedFrames, ratio: receivedRatio },
+    saturated: saturatedReasons.length > 0,
+    saturatedReasons,
     valid: worstLoop <= limit,
     invalidReason: worstLoop <= limit ? null : `생성기 이벤트 루프 지연 p99 ${worstLoop}ms > ${limit}ms`,
     loopReview: workerSelf.some((w) => w.loopDelayMaxMs > review || w.loopDelayP99Ms > review),
@@ -162,7 +192,8 @@ function summarizeStage(r, results, machineCpu, config, cgroup) {
 function formatStage(s) {
   const f = (x) => (x.count ? `${x.count}건 p50 ${x.p50} / p95 ${x.p95} / p99 ${x.p99} / 최대 ${x.max}ms` : '0건');
   return [
-    `[단계 r=${s.r}] ${s.valid ? '' : `무효(${s.invalidReason}) `}${s.loopReview ? '검토(루프 지연 > 20ms) ' : ''}`,
+    `[단계 r=${s.r}] ${s.saturated ? `생성기 포화 = 무효(${s.saturatedReasons.join(', ')}) ` : ''}${s.valid ? '' : `무효(${s.invalidReason}) `}${s.loopReview ? '검토(루프 지연 > 20ms) ' : ''}`,
+    `  방 프레임 받음 ${s.frames.received}/${s.frames.expected}${s.frames.ratio != null ? ` (${Math.round(s.frames.ratio * 1000) / 10}%)` : ''}, 이벤트 루프 사용률 최대 ${s.generator.worstEventLoopUtilization}`,
     `  전달  ${f(s.delivery)}`,
     `  확정  ${f(s.ack)}`,
     `  읽음  ${f(s.read)}`,
@@ -177,10 +208,10 @@ function formatStage(s) {
 function toCsv(stages) {
   const head = ['r', 'valid', 'delivery_count', 'delivery_p50', 'delivery_p95', 'delivery_p99', 'delivery_max',
     'ack_count', 'ack_p50', 'ack_p95', 'ack_p99', 'ack_max', 'read_count', 'read_p50', 'read_p95', 'read_p99', 'read_max',
-    'lag_p99', 'gen_machine_cpu', 'gen_worst_loop_p99', 'loop_review', 'gen_cgroup_cpus', 'gen_throttled_periods', 'gen_throttled_ms', 'sent', 'blocked', 'disconnects', 'read_reports', 'read_report_errors'];
+    'lag_p99', 'gen_machine_cpu', 'gen_worst_loop_p99', 'loop_review', 'saturated', 'frames_ratio', 'worst_elu', 'gen_cgroup_cpus', 'gen_throttled_periods', 'gen_throttled_ms', 'sent', 'blocked', 'disconnects', 'read_reports', 'read_report_errors'];
   const rows = stages.map((s) => [s.r, s.valid,
     ...['delivery', 'ack', 'read'].flatMap((k) => [s[k].count, s[k].p50, s[k].p95, s[k].p99, s[k].max]),
-    s.scheduleLag.p99, s.generator.machineCpuPercent, s.generator.worstLoopDelayP99Ms, s.loopReview,
+    s.scheduleLag.p99, s.generator.machineCpuPercent, s.generator.worstLoopDelayP99Ms, s.loopReview, s.saturated, s.frames.ratio ?? '', s.generator.worstEventLoopUtilization,
     s.cgroup?.cpusUsed ?? '', s.cgroup?.nrThrottled ?? '', s.cgroup?.throttledMs ?? '',
     s.counters.sent ?? 0, s.counters['send:blocked'] ?? 0, s.counters.disconnects ?? 0,
     s.counters.readReports ?? 0, s.counters.readReportErrors ?? 0]);
