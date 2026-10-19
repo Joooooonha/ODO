@@ -7,7 +7,6 @@
   "warmupSec": 10,
   "measureSec": 120,
   "contentLength": 40,
-  "loopDelayLimitMs": 5,
   "workers": 3,
   "topology": {
     "rooms": 100,

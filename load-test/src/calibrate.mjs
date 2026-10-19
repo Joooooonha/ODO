@@ -16,11 +16,29 @@ import { run } from './run.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function startFake(port, delay, topology) {
+/**
+ * 경우마다 가짜 서버를 준비한다. LOADTEST_FAKE_URL이 있으면 따로 떠 있는 가짜 서버(측정 환경의 fake-server 컨테이너,
+ * 서버 몫 CPU 안)를 /fake/configure로 다시 설정하고, 없으면 같은 기계에 자식 프로세스로 띄운다(맥 보정).
+ */
+async function openFake(port, delay, topology) {
+  const external = process.env.LOADTEST_FAKE_URL;
+  if (external) {
+    await fetch(`${external}/fake/configure`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delay, topology }),
+    });
+    await sleep(500);
+    return { url: external, close: async () => {} };
+  }
   const child = fork(path.join(here, 'fake-server.mjs'), ['--port', String(port), '--delay', delay, '--topology', JSON.stringify(topology)],
     { stdio: ['ignore', 'pipe', 'inherit', 'ipc'] });
   await new Promise((resolve) => child.stdout.on('data', (d) => d.toString().includes('[가짜 서버]') && resolve()));
-  return child;
+  return {
+    url: `http://127.0.0.1:${port}`,
+    close: async () => {
+      child.kill();
+      await sleep(500);
+    },
+  };
 }
 
 const getJson = async (url, method = 'GET') => {
@@ -35,20 +53,19 @@ async function main() {
   mkdirSync(outDir, { recursive: true });
   const rows = [];
   for (const [i, c] of plan.cases.entries()) {
-    const port = 18100 + i;
     const topology = { ...plan.defaults.topology, ...c.topology };
-    const fake = await startFake(port, c.delay, topology);
+    const fake = await openFake(18100 + i, c.delay, topology);
+    const base = fake.url;
     const config = {
       ...plan.defaults, ...c, topology,
-      target: { httpUrl: `http://127.0.0.1:${port}`, wsUrl: `ws://127.0.0.1:${port}/api/ws`, origin: 'http://localhost:5173' },
+      target: { httpUrl: base, wsUrl: `${base.replace(/^http/, 'ws')}/api/ws`, origin: 'http://localhost:5173' },
       runId: `${path.basename(outDir)}/case-${i + 1}`,
       stages: [{ r: c.r }],
     };
     console.log(`\n=== 경우 ${i + 1}: ${c.name} (지연 ${c.delay}, 세션 ${topology.rooms * topology.members}, 프로세스 ${config.workers}, r=${c.r}) ===`);
-    const { stages } = await run(config, { onMeasureStart: () => getJson(`http://127.0.0.1:${port}/fake/reset`, 'POST') });
-    const server = await getJson(`http://127.0.0.1:${port}/fake/stats`);
-    fake.kill();
-    await sleep(500);
+    const { stages } = await run(config, { onMeasureStart: () => getJson(`${base}/fake/reset`, 'POST') });
+    const server = await getJson(`${base}/fake/stats`);
+    await fake.close();
     const s = stages[0];
     const err = (m, p) => (m[p] == null ? null : Math.round((m[p] - server.injected[p] - server.timerLate[p]) * 100) / 100);
     const row = {
@@ -59,12 +76,16 @@ async function main() {
       error: {
         delivery: { p50: err(s.delivery, 'p50'), p95: err(s.delivery, 'p95'), p99: err(s.delivery, 'p99') },
         ack: { p50: err(s.ack, 'p50'), p95: err(s.ack, 'p95'), p99: err(s.ack, 'p99') },
+        read: { p50: err(s.read, 'p50'), p95: err(s.read, 'p95'), p99: err(s.read, 'p99') },
       },
       generator: s.generator, counters: s.counters,
     };
-    row.pass = row.valid && row.error.delivery.p99 != null && row.error.delivery.p99 <= (plan.errorLimitMs ?? 5);
+    // 판정(준하 결정 A): 직접 잰 오차 p99 ≤ errorLimitMs. 루프 지연 기준(loopDelayLimitMs)은 설정에 있을 때만 함께 본다
+    const limit = plan.errorLimitMs ?? 5;
+    const within = (e) => e.p99 == null || e.p99 <= limit;
+    row.pass = row.valid !== false && row.error.delivery.p99 != null && within(row.error.delivery) && within(row.error.ack) && within(row.error.read);
     rows.push(row);
-    console.log(`→ 오차(ms) 전달 p50 ${row.error.delivery.p50} / p95 ${row.error.delivery.p95} / p99 ${row.error.delivery.p99}, 확정 p99 ${row.error.ack.p99}, 서버 타이머 늦음 p99 ${server.timerLate.p99}, 판정 ${row.pass ? '통과' : '넘음'}`);
+    console.log(`→ 오차(ms) 전달 p50 ${row.error.delivery.p50} / p95 ${row.error.delivery.p95} / p99 ${row.error.delivery.p99}, 확정 p99 ${row.error.ack.p99}, 읽음 p99 ${row.error.read.p99}, 서버 타이머 늦음 p99 ${server.timerLate.p99}, 판정 ${row.pass ? '통과' : '넘음'}`);
     writeFileSync(path.join(outDir, 'calibration.json'), JSON.stringify(rows, null, 2));
   }
   console.log(`\n결과: ${outDir}/calibration.json`);

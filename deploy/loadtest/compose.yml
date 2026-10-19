@@ -1,0 +1,253 @@
+# 읽음 기준선 측정 환경(Task-chat-read 7절, 2-4). 윈도우 한 대에서 서버·생성기를 모두 띄운다.
+# 운영은 jar + systemd 그대로다(Docker를 쓰지 않는다). 사용법은 README.md.
+#
+# - 측정 트래픽은 이 compose 네트워크 안에서만 오간다(생성기 → nginx:8088). 호스트에 여는 포트는
+#   Grafana·Prometheus뿐이고 127.0.0.1에만 묶는다(맥에서는 ssh 터널로 보기만 한다)
+# - 모든 컨테이너에 cpus 상한. 합계는 README의 배분표(OS 몫을 남긴다)
+# - 비밀값은 .env(측정 전용 난수, git 제외). 운영 값은 넣지 않는다
+name: odo-loadtest
+
+x-app: &app
+  # 운영과 같은 Java 17.0.20.1
+  image: eclipse-temurin:17.0.20.1_1-jre
+  cpus: 2
+  # 운영 t4g.small(2GB). -Xmx는 운영 unit처럼 주지 않는다 → JVM이 컨테이너 메모리의 1/4을 힙으로 잡는다
+  mem_limit: 2g
+  volumes:
+    - ../../web-service/api-server/build/libs:/app:ro
+  command: ["sh", "-c", "exec java -jar /app/Dance-Assessment-0.0.1-SNAPSHOT.jar"]
+  environment:
+    SPRING_PROFILES_ACTIVE: prod,loadtest
+    TZ: UTC
+    SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dance_db
+    SPRING_DATASOURCE_USERNAME: dance
+    SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?}
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+    REDIS_PASSWORD: ${REDIS_PASSWORD:?}
+    JWT_SECRET: ${LOADTEST_JWT_SECRET:?}
+    CORS_ALLOWED_ORIGINS: http://loadtest.local
+    # prod 프로필이 요구하는 값. 측정에서는 쓰지 않는 더미
+    KAKAO_CLIENT_ID: loadtest-dummy
+    KAKAO_CLIENT_SECRET: loadtest-dummy
+    NAVER_CLIENT_ID: loadtest-dummy
+    NAVER_CLIENT_SECRET: loadtest-dummy
+    AI_SERVER_URL: http://ai-server.invalid
+  healthcheck:
+    test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+    interval: 3s
+    timeout: 2s
+    retries: 60
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+
+x-node: &node
+  image: node:24.10.0-bookworm-slim
+  working_dir: /lt
+  volumes:
+    - ../../load-test:/lt
+
+services:
+  postgres:
+    # 운영과 같은 16.15
+    image: postgres:16.15
+    cpus: 2
+    mem_limit: 1g
+    # 운영 설정값(env 기록에 같이 적는다). 나머지는 이미지 기본값
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - max_connections=100
+      - -c
+      - work_mem=4MB
+      - -c
+      - effective_cache_size=4GB
+    environment:
+      POSTGRES_DB: dance_db
+      POSTGRES_USER: dance
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD:?}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dance -d dance_db"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    # 운영 Ubuntu 24.04 apt의 7.0 계열. Pub/Sub만 쓰고 영속화하지 않는다
+    image: redis:7.0.15-alpine
+    cpus: 1
+    mem_limit: 128m
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?}
+      # redis-cli가 이 변수로 인증한다(-a로 비밀번호를 명령줄에 쓰지 않는다)
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?}
+    # 비밀번호를 명령줄 인자로 넘기지 않으려고 설정 파일로 쓴 뒤 띄운다
+    command:
+      - sh
+      - -c
+      - |
+        umask 077
+        printf 'requirepass %s\nsave ""\nappendonly no\nmaxmemory 64mb\n' "$$REDIS_PASSWORD" > /tmp/redis.conf
+        exec redis-server /tmp/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app1:
+    <<: *app
+
+  app2:
+    <<: *app
+    # app1이 뜬 뒤에 띄운다(Flyway 마이그레이션이 동시에 돌지 않게)
+    depends_on:
+      app1: { condition: service_healthy }
+
+  nginx:
+    # 운영 nginx와 같은 1.24
+    image: nginx:1.24.0-alpine
+    cpus: 1
+    mem_limit: 256m
+    volumes:
+      - ./nginx-main.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ulimits:
+      nofile: { soft: 40000, hard: 40000 }
+    depends_on:
+      app1: { condition: service_healthy }
+      app2: { condition: service_healthy }
+
+  sql-exporter:
+    image: burningalchemist/sql_exporter:0.24.9
+    cpus: 0.25
+    mem_limit: 64m
+    command: ["-config.file=/etc/sql_exporter/sql_exporter.yml"]
+    environment:
+      # 접속 DB는 postgres(측정 DB를 템플릿에서 다시 만들어도 끊기지 않게). 커넥션 1개(설정 max_connections)
+      SQLEXPORTER_TARGET_DSN: postgres://monitor:${MONITOR_PASSWORD:?}@postgres:5432/postgres?sslmode=disable
+    volumes:
+      - ./sql-exporter:/etc/sql_exporter:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  prometheus:
+    image: prom/prometheus:v3.13.4
+    cpus: 0.5
+    mem_limit: 512m
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  grafana:
+    image: grafana/grafana:13.1.8
+    cpus: 0.5
+    mem_limit: 256m
+    environment:
+      # 127.0.0.1에만 열고 ssh 터널로만 본다 → 익명 보기 전용
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?}
+      GF_RENDERING_SERVER_URL: http://renderer:8081/render
+      GF_RENDERING_CALLBACK_URL: http://grafana:3000/
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  # 컨테이너별 CPU·메모리(docker stats)와 cgroup cpu.stat(nr_throttled·throttled_usec)을 5초마다 기록
+  recorder:
+    image: docker:28.5.1-cli
+    cpus: 0.25
+    mem_limit: 64m
+    cgroup: host
+    entrypoint: ["sh", "/recorder/record.sh"]
+    environment:
+      OUT: /out
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys/fs/cgroup:/host-cgroup:ro
+      - ./recorder:/recorder:ro
+      - ../../load-test/results/raw/recorder:/out
+
+  # ===== 실행할 때만 (docker compose run) =====
+
+  generator:
+    <<: *node
+    profiles: ["tools"]
+    # 생성기 몫. 보정으로 정한다(README 배분표)
+    cpus: ${GENERATOR_CPUS:-4.75}
+    mem_limit: 4g
+    environment:
+      LOADTEST_JWT_SECRET: ${LOADTEST_JWT_SECRET:?}
+      LOADTEST_HTTP_URL: http://nginx:8088
+      LOADTEST_WS_URL: ws://nginx:8088/api/ws
+      LOADTEST_ORIGIN: http://loadtest.local
+      LOADTEST_FAKE_URL: http://fake-server:18080
+    ulimits:
+      nofile: { soft: 65536, hard: 65536 }
+    command: ["node", "--version"]
+
+  # 측정기 보정용 가짜 서버. 서버 몫 8 CPU(app 2+2, PG 2, Redis 1, nginx 1) 중 nginx 자리 1개를 쓴다
+  fake-server:
+    <<: *node
+    profiles: ["calib"]
+    cpus: 1
+    mem_limit: 1g
+    ulimits:
+      nofile: { soft: 65536, hard: 65536 }
+    command: ["node", "src/fake-server.mjs", "--port", "18080"]
+
+  # 보정 때 서버 몫 나머지 7 CPU를 100%로 채운다(같은 호스트 간섭을 오차에 넣기 위해). 상한은 서버 컨테이너와 같게 나눈다
+  stress-app1: &stress
+    image: alpine:3.22
+    profiles: ["calib"]
+    cpus: 2
+    mem_limit: 32m
+    environment: { LOOPS: "4" }
+    command: ["sh", "-c", "for i in $$(seq $$LOOPS); do (while :; do :; done) & done; wait"]
+  stress-app2:
+    <<: *stress
+  stress-postgres:
+    <<: *stress
+  stress-redis:
+    <<: *stress
+    cpus: 1
+    environment: { LOOPS: "2" }
+
+  # jar 빌드(윈도우에서 체크아웃한 커밋 그대로)
+  builder:
+    image: eclipse-temurin:17.0.20.1_1-jdk
+    profiles: ["build"]
+    working_dir: /src
+    volumes:
+      - ../../web-service/api-server:/src
+      - gradle-cache:/root/.gradle
+    command: ["sh", "-c", "./gradlew --no-daemon bootJar -x test"]
+
+  # Grafana 화면 캡처(측정이 끝난 뒤에만 띄운다)
+  renderer:
+    image: grafana/grafana-image-renderer:v5.12.5
+    profiles: ["render"]
+    cpus: 1
+    mem_limit: 1g
+
+volumes:
+  pg-data:
+  prom-data:
+  gradle-cache:

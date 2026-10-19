@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 5s
+  scrape_timeout: 4s
+
+scrape_configs:
+  - job_name: app
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['app1:9091']
+        labels: { server: app1 }
+      - targets: ['app2:9091']
+        labels: { server: app2 }
+
+  # DB 관찰만 1초(지시)
+  - job_name: pg_obs
+    scrape_interval: 1s
+    scrape_timeout: 900ms
+    static_configs:
+      - targets: ['sql-exporter:9399']

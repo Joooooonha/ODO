@@ -14,14 +14,17 @@ import { createHistogram, recordNs, summarize } from './hist.mjs';
  * 지연 d: `fixed:50`(ms) / `uniform:20:80` / `fixed:0`.
  *
  * 넣은 지연과 타이머가 실제로 늦은 정도를 함께 기록한다(GET /fake/stats). 생성기가 잰 값 − 이 값 = 생성기 오차.
+ *
+ * 따로 띄운 가짜 서버(측정 환경의 fake-server 컨테이너)는 POST /fake/configure {delay, topology}로 경우마다
+ * 지연·배치를 바꾼다(붙어 있던 연결은 끊고 방 상태를 처음으로).
  */
 const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) => {
   if (a.startsWith('--')) acc.push([a.slice(2), all[i + 1]]);
   return acc;
 }, []));
 const port = Number(args.port ?? 18080);
-const delaySpec = (args.delay ?? 'fixed:0').split(':');
-const topo = buildTopology(JSON.parse(args.topology ?? '{"rooms":1,"members":20}'));
+let delaySpec = (args.delay ?? 'fixed:0').split(':');
+let topo = buildTopology(JSON.parse(args.topology ?? '{"rooms":1,"members":20}'));
 
 const sampleDelayMs = () => {
   if (delaySpec[0] === 'uniform') {
@@ -33,7 +36,7 @@ const sampleDelayMs = () => {
 };
 
 // 방 상태
-const rooms = new Map();   // roomId → { lastSeq, positions: Map(userId → seq), version, subscribers: Set(conn) }
+let rooms = new Map();   // roomId → { lastSeq, positions: Map(userId → seq), version, subscribers: Set(conn) }
 const room = (id) => {
   let r = rooms.get(id);
   if (!r) {
@@ -42,8 +45,12 @@ const room = (id) => {
   }
   return r;
 };
-for (const t of topo.teams) t.members.forEach((u) => room(t.roomId).positions.set(topo.userId(u), 0));
-for (const dm of topo.dms) [dm.a, dm.b].forEach((u) => room(dm.roomId).positions.set(topo.userId(u), 0));
+const resetRooms = () => {
+  rooms = new Map();
+  for (const t of topo.teams) t.members.forEach((u) => room(t.roomId).positions.set(topo.userId(u), 0));
+  for (const dm of topo.dms) [dm.a, dm.b].forEach((u) => room(dm.roomId).positions.set(topo.userId(u), 0));
+};
+resetRooms();
 
 // 기록: 넣은 지연, 타이머가 예정보다 늦은 정도(넣은 지연 + 늦음 = 서버 쪽에서 실제로 걸린 시간)
 let stats;
@@ -163,6 +170,16 @@ const server = http.createServer((req, res) => {
     }
     if (url.pathname === '/fake/reset') {
       resetStats();
+      return send(204);
+    }
+    if (url.pathname === '/fake/configure' && req.method === 'POST') {
+      const c = JSON.parse(body || '{}');
+      for (const ws of wss.clients) ws.terminate();
+      delaySpec = String(c.delay ?? 'fixed:0').split(':');
+      topo = buildTopology(c.topology ?? { rooms: 1, members: 20 });
+      resetRooms();
+      resetStats();
+      console.log(`[가짜 서버] 다시 설정: 지연=${delaySpec.join(':')} 방=${topo.rooms} 세션=${topo.userCount}`);
       return send(204);
     }
     const userId = userOf(req.headers.cookie);

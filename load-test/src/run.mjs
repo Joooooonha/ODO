@@ -79,9 +79,14 @@ export async function run(config, { log = console.log, onMeasureStart } = {}) {
     log(`[단계 r=${stage.r}] 측정 ${config.measureSec}초`);
     await onMeasureStart?.(stage);
     const cpu0 = os.cpus();
+    const cg0 = readCgroup();
+    const startedAt = new Date().toISOString();
     const results = await Promise.all(workers.map((w) => w.call({ cmd: 'measure', durationMs: config.measureSec * 1000 })));
     const machineCpu = machineCpuPercent(cpu0, os.cpus());
-    const summary = summarizeStage(stage.r, results.map((x) => x.result), machineCpu, config);
+    const summary = {
+      ...summarizeStage(stage.r, results.map((x) => x.result), machineCpu, config, cgroupDelta(cg0, readCgroup())),
+      startedAt, endedAt: new Date().toISOString(),
+    };
     stages.push(summary);
     log(formatStage(summary));
     writeFileSync(path.join(outDir, 'stages.json'), JSON.stringify(stages, null, 2));
@@ -120,7 +125,7 @@ function sendRates(topo, config, r) {
   return rooms;
 }
 
-function summarizeStage(r, results, machineCpu, config) {
+function summarizeStage(r, results, machineCpu, config, cgroup) {
   const kinds = ['delivery', 'ack', 'read', 'lag'];
   const merged = Object.fromEntries(kinds.map((k) => [k, merge(results.map((x) => x.histograms[k]))]));
   const counters = {};
@@ -130,7 +135,10 @@ function summarizeStage(r, results, machineCpu, config) {
     loopDelayP99Ms: round(x.loopDelayMs.p99), loopDelayMaxMs: round(x.loopDelayMs.max), heapMb: x.heapMb,
   }));
   const worstLoop = Math.max(...workerSelf.map((w) => w.loopDelayP99Ms));
-  const limit = config.loopDelayLimitMs ?? 5;
+  // 유효 판정(준하 결정 A): 같은 설정의 보정에서 직접 잰 오차로 한다 → 여기서는 루프 지연을 기록만 한다.
+  // loopDelayLimitMs를 준 설정(맥 보정 때의 C4 기준)만 그 값으로 무효를 표시한다. 20ms(loopDelayReviewMs)를 넘으면 "검토"
+  const limit = config.loopDelayLimitMs ?? Infinity;
+  const review = config.loopDelayReviewMs ?? 20;
   const summary = {
     r,
     measureSec: config.measureSec,
@@ -142,6 +150,8 @@ function summarizeStage(r, results, machineCpu, config) {
     generator: { machineCpuPercent: machineCpu, worstLoopDelayP99Ms: worstLoop, workers: workerSelf },
     valid: worstLoop <= limit,
     invalidReason: worstLoop <= limit ? null : `생성기 이벤트 루프 지연 p99 ${worstLoop}ms > ${limit}ms`,
+    loopReview: workerSelf.some((w) => w.loopDelayMaxMs > review || w.loopDelayP99Ms > review),
+    cgroup,
     histograms: Object.fromEntries(kinds.map((k) => [k, results.map((x) => x.histograms[k])])),
   };
   kinds.forEach((k) => merged[k].destroy?.());
@@ -151,12 +161,13 @@ function summarizeStage(r, results, machineCpu, config) {
 function formatStage(s) {
   const f = (x) => (x.count ? `${x.count}건 p50 ${x.p50} / p95 ${x.p95} / p99 ${x.p99} / 최대 ${x.max}ms` : '0건');
   return [
-    `[단계 r=${s.r}] ${s.valid ? '유효' : `무효(${s.invalidReason})`}`,
+    `[단계 r=${s.r}] ${s.valid ? '' : `무효(${s.invalidReason}) `}${s.loopReview ? '검토(루프 지연 > 20ms) ' : ''}`,
     `  전달  ${f(s.delivery)}`,
     `  확정  ${f(s.ack)}`,
     `  읽음  ${f(s.read)}`,
     `  예약 늦음 ${f(s.scheduleLag)}`,
-    `  생성기 CPU ${s.generator.machineCpuPercent}% (맥 전체), 프로세스별 ${s.generator.workers.map((w) => `${w.cpuPercentOfCore}%`).join('/')}, 루프 지연 p99 최대 ${s.generator.worstLoopDelayP99Ms}ms`,
+    ...(s.cgroup ? [`  생성기 cgroup ${s.cgroup.cpusUsed}/${s.cgroup.cpusLimit} CPU, throttle ${s.cgroup.nrThrottled}/${s.cgroup.nrPeriods}주기 ${s.cgroup.throttledMs}ms`] : []),
+    `  생성기 CPU ${s.generator.machineCpuPercent}% (기계 전체), 프로세스별 ${s.generator.workers.map((w) => `${w.cpuPercentOfCore}%`).join('/')}, 루프 지연 p99 최대 ${s.generator.worstLoopDelayP99Ms}ms`,
     `  수 ${JSON.stringify(s.counters)}`,
   ].join('\n');
 }
@@ -164,10 +175,11 @@ function formatStage(s) {
 function toCsv(stages) {
   const head = ['r', 'valid', 'delivery_count', 'delivery_p50', 'delivery_p95', 'delivery_p99', 'delivery_max',
     'ack_count', 'ack_p50', 'ack_p95', 'ack_p99', 'ack_max', 'read_count', 'read_p50', 'read_p95', 'read_p99', 'read_max',
-    'lag_p99', 'gen_machine_cpu', 'gen_worst_loop_p99', 'sent', 'blocked', 'disconnects', 'read_reports', 'read_report_errors'];
+    'lag_p99', 'gen_machine_cpu', 'gen_worst_loop_p99', 'loop_review', 'gen_cgroup_cpus', 'gen_throttled_periods', 'gen_throttled_ms', 'sent', 'blocked', 'disconnects', 'read_reports', 'read_report_errors'];
   const rows = stages.map((s) => [s.r, s.valid,
     ...['delivery', 'ack', 'read'].flatMap((k) => [s[k].count, s[k].p50, s[k].p95, s[k].p99, s[k].max]),
-    s.scheduleLag.p99, s.generator.machineCpuPercent, s.generator.worstLoopDelayP99Ms,
+    s.scheduleLag.p99, s.generator.machineCpuPercent, s.generator.worstLoopDelayP99Ms, s.loopReview,
+    s.cgroup?.cpusUsed ?? '', s.cgroup?.nrThrottled ?? '', s.cgroup?.throttledMs ?? '',
     s.counters.sent ?? 0, s.counters['send:blocked'] ?? 0, s.counters.disconnects ?? 0,
     s.counters.readReports ?? 0, s.counters.readReportErrors ?? 0]);
   return [head, ...rows].map((r) => r.join(',')).join('\n') + '\n';
@@ -237,6 +249,34 @@ async function waitAllReady(workers, total, timeoutSec, log) {
   }
   log(`[생성기] 경고: ${timeoutSec}초 안에 모두 붙지 못함 ${live}/${total}`);
   return live;
+}
+
+/**
+ * 이 컨테이너(생성기)의 cgroup v2 CPU 기록. 컨테이너 밖(맥)에서는 null.
+ * cpu.stat: usage_usec·nr_periods·nr_throttled·throttled_usec / cpu.max: "할당 주기" (상한)
+ */
+function readCgroup() {
+  try {
+    const stat = Object.fromEntries(readFileSync('/sys/fs/cgroup/cpu.stat', 'utf8').trim().split('\n')
+      .map((l) => l.split(' ')).map(([k, v]) => [k, Number(v)]));
+    const [quota, period] = readFileSync('/sys/fs/cgroup/cpu.max', 'utf8').trim().split(' ');
+    return { at: process.hrtime.bigint(), stat, cpus: quota === 'max' ? null : Number(quota) / Number(period) };
+  } catch {
+    return null;
+  }
+}
+
+function cgroupDelta(a, b) {
+  if (!a || !b) return null;
+  const d = (k) => (b.stat[k] ?? 0) - (a.stat[k] ?? 0);
+  const elapsedUs = Number((b.at - a.at) / 1000n);
+  return {
+    cpusLimit: b.cpus,
+    cpusUsed: Math.round((d('usage_usec') / elapsedUs) * 100) / 100,
+    nrPeriods: d('nr_periods'),
+    nrThrottled: d('nr_throttled'),
+    throttledMs: Math.round(d('throttled_usec') / 1000),
+  };
 }
 
 function machineCpuPercent(a, b) {

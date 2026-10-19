@@ -1,0 +1,24 @@
+#!/bin/sh
+# 5초마다 이 compose 프로젝트(odo-loadtest)의 모든 컨테이너를 기록한다(Task-chat-read 7절 + 2-4 지시).
+#   $OUT/cgroup.jsonl : {"t", "name", "usage_usec", "nr_periods", "nr_throttled", "throttled_usec", "cpu_max"}
+#                       → 단계(시각 구간)마다 앞뒤 차이로 CPU 사용량·throttle 비율을 낸다 (load-test/src/cgroup-report.mjs)
+#   $OUT/stats.jsonl  : docker stats --no-stream 한 줄씩(CPU%·메모리)
+# Docker Desktop(WSL2)은 cgroupfs + cgroup v2: 컨테이너 cgroup = /sys/fs/cgroup/docker/<전체 id>/
+set -u
+CG=/host-cgroup/docker
+mkdir -p "$OUT"
+while :; do
+  t=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  docker ps --filter label=com.docker.compose.project=odo-loadtest --no-trunc --format '{{.ID}} {{.Names}}' |
+  while read -r id name; do
+    f="$CG/$id/cpu.stat"
+    [ -r "$f" ] || continue
+    awk -v t="$t" -v n="$name" -v max="$(cat "$CG/$id/cpu.max")" '
+      { v[$1] = $2 }
+      END { printf "{\"t\":\"%s\",\"name\":\"%s\",\"usage_usec\":%d,\"nr_periods\":%d,\"nr_throttled\":%d,\"throttled_usec\":%d,\"cpu_max\":\"%s\"}\n",
+            t, n, v["usage_usec"], v["nr_periods"], v["nr_throttled"], v["throttled_usec"], max }' "$f"
+  done >> "$OUT/cgroup.jsonl"
+  docker stats --no-stream --format "{\"t\":\"$t\",\"name\":\"{{.Name}}\",\"cpu\":\"{{.CPUPerc}}\",\"mem\":\"{{.MemUsage}}\",\"memPerc\":\"{{.MemPerc}}\"}" \
+    $(docker ps -q --filter label=com.docker.compose.project=odo-loadtest) >> "$OUT/stats.jsonl" 2>/dev/null
+  sleep 5
+done
