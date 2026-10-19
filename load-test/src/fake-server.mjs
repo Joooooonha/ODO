@@ -56,7 +56,8 @@ resetRooms();
 let stats;
 let pendingTimers = 0;
 const resetStats = () => {
-  stats = { injected: createHistogram(), timerLate: createHistogram(), serverSpan: createHistogram(), sent: 0, readBroadcasts: 0, readSkipped: 0, readPosts: 0, framesOut: 0, pending: 0 };
+  stats = { injected: createHistogram(), timerLate: createHistogram(), serverSpan: createHistogram(),
+    spanByKind: { MESSAGE: createHistogram(), ACK: createHistogram(), READ: createHistogram() }, sent: 0, readBroadcasts: 0, readSkipped: 0, readPosts: 0, framesOut: 0, pending: 0 };
 };
 resetStats();
 
@@ -128,10 +129,16 @@ function deliver(conn, destination, payload) {
   if (subId == null || conn.ws.readyState !== 1) return;
   stats.framesOut += 1;
   const b = batch;
+  // 생성기의 전달(MESSAGE)·확정(ACK)·읽음 반영(READ) 오차를 같은 종류의 가짜 서버 처리 시간으로 빼려고 종류별로도 기록
+  const kind = destination.endsWith('/queue/acks') ? 'ACK' : payload?.type === 'READ' ? 'READ' : 'MESSAGE';
   conn.ws.send(frame('MESSAGE', {
     destination, 'subscription': subId, 'message-id': String(++conn.messageIds), 'content-type': 'application/json',
   }, JSON.stringify(payload)), () => {
-    if (b && b.gen === generation) recordNs(stats.serverSpan, process.hrtime.bigint() - b.due);
+    if (b && b.gen === generation) {
+      const ns = process.hrtime.bigint() - b.due;
+      recordNs(stats.serverSpan, ns);
+      recordNs(stats.spanByKind[kind], ns);
+    }
   });
 }
 
@@ -193,7 +200,7 @@ const server = http.createServer((req, res) => {
   req.on('data', (c) => (body += c));
   req.on('end', () => {
     if (url.pathname === '/fake/stats') {
-      return send(200, { injected: summarize(stats.injected), timerLate: summarize(stats.timerLate), serverSpan: summarize(stats.serverSpan), sent: stats.sent, readPosts: stats.readPosts, readRejected: stats.readRejected ?? 0, readBroadcasts: stats.readBroadcasts, readSkipped: stats.readSkipped, pendingTimers, framesOut: stats.framesOut });
+      return send(200, { injected: summarize(stats.injected), timerLate: summarize(stats.timerLate), serverSpan: summarize(stats.serverSpan), spanByKind: Object.fromEntries(Object.entries(stats.spanByKind).map(([k, h]) => [k, summarize(h)])), sent: stats.sent, readPosts: stats.readPosts, readRejected: stats.readRejected ?? 0, readBroadcasts: stats.readBroadcasts, readSkipped: stats.readSkipped, pendingTimers, framesOut: stats.framesOut });
     }
     if (url.pathname === '/fake/reset') {
       resetStats();

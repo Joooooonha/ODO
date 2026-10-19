@@ -1,5 +1,5 @@
 {
-  "note": "윈도우 보정(2-4): 규모·작업 프로세스 수 K. 시나리오 2 모양(10:10, 활발한 방 10%, 전체 속도). 판정 A",
+  "note": "윈도우 보정(2-4): 규모·작업 프로세스 수 K. 시나리오 2 모양(10:10, 활발한 방 10%, 전체 속도). 판정 A — 압축 보정에서 가짜 서버(4 CPU)가 전체 100건/초(≈22,000프레임/초)를 못 따라가 20·40건/초를 더했다",
   "errorLimitMs": 5,
   "defaults": {
     "workers": 1,
@@ -120,6 +120,222 @@
       "name": "규모 6000세션 / 5프로세스 · 전체 100건/초 10:10",
       "delay": "fixed:50",
       "r": 100,
+      "workers": 5,
+      "topology": {
+        "rooms": 300,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 2000세션 / 3프로세스 · 전체 20건/초 10:10",
+      "delay": "fixed:50",
+      "r": 20,
+      "workers": 3,
+      "topology": {
+        "rooms": 100,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 2000세션 / 3프로세스 · 전체 40건/초 10:10",
+      "delay": "fixed:50",
+      "r": 40,
+      "workers": 3,
+      "topology": {
+        "rooms": 100,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 2000세션 / 4프로세스 · 전체 20건/초 10:10",
+      "delay": "fixed:50",
+      "r": 20,
+      "workers": 4,
+      "topology": {
+        "rooms": 100,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 2000세션 / 4프로세스 · 전체 40건/초 10:10",
+      "delay": "fixed:50",
+      "r": 40,
+      "workers": 4,
+      "topology": {
+        "rooms": 100,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 2000세션 / 5프로세스 · 전체 20건/초 10:10",
+      "delay": "fixed:50",
+      "r": 20,
+      "workers": 5,
+      "topology": {
+        "rooms": 100,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 2000세션 / 5프로세스 · 전체 40건/초 10:10",
+      "delay": "fixed:50",
+      "r": 40,
+      "workers": 5,
+      "topology": {
+        "rooms": 100,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 4000세션 / 3프로세스 · 전체 20건/초 10:10",
+      "delay": "fixed:50",
+      "r": 20,
+      "workers": 3,
+      "topology": {
+        "rooms": 200,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 4000세션 / 3프로세스 · 전체 40건/초 10:10",
+      "delay": "fixed:50",
+      "r": 40,
+      "workers": 3,
+      "topology": {
+        "rooms": 200,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 4000세션 / 4프로세스 · 전체 20건/초 10:10",
+      "delay": "fixed:50",
+      "r": 20,
+      "workers": 4,
+      "topology": {
+        "rooms": 200,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 4000세션 / 4프로세스 · 전체 40건/초 10:10",
+      "delay": "fixed:50",
+      "r": 40,
+      "workers": 4,
+      "topology": {
+        "rooms": 200,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 4000세션 / 5프로세스 · 전체 20건/초 10:10",
+      "delay": "fixed:50",
+      "r": 20,
+      "workers": 5,
+      "topology": {
+        "rooms": 200,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 4000세션 / 5프로세스 · 전체 40건/초 10:10",
+      "delay": "fixed:50",
+      "r": 40,
+      "workers": 5,
+      "topology": {
+        "rooms": 200,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 6000세션 / 3프로세스 · 전체 20건/초 10:10",
+      "delay": "fixed:50",
+      "r": 20,
+      "workers": 3,
+      "topology": {
+        "rooms": 300,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 6000세션 / 3프로세스 · 전체 40건/초 10:10",
+      "delay": "fixed:50",
+      "r": 40,
+      "workers": 3,
+      "topology": {
+        "rooms": 300,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 6000세션 / 4프로세스 · 전체 20건/초 10:10",
+      "delay": "fixed:50",
+      "r": 20,
+      "workers": 4,
+      "topology": {
+        "rooms": 300,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 6000세션 / 4프로세스 · 전체 40건/초 10:10",
+      "delay": "fixed:50",
+      "r": 40,
+      "workers": 4,
+      "topology": {
+        "rooms": 300,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 6000세션 / 5프로세스 · 전체 20건/초 10:10",
+      "delay": "fixed:50",
+      "r": 20,
+      "workers": 5,
+      "topology": {
+        "rooms": 300,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1
+      }
+    },
+    {
+      "name": "규모 6000세션 / 5프로세스 · 전체 40건/초 10:10",
+      "delay": "fixed:50",
+      "r": 40,
       "workers": 5,
       "topology": {
         "rooms": 300,

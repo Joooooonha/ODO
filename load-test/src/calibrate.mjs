@@ -68,7 +68,15 @@ async function main() {
     await fake.close();
     const s = stages[0];
     // 서버 쪽 시간 = 넣은 지연 + serverSpan(타이머 늦음 + 가짜 서버가 응답·방송을 소켓에 넘기기까지). 옛 기준(타이머 늦음만)도 함께 남긴다
-    const err = (m, p) => (m[p] == null ? null : Math.round((m[p] - server.injected[p] - server.serverSpan[p]) * 100) / 100);
+    // 종류별: 전달 ↔ MESSAGE 프레임, 확정 ↔ ACK, 읽음 반영 ↔ READ (20:0에서 READ 몰림의 압축 시간을 전달 오차에서 빼지 않게)
+    const KIND = { delivery: 'MESSAGE', ack: 'ACK', read: 'READ' };
+    let metricKind = null;
+    const span = (p) => (server.spanByKind?.[KIND[metricKind]]?.[p] ?? server.serverSpan[p]);
+    const err = (m, p) => (m[p] == null ? null : Math.round((m[p] - server.injected[p] - span(p)) * 100) / 100);
+    const errOf = (k, p) => {
+      metricKind = k;
+      return err(s[k], p);
+    };
     const errTimerOnly = (m, p) => (m[p] == null ? null : Math.round((m[p] - server.injected[p] - server.timerLate[p]) * 100) / 100);
     const row = {
       case: i + 1, name: c.name, delay: c.delay, sessions: topology.rooms * topology.members, workers: config.workers,
@@ -76,9 +84,9 @@ async function main() {
       delivery: s.delivery, ack: s.ack, read: s.read, readHttp: s.readHttp,
       server,
       error: {
-        delivery: { p50: err(s.delivery, 'p50'), p95: err(s.delivery, 'p95'), p99: err(s.delivery, 'p99') },
-        ack: { p50: err(s.ack, 'p50'), p95: err(s.ack, 'p95'), p99: err(s.ack, 'p99') },
-        read: { p50: err(s.read, 'p50'), p95: err(s.read, 'p95'), p99: err(s.read, 'p99') },
+        delivery: { p50: errOf('delivery', 'p50'), p95: errOf('delivery', 'p95'), p99: errOf('delivery', 'p99') },
+        ack: { p50: errOf('ack', 'p50'), p95: errOf('ack', 'p95'), p99: errOf('ack', 'p99') },
+        read: { p50: errOf('read', 'p50'), p95: errOf('read', 'p95'), p99: errOf('read', 'p99') },
       },
       errorTimerOnly: {
         delivery: { p99: errTimerOnly(s.delivery, 'p99') }, ack: { p99: errTimerOnly(s.ack, 'p99') }, read: { p99: errTimerOnly(s.read, 'p99') },
