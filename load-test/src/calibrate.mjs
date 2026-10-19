@@ -67,7 +67,9 @@ async function main() {
     const server = await getJson(`${base}/fake/stats`);
     await fake.close();
     const s = stages[0];
-    const err = (m, p) => (m[p] == null ? null : Math.round((m[p] - server.injected[p] - server.timerLate[p]) * 100) / 100);
+    // 서버 쪽 시간 = 넣은 지연 + serverSpan(타이머 늦음 + 가짜 서버가 응답·방송을 소켓에 넘기기까지). 옛 기준(타이머 늦음만)도 함께 남긴다
+    const err = (m, p) => (m[p] == null ? null : Math.round((m[p] - server.injected[p] - server.serverSpan[p]) * 100) / 100);
+    const errTimerOnly = (m, p) => (m[p] == null ? null : Math.round((m[p] - server.injected[p] - server.timerLate[p]) * 100) / 100);
     const row = {
       case: i + 1, name: c.name, delay: c.delay, sessions: topology.rooms * topology.members, workers: config.workers,
       sessionsPerWorker: Math.ceil((topology.rooms * topology.members) / config.workers), r: c.r, valid: s.valid,
@@ -78,6 +80,9 @@ async function main() {
         ack: { p50: err(s.ack, 'p50'), p95: err(s.ack, 'p95'), p99: err(s.ack, 'p99') },
         read: { p50: err(s.read, 'p50'), p95: err(s.read, 'p95'), p99: err(s.read, 'p99') },
       },
+      errorTimerOnly: {
+        delivery: { p99: errTimerOnly(s.delivery, 'p99') }, ack: { p99: errTimerOnly(s.ack, 'p99') }, read: { p99: errTimerOnly(s.read, 'p99') },
+      },
       generator: s.generator, counters: s.counters,
     };
     // 판정(준하 결정 A): 직접 잰 오차 p99 ≤ errorLimitMs. 루프 지연 기준(loopDelayLimitMs)은 설정에 있을 때만 함께 본다
@@ -85,7 +90,7 @@ async function main() {
     const within = (e) => e.p99 == null || e.p99 <= limit;
     row.pass = row.valid !== false && row.error.delivery.p99 != null && within(row.error.delivery) && within(row.error.ack) && within(row.error.read);
     rows.push(row);
-    console.log(`→ 오차(ms) 전달 p50 ${row.error.delivery.p50} / p95 ${row.error.delivery.p95} / p99 ${row.error.delivery.p99}, 확정 p99 ${row.error.ack.p99}, 읽음 p99 ${row.error.read.p99}, 서버 타이머 늦음 p99 ${server.timerLate.p99}, 판정 ${row.pass ? '통과' : '넘음'}`);
+    console.log(`→ 오차(ms) 전달 p50 ${row.error.delivery.p50} / p95 ${row.error.delivery.p95} / p99 ${row.error.delivery.p99}, 확정 p99 ${row.error.ack.p99}, 읽음 p99 ${row.error.read.p99}, 서버 처리 p99 ${server.serverSpan.p99}(타이머 늦음 ${server.timerLate.p99}), 타이머만 뺀 읽음 p99 ${row.errorTimerOnly.read.p99}, 판정 ${row.pass ? '통과' : '넘음'}`);
     writeFileSync(path.join(outDir, 'calibration.json'), JSON.stringify(rows, null, 2));
   }
   console.log(`\n결과: ${outDir}/calibration.json`);

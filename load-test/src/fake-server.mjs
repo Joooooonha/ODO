@@ -56,17 +56,24 @@ resetRooms();
 let stats;
 let pendingTimers = 0;
 const resetStats = () => {
-  stats = { injected: createHistogram(), timerLate: createHistogram(), sent: 0, readBroadcasts: 0, readSkipped: 0, readPosts: 0, framesOut: 0, pending: 0 };
+  stats = { injected: createHistogram(), timerLate: createHistogram(), serverSpan: createHistogram(), sent: 0, readBroadcasts: 0, readSkipped: 0, readPosts: 0, framesOut: 0, pending: 0 };
 };
 resetStats();
 
 // 다시 설정할 때마다 늘린다. 앞 경우에서 걸어 둔 타이머(지연 d)가 다시 설정한 뒤에 울리면 새 방 상태를 덮어쓴다
 // (앞 경우의 큰 읽은 위치가 들어가 새 경우의 보고가 전부 "이미 읽음"으로 건너뛰어졌다) → 세대가 다르면 버린다
 let generation = 0;
+/**
+ * 받은 시각부터 d 뒤에 fn(응답·방송). 기록:
+ * - timerLate: 타이머가 예정보다 늦게 울린 정도
+ * - serverSpan: 받은 시각 → fn(보낼 프레임을 모두 소켓에 넘김)이 끝난 시각 − d. 몰림(20명이 한꺼번에 보고 → 방송 20 × 20)을
+ *   가짜 서버 한 스레드가 처리하는 시간까지 들어간다. 생성기 오차 = 잰 값 − 넣은 지연 − 이 값
+ */
 const later = (fn) => {
   const gen = generation;
   const d = sampleDelayMs();
-  const due = process.hrtime.bigint() + BigInt(Math.round(d * 1e6));
+  const receivedAt = process.hrtime.bigint();
+  const due = receivedAt + BigInt(Math.round(d * 1e6));
   recordNs(stats.injected, BigInt(Math.round(d * 1e6)));
   pendingTimers += 1;
   setTimeout(() => {
@@ -74,6 +81,7 @@ const later = (fn) => {
     if (gen !== generation) return;
     recordNs(stats.timerLate, process.hrtime.bigint() - due);
     fn();
+    recordNs(stats.serverSpan, process.hrtime.bigint() - due);
   }, d);
 };
 
@@ -174,7 +182,7 @@ const server = http.createServer((req, res) => {
   req.on('data', (c) => (body += c));
   req.on('end', () => {
     if (url.pathname === '/fake/stats') {
-      return send(200, { injected: summarize(stats.injected), timerLate: summarize(stats.timerLate), sent: stats.sent, readPosts: stats.readPosts, readBroadcasts: stats.readBroadcasts, readSkipped: stats.readSkipped, pendingTimers, framesOut: stats.framesOut });
+      return send(200, { injected: summarize(stats.injected), timerLate: summarize(stats.timerLate), serverSpan: summarize(stats.serverSpan), sent: stats.sent, readPosts: stats.readPosts, readBroadcasts: stats.readBroadcasts, readSkipped: stats.readSkipped, pendingTimers, framesOut: stats.framesOut });
     }
     if (url.pathname === '/fake/reset') {
       resetStats();
