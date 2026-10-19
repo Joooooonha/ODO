@@ -23,10 +23,11 @@ const SERVER_SIDE = new Set(['app1', 'app2', 'postgres']);
 
 const stagesDoc = JSON.parse(readFileSync(args.stages, 'utf8'));
 const env = JSON.parse(readFileSync(args.stages.replace(/stages\.json$/, 'env.json'), 'utf8'));
-const watchers = env.config.topology.watchersPerRoom;
+const { watchersPerRoom: watchers, members } = env.config.topology;
 const calib = (args.calib ?? '').split(',').filter(Boolean).flatMap((f) => JSON.parse(readFileSync(f, 'utf8')));
-const calibFor = (r) => calib.filter((c) => c.delay === 'fixed:50' && c.r === r && c.sessions === 20
-  && (c.name.includes(`${watchers}:${20 - watchers}`))).at(-1) ?? null;
+// 같은 배치(세션 수 · 시청 비율) · 같은 r · 고정 50ms 보정 경우. 없으면 "보정 없음"(포화 판정만)
+const calibFor = (r) => calib.filter((c) => c.delay === 'fixed:50' && c.r === r && c.sessions === env.sessions
+  && (c.name.includes(`${watchers}:${members - watchers}`))).at(-1) ?? null;
 
 const cgRows = new Map();
 for (const line of readFileSync(args.cgroup, 'utf8').split('\n')) {
@@ -87,6 +88,11 @@ for (const s of stagesDoc) {
     hikariPendingMax: await one(`max_over_time(hikaricp_connections_pending[${w}])`, to),
     hikariAcquireMaxMs: await one(`max_over_time(hikaricp_connections_acquire_seconds_max[${w}]) * 1000`, to),
     sendP99Ms: await one(`max_over_time(chat_send_duration_seconds{quantile="0.99"}[${w}]) * 1000`, to),
+    hikariAcquireAvgMs: await one(`sum by (server) (increase(hikaricp_connections_acquire_seconds_sum[${w}])) / sum by (server) (increase(hikaricp_connections_acquire_seconds_count[${w}])) * 1000`, to),
+    hikariUsageAvgMs: await one(`sum by (server) (increase(hikaricp_connections_usage_seconds_sum[${w}])) / sum by (server) (increase(hikaricp_connections_usage_seconds_count[${w}])) * 1000`, to),
+    sendAvgMs: await one(`sum by (server) (increase(chat_send_duration_seconds_sum[${w}])) / sum by (server) (increase(chat_send_duration_seconds_count[${w}])) * 1000`, to),
+    readAvgMs: await one(`sum by (server) (increase(chat_read_duration_seconds_sum{outcome="advanced"}[${w}])) / sum by (server) (increase(chat_read_duration_seconds_count{outcome="advanced"}[${w}])) * 1000`, to),
+    appCores: await one(`avg_over_time(process_cpu_usage[${w}]) * 2`, to),
     readP99Ms: await one(`max_over_time(chat_read_duration_seconds{quantile="0.99", outcome="advanced"}[${w}]) * 1000`, to),
     inboundWaitP99Ms: await one(`max_over_time(chat_session_queue_wait_seconds{quantile="0.99"}[${w}]) * 1000`, to),
     redisWaitP99Ms: await one(`max_over_time(chat_redis_dispatch_wait_seconds{quantile="0.99"}[${w}]) * 1000`, to),
@@ -111,6 +117,7 @@ for (const s of stagesDoc) {
     calibCase: cal?.name ?? null,
     counters: s.counters, generator: { cgroup: s.cgroup, worstLoopP99: s.generator.worstLoopDelayP99Ms, loopReview: s.loopReview },
     server, db, cgroup: cg,
+    saturated: s.saturated ?? null, saturatedReasons: s.saturatedReasons ?? [], frames: s.frames ?? null,
     unexpectedLock: (db.lockByTarget.other ?? 0) > 0,
     invalidThrottle: throttledOthers,
   });
