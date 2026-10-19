@@ -192,8 +192,12 @@ export class Session {
     this.view.reported = seq;
     const t0 = process.hrtime.bigint();
     this.ctx.readReported(this.watched, this.userId, seq, t0);
+    // 보고 HTTP 왕복(요청 시작 → 응답). 읽음 반영 지연이 HTTP에서 늘었는지 READ 방송에서 늘었는지 나눠 보려고
     this.http('POST', `/api/chat/rooms/${this.watched}/read`, { seq }).then(
-      () => this.ctx.count('readReports'),
+      () => {
+        this.ctx.count('readReports');
+        this.ctx.record('readHttp', process.hrtime.bigint() - t0);
+      },
       () => this.ctx.count('readReportErrors'),
     );
   }

@@ -10,7 +10,7 @@ import { createHistogram, encode, recordNs } from './hist.mjs';
  * (monitorEventLoopDelay), 예약 대비 실제 전송 늦음(lag 히스토그램)을 함께 보낸다. 루프 지연이 기준을
  * 넘으면 조정자가 그 단계를 "생성기 포화, 무효"로 표시한다.
  */
-const KINDS = ['delivery', 'ack', 'read', 'lag'];
+const KINDS = ['delivery', 'ack', 'read', 'readHttp', 'lag'];
 const REPORT_TTL_NS = 60_000_000_000n;
 
 let config;

@@ -126,7 +126,7 @@ function sendRates(topo, config, r) {
 }
 
 function summarizeStage(r, results, machineCpu, config, cgroup) {
-  const kinds = ['delivery', 'ack', 'read', 'lag'];
+  const kinds = ['delivery', 'ack', 'read', 'readHttp', 'lag'];
   const merged = Object.fromEntries(kinds.map((k) => [k, merge(results.map((x) => x.histograms[k]))]));
   const counters = {};
   for (const x of results) for (const [k, v] of Object.entries(x.counters)) counters[k] = (counters[k] ?? 0) + v;
@@ -145,6 +145,7 @@ function summarizeStage(r, results, machineCpu, config, cgroup) {
     delivery: summarize(merged.delivery),
     ack: summarize(merged.ack),
     read: summarize(merged.read),
+    readHttp: summarize(merged.readHttp),
     scheduleLag: summarize(merged.lag),
     counters,
     generator: { machineCpuPercent: machineCpu, worstLoopDelayP99Ms: worstLoop, workers: workerSelf },
@@ -165,6 +166,7 @@ function formatStage(s) {
     `  전달  ${f(s.delivery)}`,
     `  확정  ${f(s.ack)}`,
     `  읽음  ${f(s.read)}`,
+    `  읽음 보고 HTTP ${f(s.readHttp)}`,
     `  예약 늦음 ${f(s.scheduleLag)}`,
     ...(s.cgroup ? [`  생성기 cgroup ${s.cgroup.cpusUsed}/${s.cgroup.cpusLimit} CPU, throttle ${s.cgroup.nrThrottled}/${s.cgroup.nrPeriods}주기 ${s.cgroup.throttledMs}ms`] : []),
     `  생성기 CPU ${s.generator.machineCpuPercent}% (기계 전체), 프로세스별 ${s.generator.workers.map((w) => `${w.cpuPercentOfCore}%`).join('/')}, 루프 지연 p99 최대 ${s.generator.worstLoopDelayP99Ms}ms`,
