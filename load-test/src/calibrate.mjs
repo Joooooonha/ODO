@@ -86,9 +86,12 @@ async function main() {
       generator: s.generator, counters: s.counters,
     };
     // 판정(준하 결정 A): 직접 잰 오차 p99 ≤ errorLimitMs. 루프 지연 기준(loopDelayLimitMs)은 설정에 있을 때만 함께 본다
-    const limit = plan.errorLimitMs ?? 5;
-    const within = (e) => e.p99 == null || e.p99 <= limit;
-    row.pass = row.valid !== false && row.error.delivery.p99 != null && within(row.error.delivery) && within(row.error.ack) && within(row.error.read);
+    // 지표별 한도(준하 결정 A', 2-4): 성공 기준의 5% — 전달·확정 5ms, 읽음 반영 50ms. errorLimitMs는 전달·확정에만
+    const limit = { delivery: plan.errorLimitMs ?? 5, ack: plan.errorLimitMs ?? 5, read: plan.readErrorLimitMs ?? 50 };
+    const within = (k) => row.error[k].p99 == null || row.error[k].p99 <= limit[k];
+    row.limits = limit;
+    row.pass = row.valid !== false && row.error.delivery.p99 != null && within('delivery') && within('ack') && within('read')
+      && !s.saturated;
     rows.push(row);
     console.log(`→ 오차(ms) 전달 p50 ${row.error.delivery.p50} / p95 ${row.error.delivery.p95} / p99 ${row.error.delivery.p99}, 확정 p99 ${row.error.ack.p99}, 읽음 p99 ${row.error.read.p99}, 서버 처리 p99 ${server.serverSpan.p99}(타이머 늦음 ${server.timerLate.p99}), 타이머만 뺀 읽음 p99 ${row.errorTimerOnly.read.p99}, 판정 ${row.pass ? '통과' : '넘음'}`);
     writeFileSync(path.join(outDir, 'calibration.json'), JSON.stringify(rows, null, 2));

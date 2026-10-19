@@ -204,17 +204,20 @@ services:
       nofile: { soft: 65536, hard: 65536 }
     command: ["node", "--version"]
 
-  # 측정기 보정용 가짜 서버. 서버 몫 8 CPU(app 2+2, PG 2, Redis 1, nginx 1) 중 nginx 자리 1개를 쓴다
+  # 측정기 보정용 가짜 서버. 서버 몫 8 CPU(app 2+2, PG 2, Redis 1, nginx 1) 중 4를 쓰고 나머지 4는 stress(app1 2 + postgres 2)로 채운다.
+  # 처음엔 1 CPU였는데 permessage-deflate를 켜자 가짜 서버가 압축(libuv 스레드 풀)을 못 따라가 규모 보정이 전부 막혔다(2-4).
+  # 서버 몫 합계 8은 그대로라 같은 호스트 간섭 조건은 같다. 압축 없는 옛 보정(--deflate off)은 cpus 1 + stress 7로 했다
   fake-server:
     <<: *node
     profiles: ["calib"]
-    cpus: 1
+    cpus: 4
     mem_limit: 1g
     ulimits:
       nofile: { soft: 65536, hard: 65536 }
     command: ["node", "src/fake-server.mjs", "--port", "18080"]
 
-  # 보정 때 서버 몫 나머지 7 CPU를 100%로 채운다(같은 호스트 간섭을 오차에 넣기 위해). 상한은 서버 컨테이너와 같게 나눈다
+  # 보정 때 서버 몫 나머지 CPU를 100%로 채운다(같은 호스트 간섭을 오차에 넣기 위해). 상한은 서버 컨테이너와 같게 나눈다.
+  # 압축 보정(가짜 서버 4 CPU): stress-app1 + stress-postgres(합 4)만 띄운다. 압축 없는 옛 보정: 4개 전부(합 7)
   stress-app1: &stress
     image: alpine:3.22
     profiles: ["calib"]

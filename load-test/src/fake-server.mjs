@@ -66,8 +66,8 @@ let generation = 0;
 /**
  * 받은 시각부터 d 뒤에 fn(응답·방송). 기록:
  * - timerLate: 타이머가 예정보다 늦게 울린 정도
- * - serverSpan: 받은 시각 → fn(보낼 프레임을 모두 소켓에 넘김)이 끝난 시각 − d. 몰림(20명이 한꺼번에 보고 → 방송 20 × 20)을
- *   가짜 서버 한 스레드가 처리하는 시간까지 들어간다. 생성기 오차 = 잰 값 − 넣은 지연 − 이 값
+ * - serverSpan: 프레임마다 send 콜백(압축 + 소켓에 씀) 시각 − 예정 시각. 몰림(20명이 한꺼번에 보고 → 방송 20 × 20)과
+ *   압축을 가짜 서버가 처리하는 시간까지 들어간다. 생성기 오차 = 잰 값 − 넣은 지연 − 이 값
  */
 const later = (fn) => {
   const gen = generation;
@@ -80,8 +80,12 @@ const later = (fn) => {
     pendingTimers -= 1;
     if (gen !== generation) return;
     recordNs(stats.timerLate, process.hrtime.bigint() - due);
-    fn();
-    recordNs(stats.serverSpan, process.hrtime.bigint() - due);
+    batch = { due, gen };
+    try {
+      fn();
+    } finally {
+      batch = null;
+    }
   }, d);
 };
 
@@ -115,13 +119,20 @@ const snapshot = (roomId, r) => ({
 const frame = (command, headers, body = '') =>
   `${command}\n${Object.entries(headers).map(([k, v]) => `${k}:${v}`).join('\n')}\n\n${body}\0`;
 
+// later()가 fn을 부르는 동안의 send마다: permessage-deflate는 send 뒤에 비동기로 압축하므로 send 콜백(압축 + 소켓에 씀)이
+// 끝난 시각 − 예정 시각을 프레임 하나의 가짜 서버 처리 시간으로 기록한다(생성기가 프레임마다 재는 것과 같은 단위)
+let batch = null;
+
 function deliver(conn, destination, payload) {
   const subId = conn.subs.get(destination);
   if (subId == null || conn.ws.readyState !== 1) return;
   stats.framesOut += 1;
+  const b = batch;
   conn.ws.send(frame('MESSAGE', {
     destination, 'subscription': subId, 'message-id': String(++conn.messageIds), 'content-type': 'application/json',
-  }, JSON.stringify(payload)));
+  }, JSON.stringify(payload)), () => {
+    if (b && b.gen === generation) recordNs(stats.serverSpan, process.hrtime.bigint() - b.due);
+  });
 }
 
 function broadcast(roomId, payload) {
@@ -182,7 +193,7 @@ const server = http.createServer((req, res) => {
   req.on('data', (c) => (body += c));
   req.on('end', () => {
     if (url.pathname === '/fake/stats') {
-      return send(200, { injected: summarize(stats.injected), timerLate: summarize(stats.timerLate), serverSpan: summarize(stats.serverSpan), sent: stats.sent, readPosts: stats.readPosts, readBroadcasts: stats.readBroadcasts, readSkipped: stats.readSkipped, pendingTimers, framesOut: stats.framesOut });
+      return send(200, { injected: summarize(stats.injected), timerLate: summarize(stats.timerLate), serverSpan: summarize(stats.serverSpan), sent: stats.sent, readPosts: stats.readPosts, readRejected: stats.readRejected ?? 0, readBroadcasts: stats.readBroadcasts, readSkipped: stats.readSkipped, pendingTimers, framesOut: stats.framesOut });
     }
     if (url.pathname === '/fake/reset') {
       resetStats();
@@ -217,6 +228,11 @@ const server = http.createServer((req, res) => {
       const roomId = Number(m[1]);
       const { seq } = JSON.parse(body || '{}');
       stats.readPosts += 1;
+      // 실제 서버와 같은 검사(READ_SEQ_AHEAD): 앞 경우에서 늦게 도착한 보고(큰 seq)가 새 방 상태를 덮지 않게 한다
+      if (!(seq > 0) || seq > room(roomId).lastSeq) {
+        stats.readRejected = (stats.readRejected ?? 0) + 1;
+        return send(400, { code: 'READ_SEQ_AHEAD' });
+      }
       send(204);
       later(() => {
         const r = room(roomId);
