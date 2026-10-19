@@ -60,13 +60,18 @@ const resetStats = () => {
 };
 resetStats();
 
+// 다시 설정할 때마다 늘린다. 앞 경우에서 걸어 둔 타이머(지연 d)가 다시 설정한 뒤에 울리면 새 방 상태를 덮어쓴다
+// (앞 경우의 큰 읽은 위치가 들어가 새 경우의 보고가 전부 "이미 읽음"으로 건너뛰어졌다) → 세대가 다르면 버린다
+let generation = 0;
 const later = (fn) => {
+  const gen = generation;
   const d = sampleDelayMs();
   const due = process.hrtime.bigint() + BigInt(Math.round(d * 1e6));
   recordNs(stats.injected, BigInt(Math.round(d * 1e6)));
   pendingTimers += 1;
   setTimeout(() => {
     pendingTimers -= 1;
+    if (gen !== generation) return;
     recordNs(stats.timerLate, process.hrtime.bigint() - due);
     fn();
   }, d);
@@ -177,6 +182,7 @@ const server = http.createServer((req, res) => {
     }
     if (url.pathname === '/fake/configure' && req.method === 'POST') {
       const c = JSON.parse(body || '{}');
+      generation += 1;
       for (const ws of wss.clients) ws.terminate();
       delaySpec = String(c.delay ?? 'fixed:0').split(':');
       topo = buildTopology(c.topology ?? { rooms: 1, members: 20 });
