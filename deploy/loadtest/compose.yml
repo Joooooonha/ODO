@@ -37,6 +37,8 @@ x-app: &app
     CHAT_READ_BULKHEAD: ${READ_BULKHEAD_K:-0}
     # 메시지 처리 스레드 수(10/20 작업 3-2). 기본 0 = CPU × 2 = 4. 실행마다 `set INBOUND_THREADS=8&& docker compose up -d app1 app2`
     CHAT_WS_INBOUND_THREADS: ${INBOUND_THREADS:-0}
+    # 발행을 커넥션 반납 뒤로(작업 3-2 조건부 E). 기본 끔. `set PUBLISH_AFTER_RELEASE=true&& docker compose up -d app1 app2`
+    CHAT_PUBLISH_AFTER_RELEASE: ${PUBLISH_AFTER_RELEASE:-false}
   healthcheck:
     test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
     interval: 3s

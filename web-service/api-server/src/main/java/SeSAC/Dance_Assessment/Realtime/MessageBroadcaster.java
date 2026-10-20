@@ -2,6 +2,7 @@ package SeSAC.Dance_Assessment.Realtime;
 
 import SeSAC.Dance_Assessment.Domain.ChatMessageType;
 import SeSAC.Dance_Assessment.Service.Chat.MessageSavedEvent;
+import SeSAC.Dance_Assessment.Service.Chat.PublishDeferral;
 import SeSAC.Dance_Assessment.Service.Chat.SavedMessage;
 import SeSAC.Dance_Assessment.Service.Chat.SendStages;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,6 +12,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * 저장이 <b>커밋된 뒤</b> Redis 방 채널로 발행한다(5.2). 롤백된 메시지는 이 메서드가 불리지 않으므로
@@ -19,6 +21,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * <p><b>발행이 실패해도 예외를 던지지 않는다.</b> 저장은 이미 끝났고 확정 응답은 나가야 한다. 유실은
  * 허용한다 — 원본은 DB이고 번호에 빈틈이 없어 브라우저가 감지해 채운다. 명령 시간 제한(500ms)과
  * 끊긴 동안 즉시 거절(RedisConfig) 때문에 Redis가 멈춰도 이 메서드가 처리 스레드를 오래 붙잡지 않는다.
+ *
+ * <p>{@code chat.send.publish-after-release}를 켜면 사람이 보낸 메시지는 커넥션을 돌려준 뒤 같은 스레드에서 발행한다
+ * ({@link PublishDeferral}). 발행할 때 커넥션을 쥐고 있었는지는 {@code chat.redis.publish.connection{state}}로 센다.
  *
  * <p>클래스에도 메서드에도 {@code @Transactional}을 붙이지 않는다(6.1+ 제약).
  */
@@ -32,10 +37,18 @@ public class MessageBroadcaster {
     private final ChatRealtimeMetrics metrics;
     private final JdbcTemplate jdbc;
     private final SendStages stages;
+    private final PublishDeferral deferral;
 
     @TransactionalEventListener
     public void onSaved(MessageSavedEvent event) {
         stages.mark(SendStages.AFTER_COMMIT);
+        if (deferral.defer(() -> publishMarked(event))) {
+            return;
+        }
+        publishMarked(event);
+    }
+
+    private void publishMarked(MessageSavedEvent event) {
         try {
             publish(event);
         } finally {
@@ -44,6 +57,7 @@ public class MessageBroadcaster {
     }
 
     private void publish(MessageSavedEvent event) {
+        metrics.publishConnection(TransactionSynchronizationManager.isActualTransactionActive());
         RoomBroadcast broadcast = RoomBroadcast.of(event.message(), targetNickname(event.message()));
         try {
             redis.convertAndSend(ChatDestinations.roomChannel(broadcast.roomId()).getTopic(),

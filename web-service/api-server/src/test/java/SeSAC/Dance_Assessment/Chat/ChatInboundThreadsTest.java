@@ -1,6 +1,7 @@
 package SeSAC.Dance_Assessment.Chat;
 
 import SeSAC.Dance_Assessment.RawStompClient;
+import SeSAC.Dance_Assessment.Realtime.ChatRealtimeMetrics;
 import SeSAC.Dance_Assessment.Service.Chat.ChatMessageService;
 import SeSAC.Dance_Assessment.TestChat;
 import SeSAC.Dance_Assessment.TestTeams;
@@ -65,6 +66,9 @@ class ChatInboundThreadsTest {
     @Qualifier("clientOutboundChannelExecutor")
     Executor outbound;
 
+    @Autowired
+    ChatRealtimeMetrics metrics;
+
     final List<RawStompClient> clients = new ArrayList<>();
 
     @AfterEach
@@ -82,13 +86,15 @@ class ChatInboundThreadsTest {
     }
 
     @Test
-    @DisplayName("[B6] 스레드 8개 · 한 방에 세션 6개가 동시에 40개씩 — 세션마다 확정·저장 순서가 보낸 순서, 방 순번은 빈틈·중복 없음")
+    @DisplayName("[B6] 스레드 8개 · 한 방에 세션 6개가 동시에 40개씩 — 세션마다 확정·저장 순서가 보낸 순서, 방 순번은 빈틈·중복 없음, 발행은 기본대로 커넥션을 쥔 채")
     void sessionOrderHoldsWithMoreThreads() throws Exception {
         TestUsers users = new TestUsers(mvc, om);
         TestChat chat = new TestChat(mvc, om, chatMessageService, jdbc);
         LoggedIn me = users.create("나");
         long room = chat.teamRoomId(me, new TestTeams(mvc, om).createTeam(me, "스레드 팀"));
 
+        long heldBefore = metrics.publishConnections("held");
+        long releasedBefore = metrics.publishConnections("released");
         List<RawStompClient> sessions = new ArrayList<>();
         List<List<String>> sent = new ArrayList<>();
         for (int s = 0; s < SESSIONS; s++) {
@@ -125,5 +131,8 @@ class ChatInboundThreadsTest {
         }
         assertThat(stored).hasSize(SESSIONS * PER_SESSION);
         chat.assertContiguous(room);
+        // 발행을 미루는 설정(chat.send.publish-after-release)이 꺼져 있으면 지금처럼 커넥션을 쥔 채 발행한다
+        assertThat(metrics.publishConnections("held") - heldBefore).isEqualTo(SESSIONS * PER_SESSION);
+        assertThat(metrics.publishConnections("released") - releasedBefore).isZero();
     }
 }

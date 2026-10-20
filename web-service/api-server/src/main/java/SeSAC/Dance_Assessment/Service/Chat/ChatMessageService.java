@@ -40,6 +40,7 @@ public class ChatMessageService {
     private final MessageWriter writer;
     private final ChatSendProperties properties;
     private final ChatSendMetrics metrics;
+    private final PublishDeferral deferral;
 
     /** 사람이 보낸 메시지. */
     public SendOutcome sendText(long senderId, long roomId, String rawClientMessageId, String content) {
@@ -51,17 +52,20 @@ public class ChatMessageService {
             return new SendOutcome.Rejected(ChatSendError.INVALID_MESSAGE);
         }
         return withRetry(roomId, clientMessageId,
-                () -> writer.writeText(roomId, senderId, clientMessageId, content));
+                () -> writer.writeText(roomId, senderId, clientMessageId, content), true);
     }
 
     /** 입장·나가기·추방 안내. {@code eventId}는 사건마다 한 번 만든 UUID다. */
     public SendOutcome sendSystem(long roomId, UUID eventId, String content) {
-        return withRetry(roomId, eventId, () -> writer.writeSystem(roomId, eventId, content));
+        return withRetry(roomId, eventId, () -> writer.writeSystem(roomId, eventId, content), false);
     }
 
-    private SendOutcome withRetry(long roomId, UUID clientMessageId, Supplier<SavedMessage> attempt) {
+    /** {@code deferPublish}: 커밋 뒤 발행을 커넥션 반납 뒤로 미뤄도 되는 경로(사람이 보낸 메시지, {@link PublishDeferral}). 걸린 시간에는 발행도 들어간다 */
+    private SendOutcome withRetry(long roomId, UUID clientMessageId, Supplier<SavedMessage> attempt, boolean deferPublish) {
         long startedAt = System.nanoTime();
-        SendOutcome outcome = attempts(roomId, clientMessageId, attempt, startedAt);
+        SendOutcome outcome = deferPublish
+                ? deferral.around(() -> attempts(roomId, clientMessageId, attempt, startedAt))
+                : attempts(roomId, clientMessageId, attempt, startedAt);
         metrics.recordDuration(outcome, Duration.ofNanos(System.nanoTime() - startedAt));
         return outcome;
     }

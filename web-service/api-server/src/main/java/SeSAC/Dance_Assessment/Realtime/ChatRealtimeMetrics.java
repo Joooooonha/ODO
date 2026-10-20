@@ -76,6 +76,16 @@ public class ChatRealtimeMetrics {
                 .tag("type", t).register(registry)).record(nanos, TimeUnit.NANOSECONDS);
     }
 
+    /** 메시지 발행 때 DB 커넥션을 쥐고 있었는지(커밋 뒤 정리 전 = held, 반납 뒤 = released). 작업 3-2 E 비교용 */
+    public void publishConnection(boolean held) {
+        registry.counter("chat.redis.publish.connection", "state", held ? "held" : "released").increment();
+    }
+
+    public long publishConnections(String state) {
+        Counter c = registry.find("chat.redis.publish.connection").tag("state", state).counter();
+        return c == null ? 0 : (long) c.count();
+    }
+
     public long publishes(String type) {
         Counter c = registry.find("chat.redis.publish").tag("type", type).counter();
         return c == null ? 0 : (long) c.count();

@@ -28,7 +28,7 @@ class ChatMessageServiceRetryTest {
     private final ChatSendMetrics metrics = new ChatSendMetrics();
 
     private ChatMessageService service(Duration cutoff, Duration... backoff) {
-        return new ChatMessageService(writer, new ChatSendProperties(4, List.of(backoff), cutoff), metrics);
+        return new ChatMessageService(writer, new ChatSendProperties(4, List.of(backoff), cutoff), metrics, new PublishDeferral(false));
     }
 
     private static SQLException state(String sqlState) {
