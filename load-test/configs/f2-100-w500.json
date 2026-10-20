@@ -1,0 +1,36 @@
+{
+  "note": "작업 6 F2(위상 0·250, 기본값): W=500 + 모으기, 활발한 방 0.15, r=800 — 주기당 바뀐 방 약 100 목표",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.15
+  },
+  "stages": [
+    {
+      "r": 800
+    }
+  ],
+  "readThrottleMs": 500,
+  "readRetryMode": "backoff",
+  "readConfirmMs": 2000,
+  "flushWindows": {
+    "periodMs": 500,
+    "phasesMs": [
+      0,
+      250
+    ],
+    "nearMs": 100
+  },
+  "nginxStatusUrl": "http://nginx:8089/nginx_status"
+}

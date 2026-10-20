@@ -1,0 +1,35 @@
+{
+  "note": "작업 6 F1(두 서버 위상 모두 0, READ_AGGREGATE_PHASE=0): W=500 + 모으기, 활발한 방 0.9, r=2400 — 주기당 바뀐 방 약 600 목표",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.9
+  },
+  "stages": [
+    {
+      "r": 2400
+    }
+  ],
+  "readThrottleMs": 500,
+  "readRetryMode": "backoff",
+  "readConfirmMs": 2000,
+  "flushWindows": {
+    "periodMs": 500,
+    "phasesMs": [
+      0
+    ],
+    "nearMs": 100
+  },
+  "nginxStatusUrl": "http://nginx:8089/nginx_status"
+}

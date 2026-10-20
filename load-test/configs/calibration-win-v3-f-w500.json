@@ -1,0 +1,50 @@
+{
+  "note": "작업 6 배치 보정(W=500): 활발한 방 비율 0.15·0.4·0.9 × r 800·1,600·2,400(주기당 바뀐 방 약 100·300·600 목표). 가짜 서버·생성기 설정은 v2 보정과 같다",
+  "errorLimitMs": 5,
+  "readErrorLimitMs": 50,
+  "defaults": {
+    "rateMode": "total",
+    "senders": "watchers",
+    "dmRatePerSec": 10,
+    "connectRatePerSec": 300,
+    "warmupSec": 10,
+    "measureSec": 30,
+    "contentLength": 40,
+    "workers": 4,
+    "topology": {
+      "rooms": 1000,
+      "members": 4,
+      "teamsPerUser": 1,
+      "dmPairsPerRoom": 1,
+      "watchersPerRoom": 2,
+      "activeRoomRatio": 0.1
+    },
+    "readThrottleMs": 500
+  },
+  "cases": [
+    {
+      "name": "v3 작업6 2:2 1000x4 W=500 활발 0.15 r=800 고정 50ms",
+      "delay": "fixed:50",
+      "r": 800,
+      "topology": {
+        "activeRoomRatio": 0.15
+      }
+    },
+    {
+      "name": "v3 작업6 2:2 1000x4 W=500 활발 0.4 r=1600 고정 50ms",
+      "delay": "fixed:50",
+      "r": 1600,
+      "topology": {
+        "activeRoomRatio": 0.4
+      }
+    },
+    {
+      "name": "v3 작업6 2:2 1000x4 W=500 활발 0.9 r=2400 고정 50ms",
+      "delay": "fixed:50",
+      "r": 2400,
+      "topology": {
+        "activeRoomRatio": 0.9
+      }
+    }
+  ]
+}
