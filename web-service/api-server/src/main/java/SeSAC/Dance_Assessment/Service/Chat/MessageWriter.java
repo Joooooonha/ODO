@@ -91,6 +91,7 @@ public class MessageWriter {
 
     private final JdbcTemplate jdbc;
     private final ApplicationEventPublisher events;
+    private final SendStages stages;
 
     /**
      * 사람이 보낸 메시지. 입력 검증은 끝났다고 본다({@link ChatMessageService}).
@@ -100,17 +101,22 @@ public class MessageWriter {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = TIMEOUT_SECONDS)
     public SavedMessage writeText(long roomId, long senderId, UUID clientMessageId, String content) {
+        stages.mark(SendStages.BEGIN);
+        stages.watchCommit();
         Seq seq = nextSeq(roomId);
+        stages.mark(SendStages.SEQ);
         if (seq == null) {
             throw new NotChatMemberException(roomId, senderId);
         }
         List<String> nickname = jdbc.queryForList(ACTIVE_SENDER, String.class, roomId, senderId);
+        stages.mark(SendStages.MEMBER);
         if (nickname.isEmpty()) {
             throw new NotChatMemberException(roomId, senderId);
         }
 
         Long messageId = jdbc.query(INSERT_TEXT, MessageWriter::firstLongOrNull,
                 roomId, seq.value(), senderId, content, clientMessageId, utc(seq.at()));
+        stages.mark(SendStages.INSERT);
         if (messageId == null) {
             throw new DuplicateMessageException(jdbc.queryForObject(
                     EXISTING_TEXT, MessageWriter::mapSaved, senderId, clientMessageId));

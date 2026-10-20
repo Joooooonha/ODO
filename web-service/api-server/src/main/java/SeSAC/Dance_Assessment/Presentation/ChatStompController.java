@@ -5,6 +5,7 @@ import SeSAC.Dance_Assessment.Realtime.ChatConnection;
 import SeSAC.Dance_Assessment.Realtime.ChatReplySender;
 import SeSAC.Dance_Assessment.Service.Chat.ChatReply;
 import SeSAC.Dance_Assessment.Service.Chat.ChatSendHandler;
+import SeSAC.Dance_Assessment.Service.Chat.SendStages;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class ChatStompController {
     private final ChatSendHandler sendHandler;
     private final ChatReplySender replySender;
     private final ObjectMapper objectMapper;
+    private final SendStages stages;
 
     @MessageMapping("/rooms/{roomId}/messages")
     public void send(@DestinationVariable long roomId, Message<byte[]> message, SimpMessageHeaderAccessor headers) {
@@ -41,9 +43,16 @@ public class ChatStompController {
         if (connection == null) {
             return;
         }
-        ChatReply reply = sendHandler.handle(connection.sendState(), connection.userId(), roomId,
-                parse(message.getPayload()));
-        replySender.send(connection, reply);
+        stages.start();
+        try {
+            ChatReply reply = sendHandler.handle(connection.sendState(), connection.userId(), roomId,
+                    parse(message.getPayload()));
+            stages.mark(SendStages.RELEASE);
+            replySender.send(connection, reply);
+            stages.mark(SendStages.ACK);
+        } finally {
+            stages.finish();
+        }
     }
 
     /**

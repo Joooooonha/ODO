@@ -3,6 +3,7 @@ package SeSAC.Dance_Assessment.Realtime;
 import SeSAC.Dance_Assessment.Domain.ChatMessageType;
 import SeSAC.Dance_Assessment.Service.Chat.MessageSavedEvent;
 import SeSAC.Dance_Assessment.Service.Chat.SavedMessage;
+import SeSAC.Dance_Assessment.Service.Chat.SendStages;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,9 +31,19 @@ public class MessageBroadcaster {
     private final ObjectMapper objectMapper;
     private final ChatRealtimeMetrics metrics;
     private final JdbcTemplate jdbc;
+    private final SendStages stages;
 
     @TransactionalEventListener
     public void onSaved(MessageSavedEvent event) {
+        stages.mark(SendStages.AFTER_COMMIT);
+        try {
+            publish(event);
+        } finally {
+            stages.mark(SendStages.PUBLISH);
+        }
+    }
+
+    private void publish(MessageSavedEvent event) {
         RoomBroadcast broadcast = RoomBroadcast.of(event.message(), targetNickname(event.message()));
         try {
             redis.convertAndSend(ChatDestinations.roomChannel(broadcast.roomId()).getTopic(),

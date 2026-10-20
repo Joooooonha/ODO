@@ -118,6 +118,9 @@ for (const s of stagesDoc) {
     sendP99Ms: await one(`max_over_time(chat_send_duration_seconds{quantile="0.99"}[${w}]) * 1000`, to),
     hikariAcquireAvgMs: await one(`sum by (server) (increase(hikaricp_connections_acquire_seconds_sum[${w}])) / sum by (server) (increase(hikaricp_connections_acquire_seconds_count[${w}])) * 1000`, to),
     hikariUsageAvgMs: await one(`sum by (server) (increase(hikaricp_connections_usage_seconds_sum[${w}])) / sum by (server) (increase(hikaricp_connections_usage_seconds_count[${w}])) * 1000`, to),
+    // 작업 3: 메시지 1건 처리 단계별 평균(SendStages). 서버:단계 → ms
+    sendStageAvgMs: Object.fromEntries((await prom(`sum by (server, stage) (increase(chat_send_stage_seconds_sum[${w}])) / sum by (server, stage) (increase(chat_send_stage_seconds_count[${w}])) * 1000`, to))
+      .map((r) => [`${r.labels.server}:${r.labels.stage}`, round(r.value, 3)])),
     sendAvgMs: await one(`sum by (server) (increase(chat_send_duration_seconds_sum[${w}])) / sum by (server) (increase(chat_send_duration_seconds_count[${w}])) * 1000`, to),
     readAvgMs: await one(`sum by (server) (increase(chat_read_duration_seconds_sum{outcome="advanced"}[${w}])) / sum by (server) (increase(chat_read_duration_seconds_count{outcome="advanced"}[${w}])) * 1000`, to),
     appCores: await one(`avg_over_time(process_cpu_usage[${w}]) * 2`, to),

@@ -161,6 +161,36 @@ class ChatWebSocketTest {
     }
 
     @Test
+    @DisplayName("[작업 3] 메시지 한 건이 처리 단계 지표(chat.send.stage) 열 단계를 한 번씩 남긴다")
+    void sendStagesAreRecorded() throws Exception {
+        LoggedIn me = users.create("나");
+        long room = chat.teamRoomId(me, teams.createTeam(me, "단계 팀"));
+        RawStompClient c = connect(me);
+        List<String> stages = List.of("begin", "seq", "member", "insert", "body_end", "commit", "after_commit", "publish", "release", "ack");
+        Map<String, Long> before = new java.util.HashMap<>();
+        for (String s : stages) {
+            before.put(s, stageCount(s));
+        }
+
+        c.sendMessage(room, UUID.randomUUID().toString(), "단계", false);
+        assertThat(c.nextAck(WAIT).get("type").asText()).isEqualTo("ACK");
+
+        // ack 단계는 확정 응답을 바깥 채널에 넘긴 뒤 기록되므로 응답을 받은 직후엔 아직일 수 있다
+        long deadline = System.nanoTime() + WAIT.toNanos();
+        while (stageCount("ack") == before.get("ack") && System.nanoTime() < deadline) {
+            Thread.sleep(20);
+        }
+        for (String s : stages) {
+            assertThat(stageCount(s) - before.get(s)).as(s).isEqualTo(1);
+        }
+    }
+
+    private long stageCount(String stage) {
+        var timer = meterRegistry.find("chat.send.stage").tag("stage", stage).timer();
+        return timer == null ? 0 : timer.count();
+    }
+
+    @Test
     @DisplayName("[B6] 한 세션에서 연달아 보낸 30개 — 확정 순서와 저장 순서가 보낸 순서와 같다")
     void sessionOrderIsSendOrder() throws Exception {
         LoggedIn me = users.create("나");
