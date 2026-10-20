@@ -18,6 +18,8 @@ export function ChatProvider({ children }) {
     const [store] = useState(() => new ChatStore({
         socketUrl: chatSocketUrl(),
         readThrottleMs: Number(import.meta.env.VITE_CHAT_READ_THROTTLE_MS ?? 0) || 0,
+        readRetryMode: import.meta.env.VITE_CHAT_READ_RETRY_MODE === 'backoff' ? 'backoff' : 'fixed',
+        readConfirmMs: Number(import.meta.env.VITE_CHAT_READ_CONFIRM_MS ?? 0) || 0,
     }));
 
     useEffect(() => {

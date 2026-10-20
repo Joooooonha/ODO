@@ -16,7 +16,7 @@ x-app: &app
   volumes:
     - ../../web-service/api-server/build/libs:/app:ro
   command: ["sh", "-c", "exec java -jar /app/Dance-Assessment-0.0.1-SNAPSHOT.jar"]
-  environment:
+  environment: &app-env
     SPRING_PROFILES_ACTIVE: prod,loadtest
     TZ: UTC
     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dance_db
@@ -39,6 +39,11 @@ x-app: &app
     CHAT_WS_INBOUND_THREADS: ${INBOUND_THREADS:-0}
     # 발행을 커넥션 반납 뒤로(작업 3-2 조건부 E). 기본 끔. `set PUBLISH_AFTER_RELEASE=true&& docker compose up -d app1 app2`
     CHAT_PUBLISH_AFTER_RELEASE: ${PUBLISH_AFTER_RELEASE:-false}
+    # 서버 쪽 읽음 모으기(10/20 작업 4). 기본 끔. 위상은 서버 순번으로(app1 0ms, app2 250ms), READ_AGGREGATE_PHASE를 주면
+    # 두 서버 모두 그 값(작업 6 F1: 0). 실행마다 `set READ_AGGREGATE=true&& docker compose up -d app1 app2`
+    CHAT_READ_AGGREGATE: ${READ_AGGREGATE:-false}
+    CHAT_READ_AGGREGATE_PHASE: ${READ_AGGREGATE_PHASE:--1}
+    CHAT_SERVER_COUNT: "2"
   healthcheck:
     test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
     interval: 3s
@@ -114,9 +119,15 @@ services:
 
   app1:
     <<: *app
+    environment:
+      <<: *app-env
+      CHAT_SERVER_INDEX: "0"
 
   app2:
     <<: *app
+    environment:
+      <<: *app-env
+      CHAT_SERVER_INDEX: "1"
     # app1이 뜬 뒤에 띄운다(Flyway 마이그레이션이 동시에 돌지 않게)
     depends_on:
       app1: { condition: service_healthy }

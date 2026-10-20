@@ -1,5 +1,7 @@
 package SeSAC.Dance_Assessment.Realtime;
 
+import SeSAC.Dance_Assessment.Service.Chat.ReadAccessCache;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
@@ -36,10 +38,13 @@ public class ChatAccessControl {
     private final RoomSubscriptions rooms;
     private final ChatReplySender replySender;
     private final MessageChannel brokerChannel;
+    private final ReadAccessCache readAccess;
 
     public ChatAccessControl(ChatConnectionRegistry registry, RoomSubscriptions rooms,
                              @Lazy ChatReplySender replySender,
-                             @Lazy @Qualifier("brokerChannel") MessageChannel brokerChannel) {
+                             @Lazy @Qualifier("brokerChannel") MessageChannel brokerChannel,
+                             ReadAccessCache readAccess) {
+        this.readAccess = readAccess;
         this.registry = registry;
         this.rooms = rooms;
         this.replySender = replySender;
@@ -48,6 +53,7 @@ public class ChatAccessControl {
 
     /** @return 실제로 끊은 세션 수(이미 막혀 있던 세션은 세지 않는다) */
     public int revoke(long userId, long roomId) {
+        readAccess.revoke(userId, roomId);   // 읽음 모으기의 HTTP 권한 캐시(웹소켓 연결이 없는 사용자 몫)
         int changed = 0;
         for (ChatConnection connection : registry.ofUser(userId)) {
             if (connection.isClosed()) {
@@ -71,6 +77,7 @@ public class ChatAccessControl {
 
     /** @return 새로 허용한 세션 수 */
     public int grant(long userId, long roomId) {
+        readAccess.grant(userId, roomId);
         int changed = 0;
         for (ChatConnection connection : registry.ofUser(userId)) {
             if (connection.isClosed() || !connection.allow(roomId)) {

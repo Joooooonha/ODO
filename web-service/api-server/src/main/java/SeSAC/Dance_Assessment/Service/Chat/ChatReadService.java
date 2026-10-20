@@ -30,6 +30,9 @@ public class ChatReadService {
     private final ReadPublisher publisher;
     private final ChatReadMetrics metrics;
     private final ReadBulkhead bulkhead;
+    private final ReadAggregator aggregator;
+    private final ReadAccessCache access;
+    private final ReadFaults faults;
 
     /**
      * 읽음 보고. 사용자는 인증 정보에서만 온다.
@@ -39,9 +42,14 @@ public class ChatReadService {
      *
      * @throws ApiException 400 {@code INVALID_READ_SEQ}·{@code READ_SEQ_AHEAD} / 403 {@code NOT_CHAT_MEMBER}
      *                      (방이 없거나, 멤버가 아니거나, 나간 멤버) / 429 {@code READ_BUSY}(벌크헤드 거절)
+     * @return 서버 쪽 모으기가 켜져 있어 버퍼에 받았으면 true(→ 202, 반영은 다음 처리 주기), 기준선 경로로 끝냈으면 false(→ 204)
      */
-    public void report(long me, long roomId, Long seq) {
+    public boolean report(long me, long roomId, Long seq) {
         long start = System.nanoTime();
+        if (faults.readFailing()) {
+            metrics.request(ChatReadMetrics.FAULT, System.nanoTime() - start);
+            throw new ApiException(ErrorCode.READ_UNAVAILABLE);
+        }
         if (!bulkhead.tryAcquire()) {
             metrics.request(ChatReadMetrics.REJECTED, System.nanoTime() - start);
             throw new ApiException(ErrorCode.READ_BUSY);
@@ -51,10 +59,20 @@ public class ChatReadService {
             if (seq == null || seq < 0) {
                 throw new ApiException(ErrorCode.INVALID_READ_SEQ);
             }
+            if (aggregator.enabled()) {
+                // 모으기: DB에 가지 않는다. 권한은 허용 방 캐시로, 범위(마지막 번호 이하)는 처리할 때 본다
+                if (!access.isAllowed(me, roomId)) {
+                    outcome = ChatReadMetrics.FORBIDDEN;
+                    throw new ApiException(ErrorCode.NOT_CHAT_MEMBER);
+                }
+                aggregator.offer(roomId, me, seq);
+                outcome = ChatReadMetrics.ACCEPTED;
+                return true;
+            }
             if (writer.advance(roomId, me, seq) == 1) {
                 outcome = ChatReadMetrics.ADVANCED;
                 publisher.publish(snapshot(roomId));
-                return;
+                return false;
             }
             // 바뀐 행이 0: 멤버가 아니면(방이 없어도) 403이 먼저다 — 방 번호로 방이 있는지 알 수 없게
             List<Object[]> rows = reader.memberStatus(roomId, me);
@@ -66,6 +84,7 @@ public class ChatReadService {
                 throw new ApiException(ErrorCode.READ_SEQ_AHEAD);
             }
             outcome = ChatReadMetrics.NOOP;   // 같거나 작은 값: 스냅샷·발행 없이 끝
+            return false;
         } finally {
             bulkhead.release();
             metrics.request(outcome, System.nanoTime() - start);

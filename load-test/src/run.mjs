@@ -81,20 +81,33 @@ export async function run(config, { log = console.log, onMeasureStart } = {}) {
     const cpu0 = os.cpus();
     const cg0 = readCgroup();
     const startedAt = new Date().toISOString();
+    const faults = scheduleFaults(config, stage.r, log);
+    const nginx = pollNginx(config, config.measureSec);
     const results = await Promise.all(workers.map((w) => w.call({ cmd: 'measure', durationMs: config.measureSec * 1000 })));
     const machineCpu = machineCpuPercent(cpu0, os.cpus());
     const summary = {
       ...summarizeStage(stage.r, results.map((x) => x.result), machineCpu, config, cgroupDelta(cg0, readCgroup())),
       startedAt, endedAt: new Date().toISOString(),
+      faults: await faults,
+      nginx: await nginx,
     };
     stages.push(summary);
     log(formatStage(summary));
     writeFileSync(path.join(outDir, 'stages.json'), JSON.stringify(stages, null, 2));
   }
   await Promise.all(workers.map((w) => w.call({ cmd: 'rates', rooms: [] })));
+  // 작업 5-4: 보내기를 멈추고 마지막 보고(창 끝 ≤ W)가 모두 서버 버퍼에 들어간 뒤, 모아 둔 값을 한 번 버리게 한다 →
+  // 그 값들은 스냅샷 확인 재전송으로만 복구된다
+  let dropAt = null;
+  if (config.dropAtDrain) {
+    await sleep((config.readThrottleMs ?? 0) + 100);
+    dropAt = Date.now();
+    await callFaultTargets(config, { action: 'read-drop-once' }, log);
+  }
   // 보내기를 멈춘 뒤 화면 위치를 서버가 모두 받아들이는지(읽음 위치가 멈추지 않는지, Task-chat-read-improve 5절 4번)
-  const drain = await readDrain(workers, config.readDrainSec ?? 60);
-  log(`[생성기] 읽음 보고 정리: 보는 세션 ${drain.watched}, 서버보다 앞선 화면 ${drain.behind}, 멈춤 ${drain.stuck} (${drain.waitedSec}초)`);
+  const drain = await readDrain(workers, config.readDrainSec ?? 60, !!config.readConfirmMs);
+  drain.dropAt = dropAt;
+  log(`[생성기] 읽음 보고 정리: 보는 세션 ${drain.watched}, 서버보다 앞선 화면 ${drain.behind}, 스냅샷 미확인 ${drain.unconfirmed}, 멈춤 ${drain.stuck} (${drain.waitedSec}초${drain.convergedMs != null ? `, 수렴 ${drain.convergedMs}ms` : ''})`);
   writeFileSync(path.join(outDir, 'read-drain.json'), JSON.stringify(drain, null, 2));
   await Promise.all(workers.map((w) => w.call({ cmd: 'stop' }).catch(() => {})));
   writeFileSync(path.join(outDir, 'summary.csv'), toCsv(stages));
@@ -103,16 +116,60 @@ export async function run(config, { log = console.log, onMeasureStart } = {}) {
 }
 
 /** 보내기를 멈춘 뒤 모든 보는 세션의 화면 위치가 서버에 반영될 때까지(최대 timeoutSec) 기다린다. */
-async function readDrain(workers, timeoutSec) {
+async function readDrain(workers, timeoutSec, needConfirm = false) {
   const t0 = Date.now();
   let last;
+  let convergedMs = null;
   for (;;) {
     const st = await Promise.all(workers.map((w) => w.call({ cmd: 'readStatus' })));
-    last = st.reduce((a, s) => ({ watched: a.watched + s.watched, behind: a.behind + s.behind, stuck: a.stuck + s.stuck }), { watched: 0, behind: 0, stuck: 0 });
-    if (last.behind === 0 || Date.now() - t0 > timeoutSec * 1000) break;
+    last = st.reduce((a, s) => ({ watched: a.watched + s.watched, behind: a.behind + s.behind, stuck: a.stuck + s.stuck, unconfirmed: a.unconfirmed + (s.unconfirmed ?? 0) }),
+      { watched: 0, behind: 0, stuck: 0, unconfirmed: 0 });
+    const done = last.behind === 0 && (!needConfirm || last.unconfirmed === 0);
+    if (done) convergedMs = Date.now() - t0;
+    if (done || Date.now() - t0 > timeoutSec * 1000) break;
+    await sleep(needConfirm ? 250 : 1000);
+  }
+  return { ...last, waitedSec: Math.round((Date.now() - t0) / 1000), convergedMs };
+}
+
+/** 측정 전용 장애 주입 끝점(앱 관리 포트, compose 네트워크 안)을 두 서버에 부른다(작업 5-3·5-4) */
+async function callFaultTargets(config, body, log) {
+  const targets = config.faultTargets ?? ['http://app1:9091', 'http://app2:9091'];
+  const at = Date.now();
+  const res = await Promise.all(targets.map((t) => fetch(`${t}/actuator/loadtest`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }).then((r) => r.status, (e) => String(e?.cause?.code ?? e))));
+  log(`[생성기] 장애 주입 ${JSON.stringify(body)} → ${res.join(',')}`);
+  return { ...body, at, status: res };
+}
+
+/** 이 단계에 걸린 장애 주입(config.faults: [{ r, atSec, action, seconds }])을 측정 시작 기준으로 예약한다 */
+async function scheduleFaults(config, r, log) {
+  const mine = (config.faults ?? []).filter((f) => f.r === r);
+  return Promise.all(mine.map(async (f) => {
+    await sleep(f.atSec * 1000);
+    const { r: _r, atSec, ...body } = f;
+    void _r;
+    return { atSec, ...(await callFaultTargets(config, body, log)) };
+  }));
+}
+
+/** nginx stub_status 누적 요청 수를 1초마다(config.nginxStatusUrl, 작업 5-3 "nginx 기준 초당 요청 수") */
+async function pollNginx(config, sec) {
+  if (!config.nginxStatusUrl) return null;
+  const out = [];
+  const t0 = Date.now();
+  while (Date.now() - t0 < sec * 1000) {
+    try {
+      const text = await (await fetch(config.nginxStatusUrl)).text();
+      const m = /\n\s*(\d+)\s+(\d+)\s+(\d+)/.exec(text);
+      if (m) out.push([Date.now(), Number(m[3])]);
+    } catch {
+      out.push([Date.now(), null]);
+    }
     await sleep(1000);
   }
-  return { ...last, waitedSec: Math.round((Date.now() - t0) / 1000) };
+  return out;
 }
 
 /** 방마다 보내기 속도. perRoom이면 활발한 방마다 r건/초, total이면 r을 활발한 방 수로 나눈다. DM 배경은 따로. */
@@ -143,7 +200,7 @@ function sendRates(topo, config, r) {
 }
 
 function summarizeStage(r, results, machineCpu, config, cgroup) {
-  const kinds = ['delivery', 'ack', 'read', 'readSend', 'readHttp', 'lag'];
+  const kinds = ['delivery', 'ack', 'read', 'readSend', 'readHttp', 'lag', 'deliveryNear', 'deliveryFar'];
   const merged = Object.fromEntries(kinds.map((k) => [k, merge(results.map((x) => x.histograms[k]))]));
   const counters = {};
   for (const x of results) for (const [k, v] of Object.entries(x.counters)) counters[k] = (counters[k] ?? 0) + v;
@@ -191,6 +248,9 @@ function summarizeStage(r, results, machineCpu, config, cgroup) {
     read: summarize(merged.read),
     readSend: summarize(merged.readSend),
     readHttp: summarize(merged.readHttp),
+    deliveryNear: summarize(merged.deliveryNear),
+    deliveryFar: summarize(merged.deliveryFar),
+    timeline: mergeTimeline(results),
     readStatus: results.reduce((a, x) => ({ behind: a.behind + (x.readStatus?.behind ?? 0), stuck: a.stuck + (x.readStatus?.stuck ?? 0) }), { behind: 0, stuck: 0 }),
     scheduleLag: summarize(merged.lag),
     counters,
@@ -206,6 +266,27 @@ function summarizeStage(r, results, machineCpu, config, cgroup) {
   };
   kinds.forEach((k) => merged[k].destroy?.());
   return summary;
+}
+
+/** 작업 프로세스들의 초 단위 시간선을 합친다: 초마다 카운터 합, 전달 지연 p50·p95·p99 */
+function mergeTimeline(results) {
+  if (!results.some((x) => x.timeline)) return null;
+  const n = Math.max(...results.map((x) => x.timeline?.length ?? 0));
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const counters = {};
+    const hs = [];
+    for (const x of results) {
+      const t = x.timeline?.[i];
+      if (!t) continue;
+      for (const [k, v] of Object.entries(t.counters)) counters[k] = (counters[k] ?? 0) + v;
+      if (t.delivery) hs.push(t.delivery);
+    }
+    const h = merge(hs);
+    out.push({ sec: i, counters, delivery: summarize(h) });
+    h.destroy?.();
+  }
+  return out;
 }
 
 function formatStage(s) {

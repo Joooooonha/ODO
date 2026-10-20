@@ -11,7 +11,9 @@ import { createHistogram, encode, recordNs } from './hist.mjs';
  * 넘으면 조정자가 그 단계를 "생성기 포화, 무효"로 표시한다.
  */
 // read = 화면에 붙은 순간 → 다른 사람의 READ에서 반영을 본 순간(2.4의 정의), readSend = 보낸 순간부터(기준선 정의)
-const KINDS = ['delivery', 'ack', 'read', 'readSend', 'readHttp', 'lag'];
+const KINDS = ['delivery', 'ack', 'read', 'readSend', 'readHttp', 'lag', 'deliveryNear', 'deliveryFar'];
+// 초 단위 시간선(설정 timeline: true, 작업 5-3): 이 이름의 카운터와 전달 지연을 측정 시작부터 초마다 따로 센다
+const TIMELINE_COUNTERS = /^(readPosts|readReports|readRejected|readReportErrors|readRetry:|readConfirmResend|sent|acked|http202:|http5|net:)/;
 const REPORT_TTL_NS = 60_000_000_000n;
 
 let config;
@@ -31,11 +33,18 @@ const sentReports = new Map();
 const loopDelay = monitorEventLoopDelay({ resolution: 1 });
 loopDelay.enable();
 
+let timeline = [];   // 초 → { counters: {}, delivery: 히스토그램 }
+let measureStartMs = 0;
+// hrtime(ns) → epoch ms 변환(처리 시점 근처 판정용). 같은 컨테이너·같은 호스트 시계
+const epochOffsetMs = Date.now() - Number(process.hrtime.bigint() / 1_000_000n);
 const resetMeasures = () => {
   histograms = Object.fromEntries(KINDS.map((k) => [k, createHistogram()]));
   counters = new Map();
   perRoom = new Map();
+  timeline = [];
+  measureStartMs = Date.now();
 };
+const slot = (sec) => (timeline[sec] ??= { counters: {}, delivery: null });
 resetMeasures();
 
 const ctx = {
@@ -44,7 +53,33 @@ const ctx = {
   },
   padding: '',
   count(name, n = 1) {
-    if (measuring) counters.set(name, (counters.get(name) ?? 0) + n);
+    if (!measuring) return;
+    counters.set(name, (counters.get(name) ?? 0) + n);
+    if (config.timeline && TIMELINE_COUNTERS.test(name)) {
+      const c = slot(Math.floor((Date.now() - measureStartMs) / 1000)).counters;
+      c[name] = (c[name] ?? 0) + n;
+    }
+  },
+  /**
+   * 전달 지연을 보낸 시각으로 나눠 기록: (1) 처리 시점 근처(flushWindows: 주기·위상들·± nearMs 안에 보낸 메시지)와 그 밖,
+   * (2) 시간선(초마다). 서버 쪽 모으기의 처리 몰림(작업 6)과 장애 동안의 전달 지연(작업 5-3)
+   */
+  deliveryAt(sentAtNs, diffNs) {
+    if (!measuring) return;
+    const fw = config.flushWindows;
+    if (fw) {
+      const ms = Number(sentAtNs / 1_000_000n) + epochOffsetMs;
+      const near = fw.phasesMs.some((p) => {
+        const d = (((ms - p) % fw.periodMs) + fw.periodMs) % fw.periodMs;
+        return d <= fw.nearMs || fw.periodMs - d <= fw.nearMs;
+      });
+      recordNs(histograms[near ? 'deliveryNear' : 'deliveryFar'], diffNs);
+    }
+    if (config.timeline) {
+      const s = slot(Math.floor((Date.now() - measureStartMs) / 1000));
+      s.delivery ??= createHistogram();
+      recordNs(s.delivery, diffNs);
+    }
   },
   record(kind, diffNs) {
     if (measuring) recordNs(histograms[kind], diffNs, () => ctx.count(`negative:${kind}`));
@@ -117,14 +152,16 @@ function readStatus() {
   let watched = 0;
   let behind = 0;
   let stuck = 0;
+  let unconfirmed = 0;
   for (const s of sessions) {
     const st = s.readStatus();
     if (!st) continue;
     watched += 1;
     if (st.behind) behind += 1;
     if (st.stuck) stuck += 1;
+    if (st.unconfirmed) unconfirmed += 1;
   }
-  return { watched, behind, stuck };
+  return { watched, behind, stuck, unconfirmed };
 }
 
 /** 이 프로세스의 세션이 구독한 방별 세션 수(세션은 자기 모든 방을 구독한다) */
@@ -215,6 +252,8 @@ async function measure(durationMs) {
     sessions: sessions.length,
     ready: sessions.filter((s) => s.ready).length,
     histograms: Object.fromEntries(KINDS.map((k) => [k, encode(histograms[k])])),
+    measureStartMs,
+    timeline: config.timeline ? timeline.map((t) => t && { counters: t.counters, delivery: t.delivery ? encode(t.delivery) : null }) : null,
     counters: Object.fromEntries(counters),
     cpuPercentOfCore: Math.round(((cpu.user + cpu.system) / elapsedUs) * 1000) / 10,
     eventLoopUtilization: Math.round(elu * 1000) / 1000,

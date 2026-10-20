@@ -148,9 +148,17 @@ export class Session {
     ]);
     const view = this.view ?? { received: new Set(), contiguousTo: 0, visibleTo: 0, gapTimer: null, fetching: false };
     this.view = view;
+    const cfg = this.ctx.config;
     this.reporter ??= new ReadThrottle({
-      windowMs: this.ctx.config.readThrottleMs ?? 0,
+      windowMs: cfg.readThrottleMs ?? 0,
       send: (seq) => this.postRead(seq),
+      // 10/20 작업 4: 재전송 방식(고정·백오프)과 스냅샷 확인 재전송(0 = 끔). 화면과 같은 규칙 파일
+      retryMode: cfg.readRetryMode ?? 'fixed',
+      confirmMs: cfg.readConfirmMs ?? 0,
+      onResult: (seq, kind, err) => {
+        if (kind === 'retry') this.ctx.count(`readRetry:${err?.status ?? 'net'}`);
+      },
+      onConfirmResend: () => this.ctx.count('readConfirmResend'),
     });
     for (const m of page?.messages ?? []) view.received.add(m.seq);
     // 최신 50개를 기준으로 이어 본다(그 앞은 화면에 없다 — 브라우저와 같다)
@@ -224,13 +232,19 @@ export class Session {
   /** 측정용: 보고 있는 방의 읽음 보고 상태 */
   readStatus() {
     if (!this.reporter || !this.view) return null;
-    return { behind: this.view.contiguousTo > this.reporter.acked, stuck: this.reporter.isStuck() };
+    // unconfirmed: 화면 위치가 서버 스냅샷(READ·read-state)에 아직 안 보임 — 202로 받았어도 모아 둔 값을 잃었을 수 있다(작업 5-4)
+    return {
+      behind: this.view.contiguousTo > this.reporter.acked,
+      stuck: this.reporter.isStuck(),
+      unconfirmed: this.view.contiguousTo > this.reporter.observed,
+    };
   }
 
   applyReadState(roomId, state) {
     for (const p of state.positions ?? []) {
       const key = `${roomId}:${p.userId}`;
       this.readSeen.set(key, Math.max(this.readSeen.get(key) ?? 0, p.lastReadSeq));
+      if (p.userId === this.userId && roomId === this.watched) this.reporter?.observe(p.lastReadSeq);
     }
   }
 
@@ -248,6 +262,7 @@ export class Session {
     if (body.senderId !== this.userId && typeof body.content === 'string' && body.content.startsWith(CONTENT_PREFIX)) {
       const sentAt = BigInt(body.content.slice(CONTENT_PREFIX.length, body.content.indexOf('|', CONTENT_PREFIX.length)));
       this.ctx.record('delivery', at - sentAt);
+      this.ctx.deliveryAt?.(sentAt, at - sentAt);
     }
     if (body.roomId === this.watched && this.view) {
       if (body.seq > this.view.contiguousTo) this.view.received.add(body.seq);
@@ -257,7 +272,11 @@ export class Session {
 
   onRead(frame, at) {
     for (const p of frame.positions) {
-      if (p.userId === this.userId) continue;   // 다른 사람의 보고가 나에게 반영된 시간만 잰다
+      if (p.userId === this.userId) {
+        // 내 위치: 확인 재전송(6)의 근거. 다른 사람의 보고가 나에게 반영된 시간만 잰다
+        if (frame.roomId === this.watched) this.reporter?.observe(p.lastReadSeq);
+        continue;
+      }
       const key = `${frame.roomId}:${p.userId}`;
       const prev = this.readSeen.get(key) ?? 0;
       if (p.lastReadSeq <= prev) continue;
@@ -327,6 +346,7 @@ export class Session {
       this.ctx.count(`net:${method}:${e?.cause?.code ?? e?.name ?? 'unknown'}`);
       throw e;
     }
+    if (res.status === 202) this.ctx.count(`http202:${method}`);
     if (!res.ok) {
       this.ctx.count(`http${res.status}:${method}`);
       await res.arrayBuffer().catch(() => {});

@@ -33,6 +33,10 @@ public class ChatReadMetrics {
     public static final String FORBIDDEN = "forbidden";
     public static final String INVALID = "invalid";
     public static final String REJECTED = "rejected";
+    /** 서버 쪽 모으기(작업 4): 버퍼에 받음 → 202 */
+    public static final String ACCEPTED = "accepted";
+    /** 측정 전용 장애 주입으로 503 */
+    public static final String FAULT = "fault";
 
     private final MeterRegistry registry;
     private final Duration window;

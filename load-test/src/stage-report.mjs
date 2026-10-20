@@ -151,6 +151,36 @@ for (const s of stagesDoc) {
     framesPerSec: await one(`sum by (type) (increase(chat_outbound_frames_total[${w}])) / ${(to - from) / 1000}`, to, 'type'),
     publishPerSec: await one(`sum by (type) (increase(chat_redis_publish_total[${w}])) / ${(to - from) / 1000}`, to, 'type'),
   };
+  // 작업 4: 서버 쪽 읽음 모으기(ReadAggregator). 꺼져 있으면 값이 비어 있다. 처리 시간 t·커넥션 보유·잠금 대기는 ms
+  const sec = (to - from) / 1000;
+  const avgMs = (name, sel = '') => one(`sum by (server) (increase(${name}_sum${sel}[${w}])) / sum by (server) (increase(${name}_count${sel}[${w}])) * 1000`, to);
+  const perSec = (expr) => one(`sum by (server) (increase(${expr}[${w}])) / ${sec}`, to);
+  const agg = {
+    cycleAvgMs: await avgMs('chat_read_agg_cycle_seconds'),
+    cycleMaxMs: await one(`max_over_time(chat_read_agg_cycle_seconds_max[${w}]) * 1000`, to),
+    cycleP99Ms: await one(`max_over_time(chat_read_agg_cycle_seconds{quantile="0.99"}[${w}]) * 1000`, to),
+    cyclesPerSec: await perSec('chat_read_agg_cycle_seconds_count'),
+    entriesAvg: await one(`sum by (server) (increase(chat_read_agg_entries_sum[${w}])) / sum by (server) (increase(chat_read_agg_entries_count[${w}]))`, to),
+    roomsAvg: await one(`sum by (server) (increase(chat_read_agg_rooms_sum[${w}])) / sum by (server) (increase(chat_read_agg_rooms_count[${w}]))`, to),
+    roomsMax: await one(`max_over_time(chat_read_agg_rooms_max[${w}])`, to),
+    writeHoldAvgMs: await avgMs('chat_read_agg_connection_seconds', '{phase="write"}'),
+    snapshotHoldAvgMs: await avgMs('chat_read_agg_connection_seconds', '{phase="snapshot"}'),
+    // 읽음 처리가 커넥션을 쥔 시간 합(초당 ms) — 5-1 비교용
+    holdMsPerSec: await one(`sum by (server) (increase(chat_read_agg_connection_seconds_sum[${w}])) * 1000 / ${sec}`, to),
+    lockAvgMs: await avgMs('chat_read_agg_lock_seconds'),
+    lockMaxMs: await one(`max_over_time(chat_read_agg_lock_seconds_max[${w}]) * 1000`, to),
+    commitsPerSec: await perSec('chat_read_agg_commits_total'),
+    rowsPerSec: Object.fromEntries((await prom(`sum by (server, result) (increase(chat_read_agg_rows_total[${w}])) / ${sec}`, to))
+      .map((r) => [`${r.labels.server}:${r.labels.result}`, round(r.value, 1)])),
+    snapshotsPerSec: await perSec('chat_read_agg_snapshots_total'),
+    publishesPerSec: await perSec('chat_read_agg_publishes_total'),
+    failures: Object.fromEntries((await prom(`sum by (server, cause) (increase(chat_read_agg_failures_total[${w}]))`, to))
+      .map((r) => [`${r.labels.server}:${r.labels.cause}`, round(r.value, 0)])),
+    overruns: await one(`sum by (server) (increase(chat_read_agg_overruns_total[${w}]))`, to),
+    dropped: await one(`sum by (server) (increase(chat_read_agg_dropped_total[${w}]))`, to),
+    bufferMax: await one(`max_over_time(chat_read_agg_buffer[${w}])`, to),
+    phaseMs: await one(`max_over_time(chat_read_agg_phase[${w}])`, to),
+  };
   const db = {
     lockWaitMax: (await one(`max_over_time((sum(pg_obs_sessions{wait_type="Lock"}) or vector(0))[${w}:1s])`, to)).all,
     idleInTxMax: (await one(`max_over_time((sum(pg_obs_sessions{state=~"idle in transaction.*"}) or vector(0))[${w}:1s])`, to)).all,
@@ -162,10 +192,11 @@ for (const s of stagesDoc) {
   rows.push({
     r: s.r, startedAt: s.startedAt, endedAt: s.endedAt,
     delivery: s.delivery, ack: s.ack, read: s.read, readSend: s.readSend ?? null, readHttp: s.readHttp, readStatus: s.readStatus ?? null,
+    deliveryNear: s.deliveryNear ?? null, deliveryFar: s.deliveryFar ?? null, faults: s.faults ?? null,
     judge: { delivery: judge('delivery', s.delivery, cal), ack: judge('ack', s.ack, cal), read: judge('read', s.read, cal) },
     calibCase: cal?.name ?? null,
     counters: s.counters, generator: { cgroup: s.cgroup, worstLoopP99: s.generator.worstLoopDelayP99Ms, loopReview: s.loopReview },
-    server, db, cgroup: cg,
+    server, agg, db, cgroup: cg,
     saturated: s.saturated ?? null, saturatedReasons: s.saturatedReasons ?? [], frames: s.frames ?? null,
     saturation: saturation(s, server, cg),
     unexpectedLock: (db.lockByTarget.other ?? 0) > 0,

@@ -18,8 +18,19 @@
  * 거절된 뒤 방에 새 메시지가 없을 때 "다음 보고"가 오지 않아 서버의 읽음 위치가 영원히 멈춘다.
  *
  * W = 0이면 기준선과 같다: 값이 커질 때마다 바로 보내고, 같은 값을 두 번 보내지 않는다(실패했을 때의 재전송만 다르다).
+ *
+ * 10/20 작업 4(서버 쪽 읽음 모으기와 함께 쓰는 규칙, 둘 다 설정으로 켜고 끈다. 기본은 위 동작 그대로)
+ * 5. 백오프 재시도(retryMode 'backoff'): 4의 재전송을 고정 간격 대신 500ms에서 시작해 2배씩(최대 4초), 0~간격 사이
+ *    무작위로 기다린 뒤 보낸다. 기다리는 동안은 창 끝·새 값이 와도 보내지 않는다(그래야 간격이 지켜진다). 성공하면 처음으로.
+ *    목적은 안정성: 장애·과부하 때 모든 탭이 같은 박자로 다시 보내 부하를 키우는 되먹임(R2, I-11)을 막는다
+ * 6. 스냅샷 확인 재전송(confirmMs > 0): 서버가 받았다(202)고 답해도 모아 둔 값을 잃을 수 있다(받은 뒤 서버가 죽음).
+ *    받은 뒤 confirmMs(+0~confirmJitterMs 무작위) 안에 READ 스냅샷에서 내 위치가 보낸 값 이상으로 보이지 않으면
+ *    다시 보낸다. 최대 confirmMax번, 그 뒤엔 다음 읽음 이벤트(더 큰 값)까지 보류. 스냅샷에서 이미 보낼 값 이상이
+ *    보이면 보내지 않는다(observe)
  */
 export const RETRY_MS = 500;
+export const BACKOFF_START_MS = 500;
+export const BACKOFF_MAX_MS = 4000;
 
 /** 응답 분류. 성공 → 'ok', 429·네트워크 실패(상태 없음)·5xx → 'retry', 그 밖의 4xx → 'drop'. */
 export function classifyReadResult(err) {
@@ -36,26 +47,61 @@ export class ReadThrottle {
      * @param timers   { setTimeout, clearTimeout }
      * @param onResult (seq, 'ok'|'retry'|'drop', err) → 측정용 훅(선택)
      */
-    constructor({ windowMs = 0, retryMs = RETRY_MS, send, timers = globalThis, onResult = null }) {
+    /**
+     * @param retryMode  'fixed'(4의 규칙) | 'backoff'(5)
+     * @param confirmMs  스냅샷 확인 대기(0 = 끔), confirmJitterMs·confirmMax와 함께(6)
+     * @param random     () → [0, 1) (테스트에서 주입)
+     * @param onConfirmResend (seq, attempt) → 측정용 훅(선택)
+     */
+    constructor({
+        windowMs = 0, retryMs = RETRY_MS, send, timers = globalThis, onResult = null,
+        retryMode = 'fixed', confirmMs = 0, confirmJitterMs = 500, confirmMax = 3, random = Math.random, onConfirmResend = null,
+    }) {
         this.windowMs = windowMs > 0 ? windowMs : 0;
         this.retryMs = retryMs;
         this.sendFn = send;
         this.timers = timers;
         this.onResult = onResult;
+        this.backoff = retryMode === 'backoff';
+        this.confirmMs = confirmMs > 0 ? confirmMs : 0;
+        this.confirmJitterMs = confirmJitterMs;
+        this.confirmMax = confirmMax;
+        this.random = random;
+        this.onConfirmResend = onConfirmResend;
         this.acked = 0;
         this.dropped = 0;
+        this.observed = 0;
         this.target = 0;
         this.inflight = new Set();
         this.windowTimer = null;
         this.retryTimer = null;
+        this.failures = 0;
+        this.confirm = null;   // { seq, attempts, timer }
         this.disposed = false;
     }
 
-    /** 보낼 값이 남았나: 받아들여지지도, 포기하지도, 지금 가고 있지도 않은 더 큰 값 */
+    /** 보낼 값이 남았나: 받아들여지지도, 포기하지도, 스냅샷에 이미 보이지도, 지금 가고 있지도 않은 더 큰 값 */
     needsSend() {
-        if (this.target <= Math.max(this.acked, this.dropped)) return false;
+        if (this.target <= Math.max(this.acked, this.dropped, this.observed)) return false;
         for (const seq of this.inflight) if (seq >= this.target) return false;
         return true;
+    }
+
+    /** 백오프로 기다리는 중이면 창 끝·새 값으로는 보내지 않는다 */
+    mayAct() {
+        return this.needsSend() && !(this.backoff && this.retryTimer);
+    }
+
+    /** 6. READ 스냅샷·read-state에서 본 내 위치(다른 탭·기기의 보고 포함) */
+    observe(seq) {
+        if (this.disposed || !(seq > this.observed)) return;
+        this.observed = seq;
+        if (this.confirm && seq >= this.confirm.seq) this.clearConfirm();
+    }
+
+    /** 측정용: 보낸 값이 스냅샷에서 확인됐나(확인 재전송을 켰을 때의 수렴 판정) */
+    isConfirmed() {
+        return this.observed >= this.target;
     }
 
     /** 1. 보고할 값이 생김 */
@@ -63,11 +109,11 @@ export class ReadThrottle {
         if (this.disposed) return;
         if (seq > this.target) this.target = seq;
         if (this.windowMs === 0) {
-            if (this.needsSend()) this.sendNow();
+            if (this.mayAct()) this.sendNow();
             return;
         }
         if (this.windowTimer) return;
-        if (this.needsSend()) {
+        if (this.mayAct()) {
             this.sendNow();
             this.openWindow();
         }
@@ -75,7 +121,7 @@ export class ReadThrottle {
 
     /** 3. 방을 나가거나 탭이 숨겨짐: 남은 값을 바로 보낸다 */
     flush() {
-        if (this.disposed || !this.needsSend()) return;
+        if (this.disposed || !this.mayAct()) return;
         this.sendNow();
         if (this.windowMs > 0 && !this.windowTimer) this.openWindow();
     }
@@ -86,11 +132,72 @@ export class ReadThrottle {
         this.timers.clearTimeout(this.retryTimer);
         this.windowTimer = null;
         this.retryTimer = null;
+        this.clearConfirm();
     }
 
     /** 측정용: 보낼 값이 남았는데 아무것도 예약되지 않은 상태(= 읽음 위치가 멈춤). 규칙이 맞으면 항상 false */
     isStuck() {
         return this.needsSend() && !this.windowTimer && !this.retryTimer && this.inflight.size === 0;
+    }
+
+    clearConfirm() {
+        if (this.confirm) this.timers.clearTimeout(this.confirm.timer);
+        this.confirm = null;
+    }
+
+    /** 6. 받은 값 seq의 확인을 예약한다. 같은 값을 다시 보낸 경우면 앞의 시도 횟수를 잇는다 */
+    scheduleConfirm(seq) {
+        if (!this.confirmMs || this.observed >= seq) return;
+        const attempts = this.confirm && this.confirm.seq === seq ? this.confirm.attempts : 0;
+        if (this.confirm && this.confirm.seq > seq) return;   // 더 큰 값을 이미 기다리는 중
+        this.clearConfirm();
+        const wait = this.confirmMs + this.random() * this.confirmJitterMs;
+        this.confirm = { seq, attempts, timer: this.timers.setTimeout(() => this.confirmDue(), wait) };
+    }
+
+    confirmDue() {
+        const c = this.confirm;
+        if (!c || this.disposed) return;
+        c.timer = null;
+        if (this.observed >= c.seq) {
+            this.confirm = null;
+            return;
+        }
+        if (c.attempts >= this.confirmMax) {
+            // 보류: 받아들여진 것으로 두고 다음 읽음 이벤트(더 큰 값)를 기다린다
+            this.confirm = null;
+            return;
+        }
+        c.attempts += 1;
+        this.onConfirmResend?.(c.seq, c.attempts);
+        // 서버가 잃었다고 보고 받은 값을 스냅샷에서 본 위치로 되돌린다 → 그 값이 다시 "보낼 값"이 된다
+        this.acked = Math.max(this.observed, this.dropped);
+        if (this.target < c.seq) this.target = c.seq;
+        if (this.mayAct()) this.sendNow();
+    }
+
+    /** 4·5. 재전송 예약 */
+    scheduleRetry() {
+        if (this.backoff) {
+            if (this.retryTimer) return;
+            const cap = Math.min(BACKOFF_MAX_MS, BACKOFF_START_MS * 2 ** this.failures);
+            this.failures += 1;
+            this.retryTimer = this.timers.setTimeout(() => {
+                this.retryTimer = null;
+                if (this.disposed || !this.needsSend()) return;
+                this.sendNow();
+                if (this.windowMs > 0 && !this.windowTimer) this.openWindow();
+            }, this.random() * cap);
+            return;
+        }
+        if (this.windowMs > 0) {
+            if (!this.windowTimer) this.openWindow();
+        } else if (!this.retryTimer) {
+            this.retryTimer = this.timers.setTimeout(() => {
+                this.retryTimer = null;
+                if (!this.disposed && this.needsSend()) this.sendNow();
+            }, this.retryMs);
+        }
     }
 
     openWindow() {
@@ -101,7 +208,7 @@ export class ReadThrottle {
     windowEnd() {
         this.windowTimer = null;
         if (this.disposed) return;
-        if (this.needsSend()) {
+        if (this.mayAct()) {
             this.sendNow();
             this.openWindow();
         }
@@ -125,19 +232,18 @@ export class ReadThrottle {
         const kind = classifyReadResult(err);
         if (kind === 'ok') {
             if (seq > this.acked) this.acked = seq;
+            this.failures = 0;
         } else if (kind === 'drop') {
             if (seq > this.dropped) this.dropped = seq;
         }
         this.onResult?.(seq, kind, err);
-        if (kind !== 'retry' || this.disposed) return;
-        // 거절된 값은 target에 남아 있다(target ≥ seq). 다음 기회를 예약한다
-        if (this.windowMs > 0) {
-            if (!this.windowTimer) this.openWindow();
-        } else if (!this.retryTimer) {
-            this.retryTimer = this.timers.setTimeout(() => {
-                this.retryTimer = null;
-                if (!this.disposed && this.needsSend()) this.sendNow();
-            }, this.retryMs);
+        if (this.disposed) return;
+        if (kind === 'ok') {
+            this.scheduleConfirm(seq);
+            return;
         }
+        if (kind !== 'retry') return;
+        // 거절된 값은 target에 남아 있다(target ≥ seq). 다음 기회를 예약한다
+        this.scheduleRetry();
     }
 }

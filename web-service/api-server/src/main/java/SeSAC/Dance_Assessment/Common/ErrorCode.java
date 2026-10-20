@@ -45,6 +45,8 @@ public enum ErrorCode {
     READ_SEQ_AHEAD(HttpStatus.BAD_REQUEST, "아직 없는 메시지를 읽음으로 보고할 수 없습니다."),
     // 읽음 벌크헤드(ReadBulkhead)가 거절했다. 화면은 같은 값을 다음 창(또는 500ms 뒤)에 다시 보낸다
     READ_BUSY(HttpStatus.TOO_MANY_REQUESTS, "읽음 보고가 많아 잠시 뒤 다시 보냅니다."),
+    // 측정 전용 장애 주입(ReadFaults, loadtest 프로필의 actuator로만 켠다). 운영에서는 나오지 않는다
+    READ_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "읽음 보고를 잠시 받을 수 없습니다."),
 
     ALREADY_MEMBER(HttpStatus.CONFLICT, "이미 참여 중인 팀입니다."),
     LEADER_CANNOT_LEAVE(HttpStatus.CONFLICT, "팀장은 팀을 나갈 수 없습니다."),

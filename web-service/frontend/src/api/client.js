@@ -473,8 +473,8 @@ export const openDm = async (userId) => {
 };
 
 /**
- * 읽음 보고: 이 방을 seq(빈틈 없이 이어진 마지막 번호)까지 읽었다. 204.
- * 사용자는 쿠키에서 서버가 꺼낸다. 실패해도 다시 보내지 않는다 — 다음 보고(더 큰 값)가 덮는다.
+ * 읽음 보고: 이 방을 seq(빈틈 없이 이어진 마지막 번호)까지 읽었다. 204(서버 쪽 모으기를 켜면 202 = 받았음, 반영은 다음 주기).
+ * 사용자는 쿠키에서 서버가 꺼낸다. 다시 보낼지는 readThrottle.js가 정한다.
  */
 export const reportRead = async (roomId, seq) => {
   return fetchAPI(`/api/chat/rooms/${roomId}/read`, {

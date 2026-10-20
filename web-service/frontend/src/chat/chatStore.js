@@ -46,10 +46,16 @@ const normalize = (m) => ({
 });
 
 export class ChatStore {
-    /** @param readThrottleMs 읽음 보고 묶기 간격 W(ms, 0 = 묶지 않음). 빌드 환경 변수 VITE_CHAT_READ_THROTTLE_MS */
-    constructor({ socketUrl, readThrottleMs = 0 }) {
+    /**
+     * @param readThrottleMs 읽음 보고 묶기 간격 W(ms, 0 = 묶지 않음). 빌드 환경 변수 VITE_CHAT_READ_THROTTLE_MS
+     * @param readRetryMode  'fixed' | 'backoff' (VITE_CHAT_READ_RETRY_MODE), readConfirmMs 스냅샷 확인 재전송 대기(0 = 끔,
+     *                       VITE_CHAT_READ_CONFIRM_MS) — readThrottle.js 5·6
+     */
+    constructor({ socketUrl, readThrottleMs = 0, readRetryMode = 'fixed', readConfirmMs = 0 }) {
         this.socketUrl = socketUrl;
         this.readThrottleMs = readThrottleMs;
+        this.readRetryMode = readRetryMode;
+        this.readConfirmMs = readConfirmMs;
         this.listeners = new Set();
         this.version = 0;
 
@@ -533,6 +539,8 @@ export class ChatStore {
         // 방 목록의 안 읽은 수: 내 위치(다른 기기에서 읽은 것 포함)에 맞춘다 — 서버 목록과 같은 공식
         const mine = snapshot.positions.find((p) => p.userId === this.user?.id);
         if (mine && (room.myReadSeq == null || mine.lastReadSeq > room.myReadSeq)) room.myReadSeq = mine.lastReadSeq;
+        // 서버에 반영된 내 위치: 확인 재전송(readThrottle 6)의 근거, 이미 보이는 값은 보내지 않는다
+        if (mine) room.reporter?.observe(mine.lastReadSeq);
         return true;
     }
 
@@ -543,7 +551,12 @@ export class ChatStore {
     maybeReport(room) {
         if (!this.running || !this.openRooms.has(room.roomId) || !isTabVisible()) return;
         const seq = room.contiguousTo;
-        room.reporter ??= new ReadThrottle({ windowMs: this.readThrottleMs, send: (s) => reportRead(room.roomId, s) });
+        room.reporter ??= new ReadThrottle({
+            windowMs: this.readThrottleMs,
+            retryMode: this.readRetryMode,
+            confirmMs: this.readConfirmMs,
+            send: (s) => reportRead(room.roomId, s),
+        });
         if (!room.baseline || seq <= room.reporter.target) return;
         if (room.myReadSeq == null || seq > room.myReadSeq) room.myReadSeq = seq;
         room.reporter.offer(seq);

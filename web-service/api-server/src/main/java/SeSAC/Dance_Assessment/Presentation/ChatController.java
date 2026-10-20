@@ -65,7 +65,10 @@ public class ChatController {
             @PathVariable Long roomId,
             @RequestBody ReadReportRequest request,
             @CurrentUserId Long userId) {
-        chatReadService.report(userId, roomId, request.seq());
+        // 서버 쪽 모으기가 켜져 있으면 "받았음"만 답한다(202) — 반영은 다음 처리 주기
+        if (chatReadService.report(userId, roomId, request.seq())) {
+            return ResponseEntity.accepted().build();
+        }
         return ResponseEntity.noContent().build();
     }
 

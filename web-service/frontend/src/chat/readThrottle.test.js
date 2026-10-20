@@ -33,6 +33,9 @@ function fakeTimers() {
         get pending() {
             return timers.size;
         },
+        get now() {
+            return now;
+        },
     };
 }
 
@@ -225,4 +228,109 @@ test('응답 분류', () => {
     assert.equal(classifyReadResult({}), 'retry');
     assert.equal(classifyReadResult({ status: 400 }), 'drop');
     assert.equal(classifyReadResult({ status: 403 }), 'drop');
+});
+
+// ===== 10/20 작업 4: 백오프 재시도(5)·스냅샷 확인 재전송(6) =====
+
+function server2(timers, opts) {
+    const sent = [];
+    let respond = () => Promise.resolve();
+    const confirms = [];
+    const throttle = new ReadThrottle({
+        timers,
+        random: () => 0.999999,   // 무작위 폭의 끝 = 간격의 상한
+        onConfirmResend: (seq, attempt) => confirms.push([seq, attempt]),
+        ...opts,
+        send: (seq) => {
+            sent.push([seq, timers.now]);
+            return respond(seq);
+        },
+    });
+    return { throttle, sent, confirms, setRespond: (fn) => { respond = fn; } };
+}
+
+const clock = fakeTimers;
+
+test('백오프: 실패가 이어지면 0.5 → 1 → 2 → 4 → 4초(상한) 간격으로만 다시 보내고, 성공하면 처음으로', async () => {
+    const t = clock();
+    const { throttle, sent, setRespond } = server2(t, { windowMs: 500, retryMode: 'backoff' });
+    setRespond(rejectWith(503));
+    throttle.offer(1);
+    await flushPromises();
+    await t.advance(12000);
+    const at = sent.map(([, ms]) => ms);
+    const gaps = at.slice(1).map((x, i) => Math.round(x - at[i]));
+    assert.deepEqual(gaps, [500, 1000, 2000, 4000, 4000]);
+    setRespond(() => Promise.resolve());
+    await t.advance(4000);
+    assert.equal(throttle.acked, 1);
+    setRespond(rejectWith(503));
+    throttle.offer(2);
+    await flushPromises();
+    await t.advance(600);
+    assert.deepEqual(sent.slice(-2).map(([s]) => s), [2, 2], '성공 뒤 첫 재시도는 다시 500ms 안');
+});
+
+test('백오프로 기다리는 동안은 창 끝·새 값이 와도 보내지 않는다', async () => {
+    const t = clock();
+    const { throttle, sent, setRespond } = server2(t, { windowMs: 500, retryMode: 'backoff' });
+    setRespond(rejectWith(429));
+    throttle.offer(1);
+    await t.advance(1);
+    throttle.offer(2);
+    throttle.offer(3);
+    await t.advance(498);
+    assert.equal(sent.length, 1);
+    setRespond(() => Promise.resolve());
+    await t.advance(2);
+    assert.deepEqual(sent.map(([s]) => s), [1, 3], '기다림이 끝나면 가장 큰 값 하나');
+});
+
+test('고정 간격(기본)은 지금 규칙 그대로: W=500에서 거절되면 창 간격마다', async () => {
+    const t = clock();
+    const { throttle, sent, setRespond } = server2(t, { windowMs: 500 });
+    setRespond(rejectWith(503));
+    throttle.offer(1);
+    await flushPromises();
+    await t.advance(2100);
+    assert.deepEqual(sent.map(([, ms]) => ms), [0, 500, 1000, 1500, 2000]);
+});
+
+test('확인 재전송: 202 뒤 2초(+무작위) 안에 스냅샷에 안 보이면 다시 보낸다, 최대 3번 뒤엔 보류', async () => {
+    const t = clock();
+    const { throttle, sent, confirms } = server2(t, { windowMs: 500, confirmMs: 2000, confirmJitterMs: 500 });
+    throttle.offer(7);
+    await flushPromises();
+    await t.advance(12000);
+    assert.deepEqual(confirms, [[7, 1], [7, 2], [7, 3]]);
+    assert.equal(sent.length, 4);
+    assert.ok(sent[1][1] >= 2000 && sent[1][1] <= 2500);
+    assert.equal(throttle.isStuck(), false);
+    assert.equal(throttle.isConfirmed(), false);
+    throttle.offer(8);
+    assert.equal(sent.length, 5, '다음 읽음 이벤트(더 큰 값)는 보낸다');
+});
+
+test('확인 재전송: 스냅샷에 보이면 다시 보내지 않고, 이미 보이는 값은 처음부터 보내지 않는다', async () => {
+    const t = clock();
+    const { throttle, sent, confirms } = server2(t, { windowMs: 500, confirmMs: 2000 });
+    throttle.offer(3);
+    await t.advance(100);
+    throttle.observe(3);
+    await t.advance(5000);
+    assert.deepEqual(confirms, []);
+    assert.equal(sent.length, 1);
+    throttle.observe(10);   // 다른 탭이 더 읽었다
+    throttle.offer(9);
+    await t.advance(1000);
+    assert.equal(sent.length, 1);
+    assert.equal(throttle.isConfirmed(), true);
+});
+
+test('확인 재전송은 끄면(기본) 동작하지 않는다', async () => {
+    const t = clock();
+    const { throttle, sent } = server2(t, { windowMs: 500 });
+    throttle.offer(1);
+    await t.advance(10000);
+    assert.equal(sent.length, 1);
 });
