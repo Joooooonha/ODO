@@ -89,6 +89,8 @@ const ctx = {
     let c = perRoom.get(roomId);
     if (!c) perRoom.set(roomId, (c = { sent: 0, reports: 0 }));
     c[kind] += 1;
+    // 서버 쪽 모으기(flushWindows가 있는 설정): READ는 보고마다가 아니라 방마다 주기에 한 번 → 보고가 있었던 주기 번호를 모은다
+    if (kind === 'reports' && config.flushWindows) (c.cycles ??= new Set()).add(Math.floor(Date.now() / config.flushWindows.periodMs));
   },
   readVisible(roomId, userId, seq, t) {
     push(visible, `${roomId}:${userId}`, seq, t);
@@ -257,7 +259,7 @@ async function measure(durationMs) {
     counters: Object.fromEntries(counters),
     cpuPercentOfCore: Math.round(((cpu.user + cpu.system) / elapsedUs) * 1000) / 10,
     eventLoopUtilization: Math.round(elu * 1000) / 1000,
-    perRoom: Object.fromEntries(perRoom),
+    perRoom: Object.fromEntries([...perRoom].map(([r, c]) => [r, c.cycles ? { ...c, cycles: [...c.cycles] } : c])),
     subscriptions: Object.fromEntries(subscriptionsByRoom()),
     loopDelayMs: { p50: loopDelay.percentile(50) / 1e6, p99: loopDelay.percentile(99) / 1e6, max: loopDelay.max / 1e6 },
     readStatus: readStatus(),

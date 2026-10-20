@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 서버 쪽 읽음 모으기(10/20 작업 4, D-29·D-32·D-42~D-46). {@code chat.read.aggregate.enabled}(기본 false)로 켜고 끈다.
@@ -118,6 +119,14 @@ public class ReadAggregator {
     private final Counter failures;
     private final Counter dropped;
     private final Counter overruns;
+    /** 측정용: 느린 주기(t ≥ SLOW_MS)의 단계별 시간과 주기 번호 */
+    private static final long SLOW_MS = 100;
+    private static final String[] SLOW_STAGES = {"write_acquire", "lock", "update", "commit", "snapshot_acquire", "snapshot_read", "publish", "other"};
+    private final Timer[] slowStages = new Timer[SLOW_STAGES.length];
+    private final DistributionSummary slowIndex;
+    private final AtomicLong cycleNo = new AtomicLong();
+    private long slowNanos = TimeUnit.MILLISECONDS.toNanos(SLOW_MS);
+    private volatile long startedAtMs = System.currentTimeMillis();
 
     public ReadAggregator(@Value("${chat.read.aggregate.enabled:false}") boolean enabled,
                           @Value("${chat.read.aggregate.period-ms:500}") long periodMs,
@@ -158,6 +167,10 @@ public class ReadAggregator {
         this.failures = registry.counter("chat.read.agg.failures", "cause", "other");
         this.dropped = registry.counter("chat.read.agg.dropped");
         this.overruns = registry.counter("chat.read.agg.overruns");
+        for (int i = 0; i < SLOW_STAGES.length; i++) {
+            this.slowStages[i] = Timer.builder("chat.read.agg.slow.stage").tag("stage", SLOW_STAGES[i]).register(registry);
+        }
+        this.slowIndex = DistributionSummary.builder("chat.read.agg.slow.index").register(registry);
         Gauge.builder("chat.read.agg.buffer", buffer, Map::size).register(registry);
         Gauge.builder("chat.read.agg.phase", () -> this.enabled ? this.phaseMs : -1).register(registry);
     }
@@ -182,6 +195,7 @@ public class ReadAggregator {
             return;
         }
         running = true;
+        startedAtMs = System.currentTimeMillis();
         scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "read-aggregate");
             t.setDaemon(true);
@@ -203,6 +217,7 @@ public class ReadAggregator {
 
     private void tick() {
         long started = System.currentTimeMillis();
+        cycleNo.incrementAndGet();
         try {
             flush();
         } catch (RuntimeException e) {
@@ -242,6 +257,7 @@ public class ReadAggregator {
             return 0;
         }
         long t0 = System.nanoTime();
+        CycleTimes ct = new CycleTimes();
         List<Map.Entry<Key, Long>> taken = take();
         if (taken.isEmpty()) {
             return 0;
@@ -258,7 +274,10 @@ public class ReadAggregator {
         Set<Long> changedRooms;
         long w0 = System.nanoTime();
         try {
-            changedRooms = writeTx.execute(status -> write(taken));
+            changedRooms = writeTx.execute(status -> {
+                ct.writeAcquire = System.nanoTime() - w0;   // 트랜잭션 시작 = 커넥션 획득
+                return write(taken, ct);
+            });
             commits.increment();
         } catch (RuntimeException e) {
             giveBack(taken);
@@ -271,12 +290,14 @@ public class ReadAggregator {
             }
             return 0;
         } finally {
-            writeHold.record(System.nanoTime() - w0, TimeUnit.NANOSECONDS);
+            ct.write = System.nanoTime() - w0;
+            writeHold.record(ct.write, TimeUnit.NANOSECONDS);
         }
         roomsPerCycle.record(changedRooms.size());
         if (!changedRooms.isEmpty()) {
             long s0 = System.nanoTime();
             List<ReadSnapshot> read = readTx.execute(status -> {
+                ct.snapshotAcquire = System.nanoTime() - s0;
                 List<ReadSnapshot> out = new ArrayList<>(changedRooms.size());
                 for (long roomId : changedRooms) {
                     long one = System.nanoTime();
@@ -286,14 +307,21 @@ public class ReadAggregator {
                 }
                 return out;
             });
-            snapshotHold.record(System.nanoTime() - s0, TimeUnit.NANOSECONDS);
+            ct.snapshot = System.nanoTime() - s0;
+            snapshotHold.record(ct.snapshot, TimeUnit.NANOSECONDS);
             snapshots.increment(read.size());
+            long p0 = System.nanoTime();
             for (ReadSnapshot snapshot : read) {
                 publisher.publish(snapshot);
                 publishes.increment();
             }
+            ct.publish = System.nanoTime() - p0;
         }
-        cycle.record(System.nanoTime() - t0, TimeUnit.NANOSECONDS);
+        long total = System.nanoTime() - t0;
+        cycle.record(total, TimeUnit.NANOSECONDS);
+        if (total >= slowNanos) {
+            recordSlow(total, ct, taken.size(), changedRooms.size());
+        }
         return changedRooms.size();
     }
 
@@ -315,7 +343,42 @@ public class ReadAggregator {
         }
     }
 
-    private Set<Long> write(List<Map.Entry<Key, Long>> taken) {
+    /**
+     * 측정용(10/21 t 초과 원인 확인): 처리 시간이 {@code SLOW_MS} 이상인 주기만 단계별 시간과 주기 번호(기동 뒤 몇 번째)를
+     * 지표({@code chat.read.agg.slow.stage}, {@code chat.read.agg.slow.index})와 로그 한 줄로 남긴다
+     */
+    private void recordSlow(long total, CycleTimes ct, int entries, int rooms) {
+        long no = cycleNo.get();
+        slowIndex.record(no);
+        long commit = Math.max(0, ct.write - ct.writeAcquire - ct.lock - ct.update);
+        long reads = Math.max(0, ct.snapshot - ct.snapshotAcquire);
+        // 그 밖: 버퍼 꺼내기·정렬, 트랜잭션 사이 등(전체 − 갱신 트랜잭션 − 스냅샷 트랜잭션 − 발행)
+        long other = Math.max(0, total - ct.write - ct.snapshot - ct.publish);
+        long[] parts = {ct.writeAcquire, ct.lock, ct.update, commit, ct.snapshotAcquire, reads, ct.publish, other};
+        for (int i = 0; i < SLOW_STAGES.length; i++) {
+            slowStages[i].record(parts[i], TimeUnit.NANOSECONDS);
+        }
+        log.warn("[읽음 모으기] 느린 주기 번호={} 기동뒤={}ms t={}ms 항목={} 방={} 커넥션획득(갱신)={} 잠금={} 갱신={} 커밋={} 커넥션획득(스냅샷)={} 스냅샷조회={} 발행={} 그밖={}",
+                no, System.currentTimeMillis() - startedAtMs, ms(total), entries, rooms,
+                ms(ct.writeAcquire), ms(ct.lock), ms(ct.update), ms(commit), ms(ct.snapshotAcquire), ms(reads), ms(ct.publish), ms(other));
+    }
+
+    private static String ms(long nanos) {
+        return String.format("%.1f", nanos / 1e6);
+    }
+
+    /** 한 주기의 단계별 시간(ns) */
+    private static final class CycleTimes {
+        long writeAcquire;
+        long lock;
+        long update;
+        long write;
+        long snapshotAcquire;
+        long snapshot;
+        long publish;
+    }
+
+    private Set<Long> write(List<Map.Entry<Key, Long>> taken, CycleTimes ct) {
         Map<Key, Long> wanted = new ConcurrentHashMap<>(taken.size() * 2);
         Long[] rooms = new Long[taken.size()];
         Long[] users = new Long[taken.size()];
@@ -328,7 +391,8 @@ public class ReadAggregator {
         long l0 = System.nanoTime();
         List<Locked> locked = jdbc.query(LOCK, arrays(rooms, users),
                 (rs, i) -> new Locked(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4)));
-        lockWait.record(System.nanoTime() - l0, TimeUnit.NANOSECONDS);
+        ct.lock = System.nanoTime() - l0;
+        lockWait.record(ct.lock, TimeUnit.NANOSECONDS);
         notMember.increment(taken.size() - locked.size());
 
         List<Long> uRooms = new ArrayList<>();
@@ -349,8 +413,10 @@ public class ReadAggregator {
             }
         }
         if (!uRooms.isEmpty()) {
+            long u0 = System.nanoTime();
             int n = jdbc.update(ADVANCE, arrays(uRooms.toArray(Long[]::new), uUsers.toArray(Long[]::new), uSeqs.toArray(Long[]::new)));
             updated.increment(n);
+            ct.update = System.nanoTime() - u0;
         }
         return changed;
     }
@@ -373,6 +439,11 @@ public class ReadAggregator {
             }
         }
         return false;
+    }
+
+    /** 테스트용: 느린 주기 기준을 바꾼다 */
+    void slowThresholdMs(long ms) {
+        this.slowNanos = TimeUnit.MILLISECONDS.toNanos(ms);
     }
 
     /** 테스트용 */

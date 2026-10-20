@@ -180,6 +180,11 @@ for (const s of stagesDoc) {
     dropped: await one(`sum by (server) (increase(chat_read_agg_dropped_total[${w}]))`, to),
     bufferMax: await one(`max_over_time(chat_read_agg_buffer[${w}])`, to),
     phaseMs: await one(`max_over_time(chat_read_agg_phase[${w}])`, to),
+    // 10/21: t ≥ 100ms인 주기 수, 그 주기 번호(기동 뒤 몇 번째) 최대, 단계별 평균
+    slowCycles: await one(`sum by (server) (increase(chat_read_agg_slow_index_count[${w}]))`, to),
+    slowIndexMax: await one(`max_over_time(chat_read_agg_slow_index_max[${w}])`, to),
+    slowStageAvgMs: Object.fromEntries((await prom(`sum by (server, stage) (increase(chat_read_agg_slow_stage_seconds_sum[${w}])) / sum by (server, stage) (increase(chat_read_agg_slow_stage_seconds_count[${w}])) * 1000`, to))
+      .map((r) => [`${r.labels.server}:${r.labels.stage}`, round(r.value, 1)])),
   };
   const db = {
     lockWaitMax: (await one(`max_over_time((sum(pg_obs_sessions{wait_type="Lock"}) or vector(0))[${w}:1s])`, to)).all,

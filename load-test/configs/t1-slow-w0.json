@@ -1,0 +1,36 @@
+{
+  "note": "10/21 t 초과 원인 확인: 앱을 새로 띄운 직후 W=0 + 모으기 400 단계만(5-1 조건). 느린 주기(t ≥ 100ms)의 단계별 시간·주기 번호는 앱 로그와 chat_read_agg_slow_* 지표",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 400
+    }
+  ],
+  "readThrottleMs": 0,
+  "readRetryMode": "backoff",
+  "readConfirmMs": 2000,
+  "flushWindows": {
+    "periodMs": 500,
+    "phasesMs": [
+      0,
+      250
+    ],
+    "nearMs": 100
+  },
+  "nginxStatusUrl": "http://nginx:8089/nginx_status"
+}

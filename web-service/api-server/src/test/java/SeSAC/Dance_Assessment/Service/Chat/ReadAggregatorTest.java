@@ -30,6 +30,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -263,6 +264,27 @@ class ReadAggregatorTest {
         a.offer(r.id(), member.id(), 5);
         assertThat(a.flush()).isEqualTo(1);
         assertThat(readSeq(r.id(), member.id())).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("측정용 느린 주기 기록: 기준 이상인 주기만 단계별 시간(커넥션 획득·잠금·갱신·커밋·스냅샷·발행·그 밖)과 주기 번호를 남긴다")
+    void slowCycleStages() throws Exception {
+        Room r = room(1, 5);
+        LoggedIn member = r.members().get(0);
+        SimpleMeterRegistry reg = new SimpleMeterRegistry();
+        ReadAggregator a = manual(reg);
+        a.offer(r.id(), member.id(), 2);
+        assertThat(a.flush()).isEqualTo(1);   // 기준 100ms 아래 → 기록 없음
+        assertThat(reg.find("chat.read.agg.slow.index").summary().count()).isZero();
+
+        a.slowThresholdMs(0);
+        a.offer(r.id(), member.id(), 3);
+        assertThat(a.flush()).isEqualTo(1);
+        assertThat(reg.find("chat.read.agg.slow.index").summary().count()).isEqualTo(1);
+        for (String stage : List.of("write_acquire", "lock", "update", "commit", "snapshot_acquire", "snapshot_read", "publish", "other")) {
+            assertThat(reg.find("chat.read.agg.slow.stage").tag("stage", stage).timer().count()).as(stage).isEqualTo(1);
+        }
+        assertThat(reg.find("chat.read.agg.slow.stage").tag("stage", "lock").timer().totalTime(TimeUnit.NANOSECONDS)).isPositive();
     }
 
     @Test

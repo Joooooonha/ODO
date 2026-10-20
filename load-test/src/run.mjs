@@ -218,6 +218,7 @@ function summarizeStage(r, results, machineCpu, config, cgroup) {
       const e = rooms.get(r) ?? { sent: 0, reports: 0, subs: 0 };
       e.sent += c.sent;
       e.reports += c.reports;
+      if (c.cycles) for (const k of c.cycles) (e.cycles ??= new Set()).add(k);
       rooms.set(r, e);
     }
     for (const [r, n] of Object.entries(x.subscriptions ?? {})) {
@@ -227,7 +228,9 @@ function summarizeStage(r, results, machineCpu, config, cgroup) {
     }
   }
   let expectedFrames = 0;
-  for (const e of rooms.values()) expectedFrames += (e.sent + e.reports) * e.subs;
+  // 서버 쪽 모으기(10/21 수정): READ 기대 수 = 보고가 있었던 주기 수(방마다, 작업 프로세스 합집합) × 구독 수.
+  // 두 서버가 같은 주기에 같은 방을 따로 발행할 수 있어 하한이다(받은 비율이 1을 넘을 수 있다)
+  for (const e of rooms.values()) expectedFrames += (e.sent + (config.flushWindows ? (e.cycles?.size ?? 0) : e.reports)) * e.subs;
   const receivedFrames = results.reduce((a, x) => a + (x.counters.messagesReceived ?? 0) + (x.counters.readFramesReceived ?? 0), 0);
   const receivedRatio = expectedFrames ? Math.round((receivedFrames / expectedFrames) * 10000) / 10000 : null;
   const worstElu = Math.max(...workerSelf.map((w) => w.eventLoopUtilization ?? 0));
