@@ -35,6 +35,8 @@ x-app: &app
     AI_SERVER_URL: http://ai-server.invalid
     # 개선 A 읽음 벌크헤드 K(서버마다). 기본 0 = 끔. 실행마다 `set READ_BULKHEAD_K=…&& docker compose up -d app1 app2`
     CHAT_READ_BULKHEAD: ${READ_BULKHEAD_K:-0}
+    # 메시지 처리 스레드 수(10/20 작업 3-2). 기본 0 = CPU × 2 = 4. 실행마다 `set INBOUND_THREADS=8&& docker compose up -d app1 app2`
+    CHAT_WS_INBOUND_THREADS: ${INBOUND_THREADS:-0}
   healthcheck:
     test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
     interval: 3s

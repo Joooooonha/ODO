@@ -42,6 +42,10 @@ import java.util.List;
  *       이 앱에서는 먼저 만들어진 {@code analysisExecutor}(동시 실행 1, 대기열 20 — 3분짜리 영상 분석용)가
  *       골라졌다. 채팅 처리가 분석 뒤에 줄을 서고 대기열이 차면 거절된다. 크기는 Spring 기본값(CPU × 2)
  *       그대로다 — 스레드 수를 바꾸는 것은 측정 후 결정(4.5)</li>
+ *   <li><b>인바운드(메시지 처리) 스레드 수는 {@code chat.ws.inbound-threads}로 바꿀 수 있다</b>(10/20 작업 3-2). 0이면 위 기본값
+ *       (측정 환경 2 CPU에서 4). 메시지 1건 시간의 대부분이 커밋의 디스크 동기화 대기라, 스레드를 늘리면 동시 커밋이 같은
+ *       동기화에 묶인다(그룹 커밋). 세션별 순서는 스레드 수와 무관하다 — {@code setPreserveReceiveOrder}가 세션마다 앞 메시지
+ *       처리가 끝나야 다음을 넘긴다</li>
  * </ul>
  *
  * <p>Boot의 설정({@code @Order(0)}) 뒤에 실행돼야 채널 실행기 지정이 이긴다.
@@ -54,6 +58,7 @@ public class ChatWebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final List<String> allowedOrigins;
     private final int queueLimit;
     private final long heartbeatMs;
+    private final int inboundThreads;
     private final ChatHandshakeInterceptor handshakeInterceptor;
     private final ChatInboundInterceptor inboundInterceptor;
     private final ChatOutboundInterceptor outboundInterceptor;
@@ -67,6 +72,7 @@ public class ChatWebSocketConfig implements WebSocketMessageBrokerConfigurer {
             List<String> allowedOrigins,
             @Value("${chat.ws.queue-limit:100}") int queueLimit,
             @Value("${chat.ws.heartbeat-ms:10000}") long heartbeatMs,
+            @Value("${chat.ws.inbound-threads:0}") int inboundThreads,
             ChatHandshakeInterceptor handshakeInterceptor,
             ChatInboundInterceptor inboundInterceptor,
             ChatOutboundInterceptor outboundInterceptor,
@@ -75,6 +81,7 @@ public class ChatWebSocketConfig implements WebSocketMessageBrokerConfigurer {
         this.allowedOrigins = allowedOrigins;
         this.queueLimit = queueLimit;
         this.heartbeatMs = heartbeatMs;
+        this.inboundThreads = inboundThreads;
         this.handshakeInterceptor = handshakeInterceptor;
         this.inboundInterceptor = inboundInterceptor;
         this.outboundInterceptor = outboundInterceptor;
@@ -108,24 +115,24 @@ public class ChatWebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.executor(channelExecutor("clientInboundChannel-"));
+        registration.executor(channelExecutor("clientInboundChannel-", inboundThreads));
         registration.interceptors(inboundInterceptor);
     }
 
     @Override
     public void configureClientOutboundChannel(ChannelRegistration registration) {
-        registration.executor(channelExecutor("clientOutboundChannel-"));
+        registration.executor(channelExecutor("clientOutboundChannel-", 0));
         registration.interceptors(outboundInterceptor);
     }
 
     /**
-     * Spring이 채널 실행기를 지정하지 않았을 때 쓰는 기본값과 같다(코어 = CPU × 2, 대기열·최대 무제한).
+     * Spring이 채널 실행기를 지정하지 않았을 때 쓰는 기본값과 같다(코어 = CPU × 2, 대기열·최대 무제한). {@code threads > 0}이면 코어를 그 값으로.
      * 이 객체가 그대로 {@code clientInboundChannelExecutor}/{@code clientOutboundChannelExecutor} 빈이 되어
      * Spring이 초기화·종료한다(여기서 {@code initialize()}를 부르지 않는다).
      */
-    private static ThreadPoolTaskExecutor channelExecutor(String threadNamePrefix) {
+    private static ThreadPoolTaskExecutor channelExecutor(String threadNamePrefix, int threads) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(Runtime.getRuntime().availableProcessors() * 2);
+        executor.setCorePoolSize(threads > 0 ? threads : Runtime.getRuntime().availableProcessors() * 2);
         executor.setMaxPoolSize(Integer.MAX_VALUE);
         executor.setQueueCapacity(Integer.MAX_VALUE);
         executor.setKeepAliveSeconds(60);
