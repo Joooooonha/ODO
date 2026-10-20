@@ -123,6 +123,8 @@ for (const s of stagesDoc) {
     // 작업 3: 메시지 1건 처리 단계별 평균(SendStages). 서버:단계 → ms
     sendStageAvgMs: Object.fromEntries((await prom(`sum by (server, stage) (increase(chat_send_stage_seconds_sum[${w}])) / sum by (server, stage) (increase(chat_send_stage_seconds_count[${w}])) * 1000`, to))
       .map((r) => [`${r.labels.server}:${r.labels.stage}`, round(r.value, 3)])),
+    // 10/21: 메시지 커밋 단계 최대(Timer 최대는 최근 2분 창) — 모으기 주기의 커밋 지연과 같은 순간인지 보려고
+    sendCommitMaxMs: await one(`max_over_time(chat_send_stage_seconds_max{stage="commit"}[${w}]) * 1000`, to),
     sendAvgMs: await one(`sum by (server) (increase(chat_send_duration_seconds_sum[${w}])) / sum by (server) (increase(chat_send_duration_seconds_count[${w}])) * 1000`, to),
     readAvgMs: await one(`sum by (server) (increase(chat_read_duration_seconds_sum{outcome="advanced"}[${w}])) / sum by (server) (increase(chat_read_duration_seconds_count{outcome="advanced"}[${w}])) * 1000`, to),
     appCores: await one(`avg_over_time(process_cpu_usage[${w}]) * 2`, to),
