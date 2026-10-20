@@ -70,6 +70,15 @@ export async function run(config, { log = console.log, onMeasureStart } = {}) {
   mkdirSync(outDir, { recursive: true });
   writeFileSync(path.join(outDir, 'env.json'), JSON.stringify(environment(config, topo, clock), null, 2));
 
+  // 예열(10/21, 판정에서 제외): 서버 쪽 모으기는 부하가 걸린 첫 주기 몇 개만 느리다(JIT·첫 실행 경로, t1-slow).
+  // 서버 지표의 최대·분위수는 2분 창이라 예열을 측정 창 밖으로 밀어낸다. 기록·단계 결과 없이 r만 걸어 둔다
+  if (config.prewarm) {
+    const rooms = sendRates(topo, config, config.prewarm.r);
+    await Promise.all(workers.map((w, i) => w.call({ cmd: 'rates', rooms: rooms.filter((r) => r.worker === i) })));
+    log(`[예열 r=${config.prewarm.r}] ${config.prewarm.sec}초(판정 제외)`);
+    await sleep(config.prewarm.sec * 1000);
+  }
+
   const stages = [];
   for (const stage of config.stages) {
     const rooms = sendRates(topo, config, stage.r);
