@@ -1,0 +1,41 @@
+{
+  "note": "작업 5-4: 5-2 설정의 800에서 보내기를 멈춘 뒤 모아 둔 값을 한 번 버리고(dropAtDrain), 스냅샷 확인 재전송으로 수렴하는지",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 400
+    },
+    {
+      "r": 800
+    }
+  ],
+  "readThrottleMs": 500,
+  "readRetryMode": "backoff",
+  "readConfirmMs": 2000,
+  "flushWindows": {
+    "periodMs": 500,
+    "phasesMs": [
+      0,
+      250
+    ],
+    "nearMs": 100
+  },
+  "nginxStatusUrl": "http://nginx:8089/nginx_status",
+  "dropAtDrain": true,
+  "readDrainSec": 60
+}

@@ -1,0 +1,39 @@
+{
+  "note": "작업 5-3(10/20 결정): W=500, 모으기 끔, 800 단계 측정 55초부터 10초 동안 읽음 보고 503 — 고정 간격 재전송",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 400
+    },
+    {
+      "r": 800
+    }
+  ],
+  "readThrottleMs": 500,
+  "readRetryMode": "fixed",
+  "faults": [
+    {
+      "r": 800,
+      "atSec": 55,
+      "action": "read-fault",
+      "seconds": 10
+    }
+  ],
+  "timeline": true,
+  "nginxStatusUrl": "http://nginx:8089/nginx_status"
+}

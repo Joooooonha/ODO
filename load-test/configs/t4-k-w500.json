@@ -1,0 +1,39 @@
+{
+  "note": "작업 4 큰 K 근거(W=500 + 모으기, K=0 = 무제한): 800 단계의 평균 동시 처리 수 L → K = max(32, 10 × L)",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 400
+    },
+    {
+      "r": 800
+    }
+  ],
+  "readThrottleMs": 500,
+  "readRetryMode": "backoff",
+  "readConfirmMs": 2000,
+  "flushWindows": {
+    "periodMs": 500,
+    "phasesMs": [
+      0,
+      250
+    ],
+    "nearMs": 100
+  },
+  "nginxStatusUrl": "http://nginx:8089/nginx_status"
+}

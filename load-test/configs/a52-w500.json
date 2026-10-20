@@ -1,0 +1,63 @@
+{
+  "note": "작업 5-2: W=500 + 모으기, 기준선 v3 R1과 같은 단계. 무릎 근처는 a52-rep-w500으로 3회 중앙값",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 400
+    },
+    {
+      "r": 700
+    },
+    {
+      "r": 800
+    },
+    {
+      "r": 1200
+    },
+    {
+      "r": 1600
+    },
+    {
+      "r": 2000
+    },
+    {
+      "r": 2400
+    },
+    {
+      "r": 3000
+    },
+    {
+      "r": 3600
+    },
+    {
+      "r": 4200
+    }
+  ],
+  "readThrottleMs": 500,
+  "readRetryMode": "backoff",
+  "readConfirmMs": 2000,
+  "flushWindows": {
+    "periodMs": 500,
+    "phasesMs": [
+      0,
+      250
+    ],
+    "nearMs": 100
+  },
+  "nginxStatusUrl": "http://nginx:8089/nginx_status"
+}

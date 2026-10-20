@@ -1,0 +1,48 @@
+{
+  "note": "작업 5-1(D-42): W=0 + 모으기, 기준선 v3 R0와 같은 단계. 700·800은 a51-rep-w0으로 3회 중앙값, 1,200 이상은 1회. W=0 생성기 범위는 1,200까지",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 400
+    },
+    {
+      "r": 700
+    },
+    {
+      "r": 800
+    },
+    {
+      "r": 1200
+    },
+    {
+      "r": 1600
+    }
+  ],
+  "readThrottleMs": 0,
+  "readRetryMode": "backoff",
+  "readConfirmMs": 2000,
+  "flushWindows": {
+    "periodMs": 500,
+    "phasesMs": [
+      0,
+      250
+    ],
+    "nearMs": 100
+  },
+  "nginxStatusUrl": "http://nginx:8089/nginx_status"
+}
