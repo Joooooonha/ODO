@@ -120,7 +120,9 @@ services:
   nginx:
     # 운영 nginx와 같은 1.24
     image: nginx:1.24.0-alpine
-    cpus: 1
+    # 측정 환경 v2(10/20 D-30): 1 → 2. R2·새 R0 1,200에서 nginx가 throttle 66~89%로 먼저 막혀 문제를 가렸다.
+    # 재시도 폭주를 푸는 게 아니라 측정 장치에 가려지지 않게 하려는 것 — v2 결과는 v2 기준선과만 비교한다
+    cpus: 2
     mem_limit: 256m
     volumes:
       - ./nginx-main.conf:/etc/nginx/nginx.conf:ro
@@ -210,17 +212,19 @@ services:
       nofile: { soft: 65536, hard: 65536 }
     command: ["node", "--version"]
 
-  # 측정기 보정용 가짜 서버. 서버 몫 8 CPU(app 2+2, PG 2, Redis 1, nginx 1) 중 4를 쓰고 나머지 4는 stress(app1 2 + postgres 2)로 채운다.
+  # 측정기 보정용 가짜 서버. 서버 몫 9 CPU(측정 환경 v2: app 2+2, PG 2, Redis 1, nginx 2) 중 5를 쓰고 나머지 4는 stress(app1 2 + postgres 2)로 채운다.
   # 처음엔 1 CPU였는데 permessage-deflate를 켜자 가짜 서버가 압축(libuv 스레드 풀)을 못 따라가 규모 보정이 전부 막혔다(2-4).
-  # 서버 몫 합계 8은 그대로라 같은 호스트 간섭 조건은 같다. 압축 없는 옛 보정(--deflate off)은 cpus 1 + stress 7로 했다
+  # 10/20 작업 1: 프로세스 하나(이벤트 루프 하나)가 r = 2,000에서 포화(1.4~1.6코어, throttle 0) → 샤드 4개로 나눈다(fake-shards.mjs).
+  # 서버 몫 합계를 v2와 같게(9) 맞춰 같은 호스트 간섭 조건을 유지한다. 옛 보정(서버 몫 8)은 cpus 4·프로세스 1이었다.
+  # 압축 없는 옛 보정(--deflate off)은 cpus 1 + stress 7로 했다
   fake-server:
     <<: *node
     profiles: ["calib"]
-    cpus: 4
-    mem_limit: 1g
+    cpus: 5
+    mem_limit: 2g
     ulimits:
       nofile: { soft: 65536, hard: 65536 }
-    command: ["node", "src/fake-server.mjs", "--port", "18080"]
+    command: ["node", "src/fake-shards.mjs", "--port", "18080", "--procs", "4"]
 
   # 보정 때 서버 몫 나머지 CPU를 100%로 채운다(같은 호스트 간섭을 오차에 넣기 위해). 상한은 서버 컨테이너와 같게 나눈다.
   # 압축 보정(가짜 서버 4 CPU): stress-app1 + stress-postgres(합 4)만 띄운다. 압축 없는 옛 보정: 4개 전부(합 7)

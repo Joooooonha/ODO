@@ -18,6 +18,9 @@ while :; do
       END { printf "{\"t\":\"%s\",\"name\":\"%s\",\"usage_usec\":%d,\"nr_periods\":%d,\"nr_throttled\":%d,\"throttled_usec\":%d,\"cpu_max\":\"%s\"}\n",
             t, n, v["usage_usec"], v["nr_periods"], v["nr_throttled"], v["throttled_usec"], max }' "$f"
   done >> "$OUT/cgroup.jsonl"
+  # 호스트 전체(WSL2 VM, 논리 CPU 전부): /proc/stat의 cpu 줄. 바쁜 시간 = user+nice+system+irq+softirq+steal(USER_HZ 100 → 1틱 10ms).
+  # 컨테이너 기록과 같은 모양(name = odo-loadtest-host-1, 상한 없음)이라 단계 정리가 그대로 "host" 사용 코어로 낸다(10/20 측정 환경 v2)
+  awk -v t="$t" '/^cpu / { printf "{\"t\":\"%s\",\"name\":\"odo-loadtest-host-1\",\"usage_usec\":%.0f,\"nr_periods\":0,\"nr_throttled\":0,\"throttled_usec\":0,\"cpu_max\":\"max 100000\"}\n", t, ($2+$3+$4+$7+$8+$9) * 10000 }' /proc/stat >> "$OUT/cgroup.jsonl"
   docker stats --no-stream --format "{\"t\":\"$t\",\"name\":\"{{.Name}}\",\"cpu\":\"{{.CPUPerc}}\",\"mem\":\"{{.MemUsage}}\",\"memPerc\":\"{{.MemPerc}}\"}" \
     $(docker ps -q --filter label=com.docker.compose.project=odo-loadtest) >> "$OUT/stats.jsonl" 2>/dev/null
   sleep 5

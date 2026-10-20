@@ -27,7 +27,11 @@ async function openFake(port, delay, topology) {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delay, topology }),
     });
     await sleep(500);
-    return { url: external, close: async () => {} };
+    // 샤드로 나눈 가짜 서버(fake-shards.mjs)면 샤드 주소 목록을 받는다. 하나짜리 가짜 서버는 404
+    const res = await fetch(`${external}/fake/shards`);
+    const shards = res.ok ? await res.json() : null;
+    if (!res.ok) await res.arrayBuffer().catch(() => {});
+    return { url: external, shards, close: async () => {} };
   }
   const child = fork(path.join(here, 'fake-server.mjs'), ['--port', String(port), '--delay', delay, '--topology', JSON.stringify(topology)],
     { stdio: ['ignore', 'pipe', 'inherit', 'ipc'] });
@@ -58,11 +62,12 @@ async function main() {
     const base = fake.url;
     const config = {
       ...plan.defaults, ...c, topology,
-      target: { httpUrl: base, wsUrl: `${base.replace(/^http/, 'ws')}/api/ws`, origin: 'http://localhost:5173' },
+      target: { httpUrl: base, wsUrl: `${base.replace(/^http/, 'ws')}/api/ws`, origin: 'http://localhost:5173', ...(fake.shards ? { shards: fake.shards } : {}) },
       runId: `${path.basename(outDir)}/case-${i + 1}`,
       stages: [{ r: c.r }],
     };
-    console.log(`\n=== 경우 ${i + 1}: ${c.name} (지연 ${c.delay}, 세션 ${topology.rooms * topology.members}, 프로세스 ${config.workers}, r=${c.r}) ===`);
+    if (fake.shards && (topology.teamsPerUser ?? 1) !== 1) throw new Error('가짜 서버 샤드는 1인 1팀 배치에서만 쓴다(방이 작업 프로세스를 넘으면 방송이 샤드를 넘는다)');
+    console.log(`\n=== 경우 ${i + 1}: ${c.name} (지연 ${c.delay}, 세션 ${topology.rooms * topology.members}, 프로세스 ${config.workers}, 가짜 서버 샤드 ${fake.shards?.length ?? 1}, r=${c.r}) ===`);
     const { stages } = await run(config, { onMeasureStart: () => getJson(`${base}/fake/reset`, 'POST') });
     const server = await getJson(`${base}/fake/stats`);
     await fake.close();
@@ -86,7 +91,7 @@ async function main() {
       sessionsPerWorker: Math.ceil((topology.rooms * topology.members) / config.workers), r: c.r, valid: s.valid,
       readThrottleMs: config.readThrottleMs ?? 0, readErrorFrom: readKey,
       delivery: s.delivery, ack: s.ack, read: s.read, readSend: s.readSend, readHttp: s.readHttp,
-      server,
+      server, fakeShards: fake.shards?.length ?? 1,
       error: {
         delivery: { p50: errOf('delivery', 'p50'), p95: errOf('delivery', 'p95'), p99: errOf('delivery', 'p99') },
         ack: { p50: errOf('ack', 'p50'), p95: errOf('ack', 'p95'), p99: errOf('ack', 'p99') },

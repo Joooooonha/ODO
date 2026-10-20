@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { WebSocketServer } from 'ws';
 import { buildTopology } from './topology.mjs';
-import { createHistogram, recordNs, summarize } from './hist.mjs';
+import { createHistogram, encode, recordNs, summarize } from './hist.mjs';
 
 /**
  * 측정기를 먼저 측정하기 위한 가짜 서버(Task-chat-read 9.3, 단계 1 E1). 사용:
@@ -200,7 +200,12 @@ const server = http.createServer((req, res) => {
   req.on('data', (c) => (body += c));
   req.on('end', () => {
     if (url.pathname === '/fake/stats') {
-      return send(200, { injected: summarize(stats.injected), timerLate: summarize(stats.timerLate), serverSpan: summarize(stats.serverSpan), spanByKind: Object.fromEntries(Object.entries(stats.spanByKind).map(([k, h]) => [k, summarize(h)])), sent: stats.sent, readPosts: stats.readPosts, readRejected: stats.readRejected ?? 0, readBroadcasts: stats.readBroadcasts, readSkipped: stats.readSkipped, pendingTimers, framesOut: stats.framesOut });
+      // raw=1: 샤드로 나눠 돌 때(fake-shards.mjs) 조정 프로세스가 합치도록 히스토그램 압축 문자열도 준다
+      const raw = url.searchParams.get('raw') === '1'
+        ? { raw: { injected: encode(stats.injected), timerLate: encode(stats.timerLate), serverSpan: encode(stats.serverSpan),
+          spanByKind: Object.fromEntries(Object.entries(stats.spanByKind).map(([k, h]) => [k, encode(h)])) } }
+        : {};
+      return send(200, { ...raw, injected: summarize(stats.injected), timerLate: summarize(stats.timerLate), serverSpan: summarize(stats.serverSpan), spanByKind: Object.fromEntries(Object.entries(stats.spanByKind).map(([k, h]) => [k, summarize(h)])), sent: stats.sent, readPosts: stats.readPosts, readRejected: stats.readRejected ?? 0, readBroadcasts: stats.readBroadcasts, readSkipped: stats.readSkipped, pendingTimers, framesOut: stats.framesOut });
     }
     if (url.pathname === '/fake/reset') {
       resetStats();

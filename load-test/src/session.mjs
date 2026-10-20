@@ -99,8 +99,9 @@ export class Session {
       this.onConnected(client).catch(() => {});
     };
     client.onStompError = (frame) => this.ctx.count(`stompError:${frame.headers?.message ?? 'unknown'}`);
-    client.onWebSocketClose = () => {
+    client.onWebSocketClose = (evt) => {
       if (this.client !== client) return;
+      if (this.running) this.ctx.count(`wsClose:${evt?.code ?? 'unknown'}`);
       this.client = null;
       this.ready = false;
       this.syncResolve = null;
@@ -313,11 +314,19 @@ export class Session {
 
   async http(method, path, body) {
     const { config } = this.ctx;
-    const res = await fetch(config.httpUrl + path, {
-      method,
-      headers: { Cookie: this.cookie, Origin: config.origin, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    let res;
+    try {
+      res = await fetch(config.httpUrl + path, {
+        method,
+        headers: { Cookie: this.cookie, Origin: config.origin, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (e) {
+      // 오류 종류별(I-11에서 첫 오류의 원인을 못 가린 빈틈): 응답 없이 실패한 요청은 원인 코드로 센다
+      // (undici: cause.code = ECONNRESET·ECONNREFUSED·UND_ERR_SOCKET·UND_ERR_CONNECT_TIMEOUT 등)
+      this.ctx.count(`net:${method}:${e?.cause?.code ?? e?.name ?? 'unknown'}`);
+      throw e;
+    }
     if (!res.ok) {
       this.ctx.count(`http${res.status}:${method}`);
       await res.arrayBuffer().catch(() => {});

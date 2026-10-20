@@ -1,0 +1,81 @@
+{
+  "note": "측정 환경 v2 보정(10/20 작업 1, W=500): 가짜 서버 샤드 4개·5 CPU + stress 4 = 서버 몫 9(v2). 생성기 한계(ELU ≥ 0.9 등)를 찾을 때까지 r을 올린다. 읽음 오차는 보낸 순간부터",
+  "errorLimitMs": 5,
+  "readErrorLimitMs": 50,
+  "defaults": {
+    "rateMode": "total",
+    "senders": "watchers",
+    "dmRatePerSec": 10,
+    "connectRatePerSec": 300,
+    "warmupSec": 10,
+    "measureSec": 30,
+    "contentLength": 40,
+    "workers": 4,
+    "topology": {
+      "rooms": 1000,
+      "members": 4,
+      "teamsPerUser": 1,
+      "dmPairsPerRoom": 1,
+      "watchersPerRoom": 2,
+      "activeRoomRatio": 0.1
+    },
+    "readThrottleMs": 500
+  },
+  "cases": [
+    {
+      "name": "v2 시나리오2 2:2 1000x4 W=500 r=400 고정 50ms",
+      "delay": "fixed:50",
+      "r": 400
+    },
+    {
+      "name": "v2 시나리오2 2:2 1000x4 W=500 r=700 고정 50ms",
+      "delay": "fixed:50",
+      "r": 700
+    },
+    {
+      "name": "v2 시나리오2 2:2 1000x4 W=500 r=800 고정 50ms",
+      "delay": "fixed:50",
+      "r": 800
+    },
+    {
+      "name": "v2 시나리오2 2:2 1000x4 W=500 r=1200 고정 50ms",
+      "delay": "fixed:50",
+      "r": 1200
+    },
+    {
+      "name": "v2 시나리오2 2:2 1000x4 W=500 r=1600 고정 50ms",
+      "delay": "fixed:50",
+      "r": 1600
+    },
+    {
+      "name": "v2 시나리오2 2:2 1000x4 W=500 r=2000 고정 50ms",
+      "delay": "fixed:50",
+      "r": 2000
+    },
+    {
+      "name": "v2 시나리오2 2:2 1000x4 W=500 r=2400 고정 50ms",
+      "delay": "fixed:50",
+      "r": 2400
+    },
+    {
+      "name": "v2 시나리오2 2:2 1000x4 W=500 r=3000 고정 50ms",
+      "delay": "fixed:50",
+      "r": 3000
+    },
+    {
+      "name": "v2 시나리오2 2:2 1000x4 W=500 r=3600 고정 50ms",
+      "delay": "fixed:50",
+      "r": 3600
+    },
+    {
+      "name": "v2 시나리오2 2:2 1000x4 W=500 r=4200 고정 50ms",
+      "delay": "fixed:50",
+      "r": 4200
+    },
+    {
+      "name": "v2 시나리오2 2:2 1000x4 W=500 r=4800 고정 50ms",
+      "delay": "fixed:50",
+      "r": 4800
+    }
+  ]
+}

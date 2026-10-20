@@ -230,6 +230,8 @@ process.on('message', async (msg) => {
   try {
     if (msg.cmd === 'init') {
       config = msg.config;
+      // 샤드로 나눈 가짜 서버(보정): 작업 프로세스 w는 샤드 w mod N에만 붙는다(fake-shards.mjs)
+      if (config.shards?.length) Object.assign(config, config.shards[msg.workerIndex % config.shards.length]);
       workerIndex = msg.workerIndex;
       ctx.padding = 'x'.repeat(Math.max(0, (config.contentLength ?? 40) - 30));
       sessions = msg.sessions.map((spec) => new Session(ctx, spec));
