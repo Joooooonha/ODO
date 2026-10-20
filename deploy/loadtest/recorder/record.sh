@@ -13,9 +13,10 @@ while :; do
   while read -r id name; do
     f="$CG/$id/cpu.stat"
     [ -r "$f" ] || continue
+    # %d는 busybox awk에서 2^31(usage_usec ≈ 2,147 CPU초)에 막혀 오래 떠 있는 postgres가 −2147483648로 찍혔다(10/20 v2 R1) → %.0f
     awk -v t="$t" -v n="$name" -v max="$(cat "$CG/$id/cpu.max")" '
       { v[$1] = $2 }
-      END { printf "{\"t\":\"%s\",\"name\":\"%s\",\"usage_usec\":%d,\"nr_periods\":%d,\"nr_throttled\":%d,\"throttled_usec\":%d,\"cpu_max\":\"%s\"}\n",
+      END { printf "{\"t\":\"%s\",\"name\":\"%s\",\"usage_usec\":%.0f,\"nr_periods\":%.0f,\"nr_throttled\":%.0f,\"throttled_usec\":%.0f,\"cpu_max\":\"%s\"}\n",
             t, n, v["usage_usec"], v["nr_periods"], v["nr_throttled"], v["throttled_usec"], max }' "$f"
   done >> "$OUT/cgroup.jsonl"
   # 호스트 전체(WSL2 VM, 논리 CPU 전부): /proc/stat의 cpu 줄. 바쁜 시간 = user+nice+system+irq+softirq+steal(USER_HZ 100 → 1틱 10ms).

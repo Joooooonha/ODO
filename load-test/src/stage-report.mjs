@@ -71,10 +71,12 @@ function cgroupWindow(from, to) {
   for (const [name, rows] of cgRows) {
     const a = rows.filter((r) => r.ms <= from).at(-1);
     const b = rows.find((r) => r.ms >= to);
-    if (!a || !b || b.usage_usec < a.usage_usec) continue;
+    if (!a || !b || (b.usage_usec < a.usage_usec && b.usage_usec !== -2147483648)) continue;
     const periods = b.nr_periods - a.nr_periods;
+    // 고치기 전 recorder(%d)는 2^31에서 막힌 값을 남겼다 — 그 구간은 CPU를 모른다(null), throttle은 그대로 쓴다
+    const clamped = [a.usage_usec, b.usage_usec].some((u) => Math.abs(u) === 2147483648 || u === 2147483647);
     out[name] = {
-      cpus: Math.round(((b.usage_usec - a.usage_usec) / 1e6 / ((b.ms - a.ms) / 1000)) * 100) / 100,
+      cpus: clamped ? null : Math.round(((b.usage_usec - a.usage_usec) / 1e6 / ((b.ms - a.ms) / 1000)) * 100) / 100,
       throttled: b.nr_throttled - a.nr_throttled,
       periods,
       ratio: periods ? (b.nr_throttled - a.nr_throttled) / periods : 0,
