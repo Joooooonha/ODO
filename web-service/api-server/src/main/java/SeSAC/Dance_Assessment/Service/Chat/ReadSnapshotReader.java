@@ -36,6 +36,18 @@ public class ReadSnapshotReader {
              ORDER BY m.user_id
             """;
 
+    /**
+     * 여러 방을 한 문장으로(10/21 모으기 개선). 방마다 따로 읽던 {@link #SNAPSHOT}과 같은 결과를 방 번호, 사용자 번호 순으로
+     * 낸다. 멤버가 없는 방도 한 줄(user_id NULL)이 나온다. version은 한 문장이라 모든 방이 같다(이 문장의 시작 시각)
+     */
+    private static final String SNAPSHOTS = """
+            SELECT (extract(epoch FROM statement_timestamp()) * 1000000)::bigint AS version,
+                   r.room_id, m.user_id, m.last_read_seq
+              FROM unnest(?::bigint[]) AS r(room_id)
+              LEFT JOIN chat_room_member m ON m.room_id = r.room_id AND m.status = 'ACTIVE'
+             ORDER BY r.room_id, m.user_id
+            """;
+
     private final JdbcTemplate jdbc;
 
     @Transactional(readOnly = true)
@@ -50,6 +62,44 @@ public class ReadSnapshotReader {
             }
         }, roomId);
         return new ReadSnapshot(roomId, version[0], List.copyOf(positions));
+    }
+
+    /**
+     * 서버 쪽 읽음 모으기의 한 주기에서 바뀐 방들의 스냅샷을 한 문장으로 읽는다(10/21 개선). 순서는 방 번호 순, 같은 방이 두 번 와도 한 번만.
+     */
+    @Transactional(readOnly = true)
+    public List<ReadSnapshot> readAll(java.util.Collection<Long> roomIds) {
+        if (roomIds.isEmpty()) {
+            return List.of();
+        }
+        Long[] ids = roomIds.stream().distinct().sorted().toArray(Long[]::new);
+        List<ReadSnapshot> out = new ArrayList<>(ids.length);
+        long[] version = {0};
+        long[] current = {Long.MIN_VALUE};
+        List<ReadSnapshot.Position> positions = new ArrayList<>();
+        jdbc.query(con -> {
+            var ps = con.prepareStatement(SNAPSHOTS);
+            ps.setArray(1, con.createArrayOf("bigint", ids));
+            return ps;
+        }, rs -> {
+            long roomId = rs.getLong("room_id");
+            if (roomId != current[0]) {
+                if (current[0] != Long.MIN_VALUE) {
+                    out.add(new ReadSnapshot(current[0], version[0], List.copyOf(positions)));
+                    positions.clear();
+                }
+                current[0] = roomId;
+                version[0] = rs.getLong("version");
+            }
+            long userId = rs.getLong("user_id");
+            if (!rs.wasNull()) {
+                positions.add(new ReadSnapshot.Position(userId, rs.getLong("last_read_seq")));
+            }
+        });
+        if (current[0] != Long.MIN_VALUE) {
+            out.add(new ReadSnapshot(current[0], version[0], List.copyOf(positions)));
+        }
+        return out;
     }
 
     /** 0행일 때 이유 찾기·read-state 권한 확인도 같은 이유로 트랜잭션 안에서. {@code [status, last_seq]}, 방이 없으면 빈 목록. */

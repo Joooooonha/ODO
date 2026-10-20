@@ -45,8 +45,9 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>버퍼에서 꺼낸다 — 항목마다 {@code remove(key, value)}라 꺼내는 사이 더 큰 값이 오면 남아서 다음 주기로 간다</li>
  *   <li>한 트랜잭션: 현재 ACTIVE 멤버 행을 <b>방 번호, 사용자 번호 순으로</b> {@code FOR UPDATE}(교착 방지, I-13) →
  *       잠근 값으로 "더 큰 값이고 방의 마지막 번호 이하"만 한 문장으로 갱신 → 커밋 1번</li>
- *   <li>바뀐 방마다 스냅샷: 읽기 전용 트랜잭션 하나(커넥션 하나)에서 차례로 읽고, <b>커넥션을 놓은 뒤</b> 발행한다
- *       (작업 0에서 찾은 "커넥션을 쥔 채 Redis 발행"을 여기서는 만들지 않는다)</li>
+ *   <li>바뀐 방들의 스냅샷: 읽기 전용 트랜잭션 하나(커넥션 하나)에서 <b>한 문장으로</b> 읽고, <b>커넥션을 놓은 뒤</b>
+ *       같은 스레드에서 파이프라인 한 번으로 발행한다(10/21 개선 — 방마다 왕복하던 것이 바뀐 방 약 320개에서 t 200ms를 넘겼다).
+ *       작업 0에서 찾은 "커넥션을 쥔 채 Redis 발행"은 여기서 만들지 않는다</li>
  * </ol>
  *
  * <p><b>안전 항목</b>(D-44): 트랜잭션이 실패하면(교착·시간 제한 등) 꺼낸 값을 버퍼에 되돌린다(큰 값 유지). 종료 직전에
@@ -298,12 +299,12 @@ public class ReadAggregator {
             long s0 = System.nanoTime();
             List<ReadSnapshot> read = readTx.execute(status -> {
                 ct.snapshotAcquire = System.nanoTime() - s0;
-                List<ReadSnapshot> out = new ArrayList<>(changedRooms.size());
-                for (long roomId : changedRooms) {
-                    long one = System.nanoTime();
-                    ReadSnapshot snapshot = reader.read(roomId);
-                    readMetrics.snapshot(System.nanoTime() - one, snapshot.positions().size());
-                    out.add(snapshot);
+                // 10/21 개선: 바뀐 방들을 한 문장으로 읽는다(방마다 왕복하지 않는다). 방 하나 비용 지표는 나눠서 남긴다
+                long q0 = System.nanoTime();
+                List<ReadSnapshot> out = reader.readAll(changedRooms);
+                long each = (System.nanoTime() - q0) / Math.max(1, out.size());
+                for (ReadSnapshot snapshot : out) {
+                    readMetrics.snapshot(each, snapshot.positions().size());
                 }
                 return out;
             });
@@ -311,10 +312,9 @@ public class ReadAggregator {
             snapshotHold.record(ct.snapshot, TimeUnit.NANOSECONDS);
             snapshots.increment(read.size());
             long p0 = System.nanoTime();
-            for (ReadSnapshot snapshot : read) {
-                publisher.publish(snapshot);
-                publishes.increment();
-            }
+            // 10/21 개선: 방마다 따로 발행하지 않고 파이프라인 한 번으로(같은 스레드, 커넥션을 놓은 뒤)
+            publisher.publishAll(read);
+            publishes.increment(read.size());
             ct.publish = System.nanoTime() - p0;
         }
         long total = System.nanoTime() - t0;

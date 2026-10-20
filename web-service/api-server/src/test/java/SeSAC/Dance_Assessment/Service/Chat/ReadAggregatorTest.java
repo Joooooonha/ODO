@@ -71,6 +71,9 @@ class ReadAggregatorTest {
     @Autowired
     ChatReadMetrics readMetrics;
 
+    @Autowired
+    org.springframework.data.redis.connection.RedisConnectionFactory redisFactory;
+
     TestUsers users;
     TestTeams teams;
     TestChat chat;
@@ -285,6 +288,62 @@ class ReadAggregatorTest {
             assertThat(reg.find("chat.read.agg.slow.stage").tag("stage", stage).timer().count()).as(stage).isEqualTo(1);
         }
         assertThat(reg.find("chat.read.agg.slow.stage").tag("stage", "lock").timer().totalTime(TimeUnit.NANOSECONDS)).isPositive();
+    }
+
+    @Test
+    @DisplayName("10/21 개선: 여러 방 스냅샷을 한 문장으로 읽어도 방마다 읽은 것과 같다(멤버가 없는 방도 한 줄, version은 한 문장이라 모두 같음)")
+    void readAllMatchesPerRoom() throws Exception {
+        Room a = room(2, 3);
+        Room b = room(1, 2);
+        Room empty = room(1, 1);
+        jdbc.update("UPDATE chat_room_member SET status = 'LEFT' WHERE room_id = ?", empty.id());
+        List<ReadSnapshot> all = new TransactionTemplate(txManager).execute(st -> reader.readAll(List.of(b.id(), empty.id(), a.id(), b.id())));
+        assertThat(all).extracting(ReadSnapshot::roomId).containsExactly(
+                java.util.stream.Stream.of(a.id(), b.id(), empty.id()).sorted().toArray(Long[]::new));
+        for (ReadSnapshot s : all) {
+            assertThat(s.positions()).isEqualTo(reader.read(s.roomId()).positions());
+            assertThat(s.version()).isEqualTo(all.get(0).version());
+        }
+        assertThat(all.stream().filter(s -> s.roomId() == empty.id()).findFirst().orElseThrow().positions()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("10/21 개선: 한 주기의 발행을 파이프라인 한 번으로 해도 바뀐 방마다 READ가 하나씩 Redis 방 채널에 나간다")
+    void pipelinedPublishReachesEveryRoom() throws Exception {
+        List<Room> rooms = List.of(room(1, 3), room(1, 3), room(1, 3));
+        Map<String, Integer> got = new java.util.concurrent.ConcurrentHashMap<>();
+        var container = new org.springframework.data.redis.listener.RedisMessageListenerContainer();
+        container.setConnectionFactory(redisFactory);
+        for (Room r : rooms) {
+            container.addMessageListener((message, pattern) -> got.merge(new String(message.getChannel()), 1, Integer::sum),
+                    SeSAC.Dance_Assessment.Realtime.ChatDestinations.roomChannel(r.id()));
+        }
+        container.afterPropertiesSet();
+        container.start();
+        try {
+            long deadline = System.nanoTime() + WAIT.toNanos();
+            while (!container.isListening() && System.nanoTime() < deadline) {
+                Thread.sleep(20);
+            }
+            Thread.sleep(200);   // 구독 등록이 Redis에 닿을 때까지
+            SimpleMeterRegistry reg = new SimpleMeterRegistry();
+            ReadAggregator agg = manual(reg);
+            for (Room r : rooms) {
+                agg.offer(r.id(), r.members().get(0).id(), 2);
+            }
+            assertThat(agg.flush()).isEqualTo(3);
+            deadline = System.nanoTime() + WAIT.toNanos();
+            while (got.size() < 3 && System.nanoTime() < deadline) {
+                Thread.sleep(20);
+            }
+            for (Room r : rooms) {
+                assertThat(got.get(SeSAC.Dance_Assessment.Realtime.ChatDestinations.roomChannel(r.id()).getTopic())).isEqualTo(1);
+            }
+            assertThat(reg.counter("chat.read.agg.publishes").count()).isEqualTo(3);
+        } finally {
+            container.stop();
+            container.destroy();
+        }
     }
 
     @Test
