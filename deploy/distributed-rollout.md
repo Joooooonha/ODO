@@ -409,6 +409,8 @@ for h in odo odo-app2; do
   echo 2 | ssh $h 'sudo bash /tmp/set-env-key.sh CHAT_SERVER_COUNT'
 done
 echo 0 | ssh odo 'sudo bash /tmp/set-env-key.sh CHAT_SERVER_INDEX'
+# (단계 10을 같이 할 때) 두 앱에 모니터링 프로필 — ④에서 띄울 때 적용된다
+for h in odo odo-app2; do echo "prod,monitoring" | ssh $h 'sudo bash /tmp/set-env-key.sh SPRING_PROFILES_ACTIVE'; done
 ```
 
 **④ 띄우기: 앱-1 먼저, 그다음 앱-2**
@@ -467,6 +469,80 @@ ssh odo 'sudo systemctl stop dance-api; sudo cp -a /etc/dance-api.env.bak-single
 - `odo-db` 볼륨 스냅샷이 매일 생기는지: EC2 → 스냅샷
 - `deploy/README.md`의 운영 점검 절에 "두 대 모두 보기"(journalctl을 odo·odo-app2에서)
 
+## 단계 10. 모니터링 (맥미니 Prometheus·Grafana, 약 30분)
+
+구성: 앱 서버 두 대가 **관리 포트 9091**(`/actuator/prometheus`, `prod,monitoring` 프로필일 때만)과 **node_exporter 9100**(CPU·메모리·디스크)을 연다. 맥미니의 Prometheus가 **Tailscale로** 15초마다 긁고, Grafana 대시보드 "채팅 운영"으로 본다.
+
+- 9091·9100은 보안 그룹에 열지 않는다 → 인터넷·사설망에서는 닿지 않고, Tailscale ACL로 맥미니에서만 닿는다
+- 앱 포트 8080(nginx가 넘기는 곳)에는 actuator가 없다(`MonitoringProfileTest`로 확인)
+- Prometheus(127.0.0.1:9090)와 Grafana(127.0.0.1:3000)는 맥미니 밖으로 열지 않는다 → 노트북에서는 SSH 터널로 본다
+- DB·Redis 서버 지표는 이번 범위가 아니다(Tailscale에 붙이지 않았다). 필요하면 나중에 앱-1을 거쳐 긁는다
+
+### 10-1. Tailscale ACL (콘솔, 중단 없음)
+
+단계 6-2의 정책에 더한다:
+
+```jsonc
+"hosts": { "coco-mac-mini": "100.117.201.13" },
+"acls": [
+  // 모니터링: 맥미니 → 앱 서버 지표·자원
+  { "action": "accept", "src": ["coco-mac-mini"], "dst": ["tag:server:9091,9100"] }
+]
+```
+
+(`hosts`·`acls`가 이미 있으면 그 안에 항목만 더한다)
+
+### 10-2. 앱 서버 두 대 (중단: 앱마다 재시작 약 20초 — 8-6 ③에서 같이 하면 추가 중단 없음)
+
+```bash
+for h in odo odo-app2; do
+  ssh $h 'sudo apt-get install -y -q prometheus-node-exporter && systemctl is-active prometheus-node-exporter'
+  echo "prod,monitoring" | ssh $h 'sudo bash /tmp/set-env-key.sh SPRING_PROFILES_ACTIVE'
+done
+# 8-6 ④보다 먼저 했다면 재시작이 필요 없다(④에서 띄운다). 이미 돌고 있다면 한 대씩:
+ssh odo 'sudo systemctl restart dance-api'; sleep 25; ssh odo-app2 'sudo systemctl restart dance-api'
+```
+
+- **확인**(서버 안에서)
+  - `ssh odo 'curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:9091/actuator/prometheus; curl -s http://127.0.0.1:9091/actuator/health; curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:9100/metrics'` → `200`, `{"status":"UP"}`, `200`
+  - 밖에서는 닿지 않는지: `curl -s -m 5 -o /dev/null -w "%{http_code}\n" http://13.125.143.96:9091/actuator/prometheus` → `000`(시간 초과)
+- **되돌리기:** `echo prod | ssh <서버> 'sudo bash /tmp/set-env-key.sh SPRING_PROFILES_ACTIVE'` 뒤 재시작, `sudo apt-get remove -y prometheus-node-exporter`
+
+### 10-3. 맥미니에 Prometheus·Grafana (중단 없음)
+
+맥미니에 컨테이너 도구가 있는지 먼저 본다(어느 하나):
+
+```bash
+ssh macmini 'docker compose version 2>/dev/null || podman compose version 2>/dev/null || echo "컨테이너 도구 없음"'
+```
+
+없으면 Fedora 기준 `ssh -t macmini 'sudo dnf install -y podman podman-compose'`(또는 Docker CE). 그다음:
+
+```bash
+cd ~/SeSAC/Project/dance-analyze-service && git fetch -q origin && git checkout -q feature/distributed-ops
+rsync -a deploy/monitoring/ macmini:~/odo-monitoring/      # 다시 돌려도 targets.yml·비밀번호 파일은 그대로(저장소에 없다)
+ssh macmini 'set -e; cd ~/odo-monitoring
+  [ -f targets.yml ] || cp targets.example.yml targets.yml
+  umask 077; [ -s grafana-admin-password ] || openssl rand -hex 16 > grafana-admin-password
+  if docker compose version >/dev/null 2>&1; then docker compose up -d; else podman compose up -d; fi'
+```
+
+- `targets.yml`의 `odo-ec2`·`odo-app-2`가 맥미니에서 풀리는지: `ssh macmini 'getent hosts odo-ec2 odo-app-2'`
+  - 안 풀리면 100.x 주소로 바꾼다(`tailscale status`의 주소)
+- Grafana 관리자 비밀번호는 `ssh macmini 'cat ~/odo-monitoring/grafana-admin-password'` 로 한 번 보고 비밀번호 관리자에 넣는다
+
+**확인**
+
+```bash
+ssh macmini 'curl -s 127.0.0.1:9090/api/v1/targets | grep -oE "\"(job|health)\":\"[a-z0-9]+\"" | paste - - | sort | uniq -c'
+#   → app·node 각 2개, prometheus 1개가 모두 "health":"up"
+ssh -N -L 3000:127.0.0.1:3000 macmini      # 이 창은 열어 둔다
+#   브라우저 http://localhost:3000 → admin / (위 비밀번호) → 대시보드 "채팅 운영"
+```
+
+- 메시지 저장 지연·나간 프레임·발행 실패 같은 패널은 **채팅이 한 번 오간 뒤에** 선이 생긴다(처음 쓸 때 지표가 만들어진다)
+- **되돌리기:** `ssh macmini 'cd ~/odo-monitoring && (docker compose down || podman compose down)'`
+
 ## 단계 9. 병합
 
 ### 9-1. `feature/distributed-ops`를 먼저 병합 — 아직 한 대 구성으로 (중단 약 30초)
@@ -492,7 +568,8 @@ ssh odo 'sudo systemctl stop dance-api; sudo cp -a /etc/dance-api.env.bak-single
 | 그다음 | 8-1~8-5(SSH 설정, DB·Redis·앱-2 준비, nginx 서버 목록 파일) | 없음 |
 | 그다음 | 9-1: `feature/distributed-ops` 병합(한 대로 배포) | 약 30초 |
 | 그다음 | 8-6 전환 | **약 10분** |
-| 마지막 | 8-7 배포를 두 대로(Run workflow로 한 번 확인) | 약 1분 |
+| 그다음 | 8-7 배포를 두 대로(Run workflow로 한 번 확인) | 약 1분 |
+| 마지막 | 단계 10 모니터링(10-2를 8-6 ③에서 같이 하면 재시작 추가 없음) | 없음~앱마다 20초 |
 
 ## 비용 줄이기 — 필요할 때만 켜기
 

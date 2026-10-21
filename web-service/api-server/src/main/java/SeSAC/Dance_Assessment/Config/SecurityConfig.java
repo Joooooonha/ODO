@@ -41,13 +41,18 @@ public class SecurityConfig {
     private final Environment environment;
 
     /**
-     * 측정 환경(loadtest 프로필)에서만 로그인 없이 여는 actuator 경로. 그 프로필이 아니면 목록에 넣지 않는다 — 운영(prod)은
-     * actuator를 하나도 노출하지 않고(exclude=*), 노출하지 않은 경로는 로그인 검사에 걸려 401이다.
-     * 관리 포트(9091)에도 이 보안 설정이 그대로 걸린다(LoadtestProfileTest)
+     * 로그인 없이 여는 actuator 경로. 해당 프로필일 때만 목록에 넣는다 — 그냥 운영(prod)은 actuator를 하나도 노출하지 않고
+     * (exclude=*), 노출하지 않은 경로는 로그인 검사에 걸려 401이다. 관리 포트(9091)에도 이 보안 설정이 그대로 걸린다.
+     * <ul>
+     *   <li>{@code monitoring}(운영 모니터링, 10/21): 수집기용 prometheus·health. 관리 포트는 Tailscale로만 닿는다</li>
+     *   <li>{@code loadtest}(측정): 위에 더해 측정 전용 장애 주입</li>
+     * </ul>
      */
-    static final String[] LOADTEST_ACTUATOR = {
+    static final String[] MONITORING_ACTUATOR = {
             "/actuator/prometheus",          // 수집기(Prometheus)
             "/actuator/health",
+    };
+    static final String[] LOADTEST_ACTUATOR = {
             "/actuator/loadtest",            // 측정 전용 장애 주입(LoadtestFaultEndpoint, 10/20 작업 5-3·5-4)
     };
 
@@ -85,6 +90,9 @@ public class SecurityConfig {
                                 "/api/push/public-key",
                                 "/error"
                         ).permitAll();
+                    if (environment.acceptsProfiles(Profiles.of("loadtest | monitoring"))) {
+                        auth.requestMatchers(MONITORING_ACTUATOR).permitAll();
+                    }
                     if (environment.acceptsProfiles(Profiles.of("loadtest"))) {
                         auth.requestMatchers(LOADTEST_ACTUATOR).permitAll();
                     }

@@ -153,9 +153,11 @@ ssh odo "sudo -u postgres psql -d dance_db -Atc 'select count(*) from chat_room 
 # 웹소켓 경로가 Spring까지 가는지: 쿠키 없이 → 401이면 정상(200 HTML이면 nginx가 화면으로 보낸 것)
 curl -s -o /dev/null -w '%{http_code}\n' -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
      -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' https://odostudio.site/api/ws
-# actuator·측정 전용 경로가 밖에서 열리지 않는지 → 401 또는 404
+# actuator·측정 전용 경로가 밖에서 열리지 않는지. nginx는 /api·/oauth2·/login/oauth2만 앱으로 넘기고 나머지는 화면(index.html)을
+# 돌려준다 → 200이 나오지만 본문이 HTML이면 정상(앱까지 가지 않음). JSON("status")이나 지표("# HELP")가 보이면 문제
 for p in /actuator /actuator/health /actuator/prometheus /actuator/loadtest; do
-  printf '%s ' "$p"; curl -s -o /dev/null -w '%{http_code}\n' "https://odostudio.site$p"; done
+  printf '%s ' "$p"; curl -s "https://odostudio.site$p" | head -c 15; echo; done                # 모두 <!doctype html>
+ssh odo 'curl -s -o /dev/null -w "앱 직접 %{http_code}\n" http://127.0.0.1:8080/actuator/health'   # 401
 ssh odo 'free -m | head -2; REDISCLI_AUTH="$(sudo sed -n "s/^REDIS_PASSWORD=//p" /etc/dance-api.env)" redis-cli -h 127.0.0.1 info memory | grep used_memory_human'
 ```
 
