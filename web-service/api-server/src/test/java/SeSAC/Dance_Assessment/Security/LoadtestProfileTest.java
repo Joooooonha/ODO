@@ -63,6 +63,22 @@ class LoadtestProfileTest {
     @DisplayName("앱 포트에는 actuator가 없다(밖으로 여는 nginx는 앱 포트만 넘긴다)")
     void noActuatorOnAppPort() throws Exception {
         assertThat(get(appPort, "/actuator/prometheus").statusCode()).isNotEqualTo(200);
+        assertThat(post(appPort, "/actuator/loadtest", "{\"action\":\"read-fault\",\"seconds\":0}").statusCode()).isNotEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("관리 포트의 측정 전용 장애 주입(/actuator/loadtest)은 로그인 없이 부른다(생성기가 compose 네트워크 안에서 부름, 10/21 401 발견)")
+    void faultEndpointOnManagementPort() throws Exception {
+        HttpResponse<String> res = post(managementPort, "/actuator/loadtest", "{\"action\":\"read-fault\",\"seconds\":0}");
+        assertThat(res.statusCode()).isEqualTo(200);
+        assertThat(res.body()).contains("\"ok\":true");
+    }
+
+    private static HttpResponse<String> post(int port, String path, String json) throws Exception {
+        return HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                        .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(json)).build(),
+                HttpResponse.BodyHandlers.ofString());
     }
 
     @Test

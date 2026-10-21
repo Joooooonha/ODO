@@ -71,6 +71,9 @@ public class SecurityConfig {
                                 // 관리 포트에도 이 보안 설정이 그대로 걸린다(테스트로 확인: 없으면 401).
                                 "/actuator/prometheus",
                                 "/actuator/health",
+                                // 측정 전용 장애 주입(LoadtestFaultEndpoint, 10/20 작업 5-3·5-4). 빈은 loadtest 프로필에만
+                                // 있고 노출도 그 프로필의 관리 포트에서만 한다 — 다른 설정에서는 이 경로가 없다
+                                "/actuator/loadtest",
                                 "/error"
                         ).permitAll()
                         // 영상 재생은 <video src>로 불러서 쿠키가 실리지만,
