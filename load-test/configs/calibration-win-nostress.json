@@ -1,5 +1,5 @@
 {
-  "note": "윈도우 보정(2-4) 대조: stress 없이(같은 호스트 간섭 크기를 따로 보려고). calibration-win-s1·scale의 일부와 같은 경우",
+  "note": "윈도우 보정 대조: stress 없이(같은 호스트 간섭 크기를 따로 보려고). calibration-win-s1·scale의 일부와 같은 경우",
   "errorLimitMs": 5,
   "defaults": {
     "workers": 1,

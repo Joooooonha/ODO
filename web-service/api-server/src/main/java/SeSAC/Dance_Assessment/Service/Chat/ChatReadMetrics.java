@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 읽음 지표(Task-chat-read 5절).
+ * 읽음 지표.
  *
  * <ul>
  *   <li>{@code chat.read.requests{outcome}} — 읽음 보고 수와 결과.

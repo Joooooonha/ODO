@@ -8,7 +8,7 @@ import { COOKIE_NAME, signToken } from './jwt.mjs';
 import { merge, summarize } from './hist.mjs';
 
 /**
- * 부하 생성기 조정자(Task-chat-read 6절). 사용: `node src/run.mjs <설정.json>`
+ * 부하 생성기 조정자. 사용: `node src/run.mjs <설정.json>`
  *
  * 1. 배치 계산(시드와 같은 함수) → 세션을 방(주 팀) 단위로 작업 프로세스 K개에 나눈다
  * 2. 프로세스 간 시계 확인(IPC 왕복 중간점과의 차이) — 같은 단조 시계인지 실행마다 기록
@@ -113,7 +113,7 @@ export async function run(config, { log = console.log, onMeasureStart } = {}) {
     dropAt = Date.now();
     await callFaultTargets(config, { action: 'read-drop-once' }, log);
   }
-  // 보내기를 멈춘 뒤 화면 위치를 서버가 모두 받아들이는지(읽음 위치가 멈추지 않는지, Task-chat-read-improve 5절 4번)
+  // 보내기를 멈춘 뒤 화면 위치를 서버가 모두 받아들이는지(읽음 위치가 멈추지 않는지)
   const drain = await readDrain(workers, config.readDrainSec ?? 60, !!config.readConfirmMs);
   drain.dropAt = dropAt;
   log(`[생성기] 읽음 보고 정리: 보는 세션 ${drain.watched}, 서버보다 앞선 화면 ${drain.behind}, 스냅샷 미확인 ${drain.unconfirmed}, 멈춤 ${drain.stuck} (${drain.waitedSec}초${drain.convergedMs != null ? `, 수렴 ${drain.convergedMs}ms` : ''})`);
@@ -218,7 +218,7 @@ function summarizeStage(r, results, machineCpu, config, cgroup) {
     loopDelayP99Ms: round(x.loopDelayMs.p99), loopDelayMaxMs: round(x.loopDelayMs.max), heapMb: x.heapMb,
     eventLoopUtilization: x.eventLoopUtilization,
   }));
-  // 생성기 포화(준하 결정, 2-4): 이벤트 루프 사용률 ≥ 0.9 또는 받은 방 프레임 < 받아야 할 것의 99%.
+  // 생성기 포화: 이벤트 루프 사용률 ≥ 0.9 또는 받은 방 프레임 < 받아야 할 것의 99%.
   // 받아야 할 것 = 방마다 (보낸 메시지 + 읽음 보고) × 그 방을 구독한 세션 수(전 작업 프로세스 합). 프로세스 CPU는 압축 해제
   // 백그라운드 스레드 때문에 1코어를 넘을 수 있어 단독 기준으로 쓰지 않는다(기록만)
   const rooms = new Map();
@@ -248,7 +248,7 @@ function summarizeStage(r, results, machineCpu, config, cgroup) {
     ...(receivedRatio != null && receivedRatio < 0.99 ? [`받은 방 프레임 ${Math.round(receivedRatio * 1000) / 10}% < 99%`] : []),
   ];
   const worstLoop = Math.max(...workerSelf.map((w) => w.loopDelayP99Ms));
-  // 유효 판정(준하 결정 A): 같은 설정의 보정에서 직접 잰 오차로 한다 → 여기서는 루프 지연을 기록만 한다.
+  // 유효 판정: 같은 설정의 보정에서 직접 잰 오차로 한다 → 여기서는 루프 지연을 기록만 한다.
   // loopDelayLimitMs를 준 설정(맥 보정 때의 C4 기준)만 그 값으로 무효를 표시한다. 20ms(loopDelayReviewMs)를 넘으면 "검토"
   const limit = config.loopDelayLimitMs ?? Infinity;
   const review = config.loopDelayReviewMs ?? 20;

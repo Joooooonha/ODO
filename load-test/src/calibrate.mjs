@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { run } from './run.mjs';
 
 /**
- * 측정기를 먼저 측정한다(Task-chat-read 9.3, 단계 1 E). 사용: `node src/calibrate.mjs configs/calibration-mac.json`
+ * 측정기를 먼저 측정한다. 사용: `node src/calibrate.mjs configs/calibration-mac.json`
  *
  * 경우마다 가짜 서버(지연 d를 넣음)를 띄우고 생성기를 돌려, 생성기가 잰 값과 서버 쪽 실제 시간
  * (넣은 지연 + 가짜 서버 타이머가 늦은 정도)을 비교한다.
@@ -102,8 +102,8 @@ async function main() {
       },
       generator: s.generator, counters: s.counters,
     };
-    // 판정(준하 결정 A): 직접 잰 오차 p99 ≤ errorLimitMs. 루프 지연 기준(loopDelayLimitMs)은 설정에 있을 때만 함께 본다
-    // 지표별 한도(준하 결정 A', 2-4): 성공 기준의 5% — 전달·확정 5ms, 읽음 반영 50ms. errorLimitMs는 전달·확정에만
+    // 판정: 직접 잰 오차 p99 ≤ errorLimitMs. 루프 지연 기준(loopDelayLimitMs)은 설정에 있을 때만 함께 본다
+    // 지표별 한도: 성공 기준의 5% — 전달·확정 5ms, 읽음 반영 50ms. errorLimitMs는 전달·확정에만
     const limit = { delivery: plan.errorLimitMs ?? 5, ack: plan.errorLimitMs ?? 5, read: plan.readErrorLimitMs ?? 50 };
     const within = (k) => row.error[k].p99 == null || row.error[k].p99 <= limit[k];
     row.limits = limit;

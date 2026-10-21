@@ -9,7 +9,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 읽음 벌크헤드(Task-chat-read-improve 3절, 개선 A): 서버 한 대에서 동시에 처리하는 읽음 보고 수의 상한 K.
+ * 읽음 벌크헤드: 서버 한 대에서 동시에 처리하는 읽음 보고 수의 상한 K.
  * 넘치면 <b>기다리지 않고</b> 바로 거절한다(호출자가 429로 응답).
  *
  * <p>왜 읽음 쪽을 막나: 과부하 때 메시지 SEND(인바운드 실행기 스레드 4개)와 읽음 보고(Tomcat 스레드 최대 200)가

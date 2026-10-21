@@ -41,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Mission (작업 지시서 7절 "브랜치 2 · Mission").
+ * Mission.
  *
  * <p>분석 서버 클라이언트는 목으로 바꿔, Mission 흐름이 <b>한 번도 부르지 않는지</b> 확인한다.
  * 트랜잭션을 테스트에 걸지 않는다 — 동시 제출 테스트는 각 요청이 실제로 커밋되어야 의미가 있다.

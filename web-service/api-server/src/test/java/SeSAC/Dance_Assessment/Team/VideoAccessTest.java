@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 자유 연습 영상·기록은 본인만 (작업 지시서 4.6, 8절 D4).
+ * 자유 연습 영상·기록은 본인만.
  *
  * <p>예전에는 같은 팀원이 올린 기준 영상을 재생할 수 있었다. 그 분기를 없앴으므로
  * <b>같은 팀으로 묶은 뒤에도</b> 거부되는지를 본다 — 팀이 없는 두 사람으로 확인하면

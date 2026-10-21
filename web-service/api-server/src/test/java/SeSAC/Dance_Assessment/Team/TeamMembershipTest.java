@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 팀 생성·코드 참여·나가기·추방 (작업 지시서 7절 "브랜치 1 · 팀").
+ * 팀 생성·코드 참여·나가기·추방.
  *
  * <p>트랜잭션을 테스트에 걸지 않는다. 동시 요청 테스트는 각 요청이 실제로 커밋되어야
  * 의미가 있다. 사용자·팀은 테스트마다 새로 만들어 서로 섞이지 않게 한다.
