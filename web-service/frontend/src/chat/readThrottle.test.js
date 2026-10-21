@@ -230,7 +230,7 @@ test('응답 분류', () => {
     assert.equal(classifyReadResult({ status: 403 }), 'drop');
 });
 
-// ===== 10/20 작업 4: 백오프 재시도(5)·스냅샷 확인 재전송(6) =====
+// ===== 백오프 재시도(5)·스냅샷 확인 재전송(6) =====
 
 function server2(timers, opts) {
     const sent = [];

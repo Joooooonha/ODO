@@ -152,7 +152,7 @@ export class Session {
     this.reporter ??= new ReadThrottle({
       windowMs: cfg.readThrottleMs ?? 0,
       send: (seq) => this.postRead(seq),
-      // 10/20 작업 4: 재전송 방식(고정·백오프)과 스냅샷 확인 재전송(0 = 끔). 화면과 같은 규칙 파일
+      // 재전송 방식(고정·백오프)과 스냅샷 확인 재전송(0 = 끔). 화면과 같은 규칙 파일
       retryMode: cfg.readRetryMode ?? 'fixed',
       confirmMs: cfg.readConfirmMs ?? 0,
       onResult: (seq, kind, err) => {
@@ -232,7 +232,7 @@ export class Session {
   /** 측정용: 보고 있는 방의 읽음 보고 상태 */
   readStatus() {
     if (!this.reporter || !this.view) return null;
-    // unconfirmed: 화면 위치가 서버 스냅샷(READ·read-state)에 아직 안 보임 — 202로 받았어도 모아 둔 값을 잃었을 수 있다(작업 5-4)
+    // unconfirmed: 화면 위치가 서버 스냅샷(READ·read-state)에 아직 안 보임 — 202로 받았어도 모아 둔 값을 잃었을 수 있다
     return {
       behind: this.view.contiguousTo > this.reporter.acked,
       stuck: this.reporter.isStuck(),
@@ -341,7 +341,7 @@ export class Session {
         body: body ? JSON.stringify(body) : undefined,
       });
     } catch (e) {
-      // 오류 종류별(I-11에서 첫 오류의 원인을 못 가린 빈틈): 응답 없이 실패한 요청은 원인 코드로 센다
+      // 오류 종류별(첫 오류의 원인을 못 가린 빈틈을 막으려고): 응답 없이 실패한 요청은 원인 코드로 센다
       // (undici: cause.code = ECONNRESET·ECONNREFUSED·UND_ERR_SOCKET·UND_ERR_CONNECT_TIMEOUT 등)
       this.ctx.count(`net:${method}:${e?.cause?.code ?? e?.name ?? 'unknown'}`);
       throw e;

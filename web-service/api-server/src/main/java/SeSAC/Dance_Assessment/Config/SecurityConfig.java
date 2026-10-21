@@ -53,7 +53,7 @@ public class SecurityConfig {
             "/actuator/health",
     };
     static final String[] LOADTEST_ACTUATOR = {
-            "/actuator/loadtest",            // 측정 전용 장애 주입(LoadtestFaultEndpoint, 10/20 작업 5-3·5-4)
+            "/actuator/loadtest",            // 측정 전용 장애 주입(LoadtestFaultEndpoint)
     };
 
     @Bean

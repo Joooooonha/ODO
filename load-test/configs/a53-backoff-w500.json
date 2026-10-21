@@ -1,5 +1,5 @@
 {
-  "note": "작업 5-3: 위와 같고 백오프 재전송",
+  "note": "위와 같고 백오프 재전송",
   "rateMode": "total",
   "senders": "watchers",
   "dmRatePerSec": 10,

@@ -1,5 +1,5 @@
 {
-  "note": "작업 3-2: 메시지 처리 스레드 8개(INBOUND_THREADS=8), v2·R1 설정(W=500). 전 단계 한 번, 무릎 근처는 t32-rep-w500.json으로 3회 중앙값. 비교 기준 = v2 R1(스레드 4개)",
+  "note": "메시지 처리 스레드 8개(INBOUND_THREADS=8), v2·R1 설정(W=500). 전 단계 한 번, 무릎 근처는 t32-rep-w500.json으로 3회 중앙값. 비교 기준 = v2 R1(스레드 4개)",
   "rateMode": "total",
   "senders": "watchers",
   "dmRatePerSec": 10,

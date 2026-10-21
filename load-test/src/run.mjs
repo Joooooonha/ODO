@@ -105,7 +105,7 @@ export async function run(config, { log = console.log, onMeasureStart } = {}) {
     writeFileSync(path.join(outDir, 'stages.json'), JSON.stringify(stages, null, 2));
   }
   await Promise.all(workers.map((w) => w.call({ cmd: 'rates', rooms: [] })));
-  // 작업 5-4: 보내기를 멈추고 마지막 보고(창 끝 ≤ W)가 모두 서버 버퍼에 들어간 뒤, 모아 둔 값을 한 번 버리게 한다 →
+  // 보내기를 멈추고 마지막 보고(창 끝 ≤ W)가 모두 서버 버퍼에 들어간 뒤, 모아 둔 값을 한 번 버리게 한다 →
   // 그 값들은 스냅샷 확인 재전송으로만 복구된다
   let dropAt = null;
   if (config.dropAtDrain) {
@@ -141,7 +141,7 @@ async function readDrain(workers, timeoutSec, needConfirm = false) {
   return { ...last, waitedSec: Math.round((Date.now() - t0) / 1000), convergedMs };
 }
 
-/** 측정 전용 장애 주입 끝점(앱 관리 포트, compose 네트워크 안)을 두 서버에 부른다(작업 5-3·5-4) */
+/** 측정 전용 장애 주입 끝점(앱 관리 포트, compose 네트워크 안)을 두 서버에 부른다 */
 async function callFaultTargets(config, body, log) {
   const targets = config.faultTargets ?? ['http://app1:9091', 'http://app2:9091'];
   const at = Date.now();
@@ -163,7 +163,7 @@ async function scheduleFaults(config, r, log) {
   }));
 }
 
-/** nginx stub_status 누적 요청 수를 1초마다(config.nginxStatusUrl, 작업 5-3 "nginx 기준 초당 요청 수") */
+/** nginx stub_status 누적 요청 수를 1초마다(config.nginxStatusUrl, "nginx 기준 초당 요청 수") */
 async function pollNginx(config, sec) {
   if (!config.nginxStatusUrl) return null;
   const out = [];

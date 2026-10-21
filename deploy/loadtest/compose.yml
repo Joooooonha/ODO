@@ -35,12 +35,12 @@ x-app: &app
     AI_SERVER_URL: http://ai-server.invalid
     # 개선 A 읽음 벌크헤드 K(서버마다). 기본 0 = 끔. 실행마다 `set READ_BULKHEAD_K=…&& docker compose up -d app1 app2`
     CHAT_READ_BULKHEAD: ${READ_BULKHEAD_K:-0}
-    # 메시지 처리 스레드 수(10/20 작업 3-2). 기본 0 = CPU × 2 = 4. 실행마다 `set INBOUND_THREADS=8&& docker compose up -d app1 app2`
+    # 메시지 처리 스레드 수. 기본 0 = CPU × 2 = 4. 실행마다 `set INBOUND_THREADS=8&& docker compose up -d app1 app2`
     CHAT_WS_INBOUND_THREADS: ${INBOUND_THREADS:-0}
-    # 발행을 커넥션 반납 뒤로(작업 3-2 조건부 E). 기본 끔. `set PUBLISH_AFTER_RELEASE=true&& docker compose up -d app1 app2`
+    # 발행을 커넥션 반납 뒤로. 기본 끔. `set PUBLISH_AFTER_RELEASE=true&& docker compose up -d app1 app2`
     CHAT_PUBLISH_AFTER_RELEASE: ${PUBLISH_AFTER_RELEASE:-false}
-    # 서버 쪽 읽음 모으기(10/20 작업 4). 기본 끔. 위상은 서버 순번으로(app1 0ms, app2 250ms), READ_AGGREGATE_PHASE를 주면
-    # 두 서버 모두 그 값(작업 6 F1: 0). 실행마다 `set READ_AGGREGATE=true&& docker compose up -d app1 app2`
+    # 서버 쪽 읽음 모으기. 기본 끔. 위상은 서버 순번으로(app1 0ms, app2 250ms), READ_AGGREGATE_PHASE를 주면
+    # 두 서버 모두 그 값(0). 실행마다 `set READ_AGGREGATE=true&& docker compose up -d app1 app2`
     CHAT_READ_AGGREGATE: ${READ_AGGREGATE:-false}
     CHAT_READ_AGGREGATE_PHASE: ${READ_AGGREGATE_PHASE:--1}
     CHAT_SERVER_COUNT: "2"
@@ -135,7 +135,7 @@ services:
   nginx:
     # 운영 nginx와 같은 1.24
     image: nginx:1.24.0-alpine
-    # 측정 환경 v2(10/20 D-30): 1 → 2. R2·새 R0 1,200에서 nginx가 throttle 66~89%로 먼저 막혀 문제를 가렸다.
+    # 측정 환경 v2(10/20): 1 → 2. R2·새 R0 1,200에서 nginx가 throttle 66~89%로 먼저 막혀 문제를 가렸다.
     # 재시도 폭주를 푸는 게 아니라 측정 장치에 가려지지 않게 하려는 것 — v2 결과는 v2 기준선과만 비교한다
     cpus: 2
     mem_limit: 256m
@@ -229,7 +229,7 @@ services:
 
   # 측정기 보정용 가짜 서버. 서버 몫 9 CPU(측정 환경 v2: app 2+2, PG 2, Redis 1, nginx 2) 중 5를 쓰고 나머지 4는 stress(app1 2 + postgres 2)로 채운다.
   # 처음엔 1 CPU였는데 permessage-deflate를 켜자 가짜 서버가 압축(libuv 스레드 풀)을 못 따라가 규모 보정이 전부 막혔다(2-4).
-  # 10/20 작업 1: 프로세스 하나(이벤트 루프 하나)가 r = 2,000에서 포화(1.4~1.6코어, throttle 0) → 샤드 4개로 나눈다(fake-shards.mjs).
+  # 프로세스 하나(이벤트 루프 하나)가 r = 2,000에서 포화(1.4~1.6코어, throttle 0) → 샤드 4개로 나눈다(fake-shards.mjs).
   # 서버 몫 합계를 v2와 같게(9) 맞춰 같은 호스트 간섭 조건을 유지한다. 옛 보정(서버 몫 8)은 cpus 4·프로세스 1이었다.
   # 압축 없는 옛 보정(--deflate off)은 cpus 1 + stress 7로 했다
   fake-server:

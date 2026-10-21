@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 서버 쪽 읽음 모으기(10/20 작업 4)에서 보고를 받을 때의 권한 확인 — DB에 가지 않는다.
+ * 서버 쪽 읽음 모으기에서 보고를 받을 때의 권한 확인 — DB에 가지 않는다.
  *
  * <ol>
  *   <li>이 서버에 붙은 그 사용자의 웹소켓 연결이 그 방을 허용하고 있으면(구독 때 쓰는 허용 방 캐시) 허용</li>

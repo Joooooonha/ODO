@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
- * 측정 전용 장애 주입 끝점(10/20 작업 5-3·5-4). <b>loadtest 프로필에서만 빈이 생긴다</b>. 관리 포트(9091)는 측정
+ * 측정 전용 장애 주입 끝점. <b>loadtest 프로필에서만 빈이 생긴다</b>. 관리 포트(9091)는 측정
  * compose 네트워크 안에서만 열리고, 노출 목록(application-loadtest.properties)에도 측정에서만 넣는다.
  *
  * <pre>

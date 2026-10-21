@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { merge, summarize } from './hist.mjs';
 
 /**
- * 가짜 서버를 프로세스 여러 개로 나눈다(보정 범위 확장, 10/20 작업 1). 사용:
+ * 가짜 서버를 프로세스 여러 개로 나눈다(보정 범위 확장). 사용:
  *   node src/fake-shards.mjs --port 18080 --procs 4
  *
  * 가짜 서버 하나는 이벤트 루프 하나라, W=500 (나) 보정의 r = 2,000에서 컨테이너 CPU 4개 중 1.4~1.6만 쓰고

@@ -120,7 +120,7 @@ for (const s of stagesDoc) {
     sendP99Ms: await one(`max_over_time(chat_send_duration_seconds{quantile="0.99"}[${w}]) * 1000`, to),
     hikariAcquireAvgMs: await one(`sum by (server) (increase(hikaricp_connections_acquire_seconds_sum[${w}])) / sum by (server) (increase(hikaricp_connections_acquire_seconds_count[${w}])) * 1000`, to),
     hikariUsageAvgMs: await one(`sum by (server) (increase(hikaricp_connections_usage_seconds_sum[${w}])) / sum by (server) (increase(hikaricp_connections_usage_seconds_count[${w}])) * 1000`, to),
-    // 작업 3: 메시지 1건 처리 단계별 평균(SendStages). 서버:단계 → ms
+    // 메시지 1건 처리 단계별 평균(SendStages). 서버:단계 → ms
     sendStageAvgMs: Object.fromEntries((await prom(`sum by (server, stage) (increase(chat_send_stage_seconds_sum[${w}])) / sum by (server, stage) (increase(chat_send_stage_seconds_count[${w}])) * 1000`, to))
       .map((r) => [`${r.labels.server}:${r.labels.stage}`, round(r.value, 3)])),
     // 10/21: 메시지 커밋 단계 최대(Timer 최대는 최근 2분 창) — 모으기 주기의 커밋 지연과 같은 순간인지 보려고
@@ -153,7 +153,7 @@ for (const s of stagesDoc) {
     framesPerSec: await one(`sum by (type) (increase(chat_outbound_frames_total[${w}])) / ${(to - from) / 1000}`, to, 'type'),
     publishPerSec: await one(`sum by (type) (increase(chat_redis_publish_total[${w}])) / ${(to - from) / 1000}`, to, 'type'),
   };
-  // 작업 4: 서버 쪽 읽음 모으기(ReadAggregator). 꺼져 있으면 값이 비어 있다. 처리 시간 t·커넥션 보유·잠금 대기는 ms
+  // 서버 쪽 읽음 모으기(ReadAggregator). 꺼져 있으면 값이 비어 있다. 처리 시간 t·커넥션 보유·잠금 대기는 ms
   const sec = (to - from) / 1000;
   const avgMs = (name, sel = '') => one(`sum by (server) (increase(${name}_sum${sel}[${w}])) / sum by (server) (increase(${name}_count${sel}[${w}])) * 1000`, to);
   const perSec = (expr) => one(`sum by (server) (increase(${expr}[${w}])) / ${sec}`, to);

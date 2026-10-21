@@ -30,7 +30,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 발행을 커넥션 반납 뒤로(10/20 작업 3-2 조건부 E, {@code chat.send.publish-after-release}). 켜면 사람이 보낸 메시지의
+ * 발행을 커넥션 반납 뒤로({@code chat.send.publish-after-release}). 켜면 사람이 보낸 메시지의
  * 발행이 커넥션을 돌려준 뒤에 일어나고, 확정·저장·방송 순서와 방 순번은 그대로인지 본다(스레드 8개).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
