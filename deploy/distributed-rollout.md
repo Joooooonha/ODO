@@ -478,7 +478,7 @@ ssh odo 'sudo systemctl stop dance-api; sudo cp -a /etc/dance-api.env.bak-single
 
 - 9091·9100은 보안 그룹에 열지 않는다 → 인터넷·사설망에서는 닿지 않고, Tailscale ACL로 맥미니에서만 닿는다
 - 앱 포트 8080(nginx가 넘기는 곳)에는 actuator가 없다(`MonitoringProfileTest`로 확인)
-- Prometheus(127.0.0.1:19090 — 9090은 맥미니 Fedora의 Cockpit이 쓴다)와 Grafana(127.0.0.1:3000)는 맥미니 밖으로 열지 않는다 → 노트북에서는 SSH 터널로 본다
+- Prometheus(127.0.0.1:29090 — 맥미니에서 9090은 Cockpit, 19090은 CoCo API가 쓴다)와 Grafana(127.0.0.1:3000)는 맥미니 밖으로 열지 않는다 → 노트북에서는 SSH 터널로 본다
 - DB·Redis 서버 지표는 이번 범위가 아니다(Tailscale에 붙이지 않았다). 필요하면 나중에 앱-1을 거쳐 긁는다
 
 ### 10-1. Tailscale ACL (콘솔, 중단 없음)
@@ -537,7 +537,7 @@ ssh macmini 'set -e; cd ~/odo-monitoring
 **확인**
 
 ```bash
-ssh macmini 'curl -s 127.0.0.1:19090/api/v1/targets | grep -oE "\"(job|health)\":\"[a-z0-9]+\"" | paste - - | sort | uniq -c'
+ssh macmini 'curl -s 127.0.0.1:29090/api/v1/targets | grep -oE "\"(job|health)\":\"[a-z0-9]+\"" | paste - - | sort | uniq -c'
 #   → app·node 각 2개, prometheus 1개가 모두 "health":"up"
 ssh -N -L 3000:127.0.0.1:3000 macmini      # 이 창은 열어 둔다
 #   브라우저 http://localhost:3000 → admin / (위 비밀번호) → 대시보드 "채팅 운영"
