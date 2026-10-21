@@ -43,6 +43,8 @@ class OAuth2CookieRequestTest {
         assertThat(cookie).isNotNull();
         assertThat(cookie.isHttpOnly()).isTrue();
         assertThat(cookie.getMaxAge()).isEqualTo(180);
+        // 브라우저 쿠키 한도(이름+값 4,096바이트) 안이어야 한다. 넘으면 브라우저가 조용히 버려 로그인이 실패한다
+        assertThat(cookie.getName().length() + cookie.getValue().length()).isLessThan(4000);
         return cookie;
     }
 
