@@ -344,6 +344,9 @@ ssh odo 'sudo cat /etc/dance-api.env' | ssh odo-app2 'sudo install -m 600 -o ubu
 ssh odo-app2 'hostname -I | awk "{print \$1}"' | ssh odo-app2 'sudo bash /tmp/set-env-key.sh SERVER_ADDRESS'
 echo 1 | ssh odo-app2 'sudo bash /tmp/set-env-key.sh CHAT_SERVER_INDEX'
 echo 2 | ssh odo-app2 'sudo bash /tmp/set-env-key.sh CHAT_SERVER_COUNT'
+# GitHub 배포 공개키(앱-1에 있는 github-actions-deploy@odostudio.site 한 줄)를 앱-2에도 — 빠뜨리면 8-7 배포가
+# "Permission denied (publickey)"로 멈춘다(10/22 실제로 겪음). 공개키라 비밀이 아니다
+ssh odo 'grep "github-actions-deploy@odostudio.site" ~/.ssh/authorized_keys' | ssh odo-app2 'grep -qF "github-actions-deploy@odostudio.site" ~/.ssh/authorized_keys || cat >> ~/.ssh/authorized_keys'
 ```
 
 - **아직 띄우지 않는다**(`systemctl enable`만 하고 start는 8-6에서). DB·Redis 주소가 아직 앱-1 안을 가리킨다
@@ -475,7 +478,7 @@ ssh odo 'sudo systemctl stop dance-api; sudo cp -a /etc/dance-api.env.bak-single
 
 - 9091·9100은 보안 그룹에 열지 않는다 → 인터넷·사설망에서는 닿지 않고, Tailscale ACL로 맥미니에서만 닿는다
 - 앱 포트 8080(nginx가 넘기는 곳)에는 actuator가 없다(`MonitoringProfileTest`로 확인)
-- Prometheus(127.0.0.1:9090)와 Grafana(127.0.0.1:3000)는 맥미니 밖으로 열지 않는다 → 노트북에서는 SSH 터널로 본다
+- Prometheus(127.0.0.1:19090 — 9090은 맥미니 Fedora의 Cockpit이 쓴다)와 Grafana(127.0.0.1:3000)는 맥미니 밖으로 열지 않는다 → 노트북에서는 SSH 터널로 본다
 - DB·Redis 서버 지표는 이번 범위가 아니다(Tailscale에 붙이지 않았다). 필요하면 나중에 앱-1을 거쳐 긁는다
 
 ### 10-1. Tailscale ACL (콘솔, 중단 없음)
@@ -534,7 +537,7 @@ ssh macmini 'set -e; cd ~/odo-monitoring
 **확인**
 
 ```bash
-ssh macmini 'curl -s 127.0.0.1:9090/api/v1/targets | grep -oE "\"(job|health)\":\"[a-z0-9]+\"" | paste - - | sort | uniq -c'
+ssh macmini 'curl -s 127.0.0.1:19090/api/v1/targets | grep -oE "\"(job|health)\":\"[a-z0-9]+\"" | paste - - | sort | uniq -c'
 #   → app·node 각 2개, prometheus 1개가 모두 "health":"up"
 ssh -N -L 3000:127.0.0.1:3000 macmini      # 이 창은 열어 둔다
 #   브라우저 http://localhost:3000 → admin / (위 비밀번호) → 대시보드 "채팅 운영"

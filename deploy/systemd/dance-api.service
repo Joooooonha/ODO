@@ -52,6 +52,8 @@ StartLimitIntervalSec=300
 # 중간에 끊기면 결과가 PROCESSING에 영원히 멈춘다.
 TimeoutStopSec=330
 KillSignal=SIGTERM
+# JVM은 SIGTERM을 받으면 종료 코드 143으로 끝난다. 정상 종료로 쳐서 멈출 때 상태가 failed로 보이지 않게 한다(10/22)
+SuccessExitStatus=143
 
 # --- 최소 권한 ---
 NoNewPrivileges=true
