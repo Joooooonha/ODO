@@ -5,6 +5,7 @@ import SeSAC.Dance_Assessment.Common.ErrorCode;
 import SeSAC.Dance_Assessment.Dto.Chat.ReadStateResponse;
 import SeSAC.Dance_Assessment.Realtime.ReadPublisher;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -32,7 +33,8 @@ public class ChatReadService {
     private final ReadBulkhead bulkhead;
     private final ReadAggregator aggregator;
     private final ReadAccessCache access;
-    private final ReadFaults faults;
+    /** 측정 전용 장애 주입(loadtest 프로필에서만 빈이 있다). 없으면 검사하지 않는다 */
+    private final ObjectProvider<ReadFaults> faults;
 
     /**
      * 읽음 보고. 사용자는 인증 정보에서만 온다.
@@ -46,7 +48,8 @@ public class ChatReadService {
      */
     public boolean report(long me, long roomId, Long seq) {
         long start = System.nanoTime();
-        if (faults.readFailing()) {
+        ReadFaults fault = faults.getIfAvailable();
+        if (fault != null && fault.readFailing()) {
             metrics.request(ChatReadMetrics.FAULT, System.nanoTime() - start);
             throw new ApiException(ErrorCode.READ_UNAVAILABLE);
         }

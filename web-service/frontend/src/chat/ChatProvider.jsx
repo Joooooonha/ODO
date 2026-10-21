@@ -13,13 +13,22 @@ import { ChatStore } from './chatStore';
  * refresh는 실패하면 무조건 사용자를 비우므로, 서버가 내려간 동안(네트워크 오류) 재연결마다 부르면
  * 로그아웃되고 보낼 목록까지 지워진다.
  */
+/** 빌드 환경 변수(ms). 비어 있으면 기본값, 숫자가 아니거나 음수면 0(끔) */
+function envMs(value, fallback) {
+    if (value === undefined || value === '') return fallback;
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 export function ChatProvider({ children }) {
     const { user, checking, refresh } = useAuth();
     const [store] = useState(() => new ChatStore({
         socketUrl: chatSocketUrl(),
-        readThrottleMs: Number(import.meta.env.VITE_CHAT_READ_THROTTLE_MS ?? 0) || 0,
-        readRetryMode: import.meta.env.VITE_CHAT_READ_RETRY_MODE === 'backoff' ? 'backoff' : 'fixed',
-        readConfirmMs: Number(import.meta.env.VITE_CHAT_READ_CONFIRM_MS ?? 0) || 0,
+        // 10/21 측정으로 채택한 기본값: 묶기 500ms, 백오프 재전송, 202 뒤 2초 확인 재전송(서버 쪽 모으기와 짝).
+        // 빌드 환경 변수로 덮는다(0이면 끔, VITE_CHAT_READ_RETRY_MODE=fixed면 고정 간격)
+        readThrottleMs: envMs(import.meta.env.VITE_CHAT_READ_THROTTLE_MS, 500),
+        readRetryMode: import.meta.env.VITE_CHAT_READ_RETRY_MODE === 'fixed' ? 'fixed' : 'backoff',
+        readConfirmMs: envMs(import.meta.env.VITE_CHAT_READ_CONFIRM_MS, 2000),
     }));
 
     useEffect(() => {

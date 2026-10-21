@@ -441,6 +441,15 @@ public class ReadAggregator {
         return false;
     }
 
+    /**
+     * 측정 전용 느린 주기 기록을 켠다({@code chat.metrics.read-agg-slow}, 기본 끔 — loadtest 프로필만 켠다, 10/21 병합 준비).
+     * 끄면 기준이 무한대라 기록·로그가 없다
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    void slowRecording(@Value("${chat.metrics.read-agg-slow:false}") boolean on) {
+        this.slowNanos = on ? TimeUnit.MILLISECONDS.toNanos(SLOW_MS) : Long.MAX_VALUE;
+    }
+
     /** 테스트용: 느린 주기 기준을 바꾼다 */
     void slowThresholdMs(long ms) {
         this.slowNanos = TimeUnit.MILLISECONDS.toNanos(ms);

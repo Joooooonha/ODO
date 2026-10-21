@@ -56,7 +56,7 @@ public class SendStages {
     private final boolean enabled;
     private final Map<String, Timer> timers = new ConcurrentHashMap<>();
 
-    public SendStages(MeterRegistry registry, @Value("${chat.metrics.send-stages:true}") boolean enabled) {
+    public SendStages(MeterRegistry registry, @Value("${chat.metrics.send-stages:false}") boolean enabled) {
         this.registry = registry;
         this.enabled = enabled;
     }

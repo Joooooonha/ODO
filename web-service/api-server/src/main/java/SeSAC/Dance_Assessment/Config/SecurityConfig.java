@@ -6,6 +6,8 @@ import SeSAC.Dance_Assessment.Security.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -34,6 +36,18 @@ public class SecurityConfig {
     private final CustomOAuth2UserService oAuth2UserService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
     private final CorsConfigurationSource corsConfigurationSource;
+    private final Environment environment;
+
+    /**
+     * 측정 환경(loadtest 프로필)에서만 로그인 없이 여는 actuator 경로. 그 프로필이 아니면 목록에 넣지 않는다 — 운영(prod)은
+     * actuator를 하나도 노출하지 않고(exclude=*), 노출하지 않은 경로는 로그인 검사에 걸려 401이다.
+     * 관리 포트(9091)에도 이 보안 설정이 그대로 걸린다(LoadtestProfileTest)
+     */
+    static final String[] LOADTEST_ACTUATOR = {
+            "/actuator/prometheus",          // 수집기(Prometheus)
+            "/actuator/health",
+            "/actuator/loadtest",            // 측정 전용 장애 주입(LoadtestFaultEndpoint, 10/20 작업 5-3·5-4)
+    };
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -54,7 +68,8 @@ public class SecurityConfig {
                 .exceptionHandling(e -> e.authenticationEntryPoint(
                         new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
 
-                .authorizeHttpRequests(auth -> auth
+                .authorizeHttpRequests(auth -> {
+                    auth
                         .requestMatchers(
                                 "/api/auth/**",     // 로그인·회원가입 (컨트롤러는 /api 접두사가 붙는다)
                                 "/oauth2/**",       // 소셜 로그인 시작
@@ -66,19 +81,16 @@ public class SecurityConfig {
                                 // VAPID 공개키. 이름 그대로 공개해도 되는 값이고,
                                 // 알림 구독 UI를 그릴지 판단하려면 로그인 전에도 필요하다.
                                 "/api/push/public-key",
-                                // 측정 환경(loadtest 프로필)의 수집기. 관리 포트(9091, 컨테이너 네트워크 안)에만
-                                // 있다 — 운영과 기본 설정은 actuator를 아무것도 노출하지 않아 이 경로가 없다.
-                                // 관리 포트에도 이 보안 설정이 그대로 걸린다(테스트로 확인: 없으면 401).
-                                "/actuator/prometheus",
-                                "/actuator/health",
-                                // 측정 전용 장애 주입(LoadtestFaultEndpoint, 10/20 작업 5-3·5-4). 빈은 loadtest 프로필에만
-                                // 있고 노출도 그 프로필의 관리 포트에서만 한다 — 다른 설정에서는 이 경로가 없다
-                                "/actuator/loadtest",
                                 "/error"
-                        ).permitAll()
+                        ).permitAll();
+                    if (environment.acceptsProfiles(Profiles.of("loadtest"))) {
+                        auth.requestMatchers(LOADTEST_ACTUATOR).permitAll();
+                    }
+                    auth
                         // 영상 재생은 <video src>로 불러서 쿠키가 실리지만,
                         // 권한 검사는 VideoService.playVideo가 직접 한다.
-                        .anyRequest().authenticated())
+                        .anyRequest().authenticated();
+                })
 
                 .oauth2Login(oauth -> oauth
                         .userInfoEndpoint(u -> u.userService(oAuth2UserService))

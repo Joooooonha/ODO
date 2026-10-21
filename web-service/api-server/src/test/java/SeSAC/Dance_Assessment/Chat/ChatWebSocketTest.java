@@ -48,7 +48,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 웹소켓·STOMP(5.1): 핸드셰이크 인증과 Origin, 확정·오류가 보낸 세션에만 가는지, 보낸 순서, 구독
  * 규칙, 토큰 만료, "메시지 하나에 프레임 하나", 연결 종료 정리. 실제 서버(임의 포트) + Redis로 돈다.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "chat.metrics.send-stages=true")
 @AutoConfigureMockMvc
 @ActiveProfiles("dev")
 class ChatWebSocketTest {
