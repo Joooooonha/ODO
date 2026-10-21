@@ -1,5 +1,6 @@
 package SeSAC.Dance_Assessment.Config;
 
+import SeSAC.Dance_Assessment.Security.CookieOAuth2AuthorizationRequestRepository;
 import SeSAC.Dance_Assessment.Security.CustomOAuth2UserService;
 import SeSAC.Dance_Assessment.Security.JwtAuthenticationFilter;
 import SeSAC.Dance_Assessment.Security.OAuth2SuccessHandler;
@@ -36,6 +37,7 @@ public class SecurityConfig {
     private final CustomOAuth2UserService oAuth2UserService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
     private final CorsConfigurationSource corsConfigurationSource;
+    private final CookieOAuth2AuthorizationRequestRepository authorizationRequests;
     private final Environment environment;
 
     /**
@@ -93,6 +95,8 @@ public class SecurityConfig {
                 })
 
                 .oauth2Login(oauth -> oauth
+                        // 인가 요청을 세션 대신 서명한 쿠키에(앱 서버 두 대 — 시작과 콜백이 다른 서버로 가도 된다)
+                        .authorizationEndpoint(a -> a.authorizationRequestRepository(authorizationRequests))
                         .userInfoEndpoint(u -> u.userService(oAuth2UserService))
                         .successHandler(oAuth2SuccessHandler))
 

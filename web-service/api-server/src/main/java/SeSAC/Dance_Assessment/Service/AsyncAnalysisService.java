@@ -31,6 +31,7 @@ public class AsyncAnalysisService {
     private final AnalysisResultWriter writer;
     private final AiClientService aiClientService;
     private final AnalysisNotifier notifier;
+    private final AnalysisLock analysisLock;
 
     /**
      * 별도 스레드에서 분석을 실행한다. 호출자를 블로킹하지 않는다.
@@ -57,7 +58,8 @@ public class AsyncAnalysisService {
         }
 
         try {
-            AiAnalysisResponse response = aiClientService.requestAnalysis(job, jobId);
+            // 앱 서버가 여러 대여도 맥미니에는 한 건씩(AnalysisLock). 기다리는 동안 이 작업은 PROCESSING·0%로 보인다
+            AiAnalysisResponse response = analysisLock.runExclusive(jobId, () -> aiClientService.requestAnalysis(job, jobId));
             writer.complete(practiceLogId, response, job.imageKeys());
 
             log.info("[비동기 분석 완료] PracticeLog ID: {}, 지적 구간: {}개",

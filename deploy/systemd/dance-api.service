@@ -34,6 +34,9 @@ Environment="SPRING_PROFILES_ACTIVE=prod"
 Environment="TZ=UTC"
 # 127.0.0.1에만 바인딩한다. 외부 노출은 Nginx가 담당하고,
 # 8080이 직접 열려 있으면 Cloudflare를 우회해 접근할 수 있다.
+#
+# 앱-2(두 대 구성)는 앱-1 nginx가 사설망으로 들어와야 하므로 /etc/dance-api.env에 SERVER_ADDRESS=<자기 사설 IP>를 둔다.
+# EnvironmentFile의 값이 Environment=보다 우선한다(systemd.exec). 8080은 보안 그룹 odo-app끼리만 열려 있다.
 Environment="SERVER_ADDRESS=127.0.0.1"
 
 ExecStart=/usr/bin/java -jar /opt/dance-api/app.jar

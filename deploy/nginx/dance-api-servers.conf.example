@@ -1,0 +1,8 @@
+# /etc/nginx/dance-api-servers.conf — odostudio.site.conf의 upstream dance_api가 읽는다(저장소 밖, 서버마다)
+#
+# 한 대 구성(지금):
+server 127.0.0.1:8080;
+#
+# 두 대 구성(deploy/distributed-rollout.md 단계 8) — 위 줄을 지우고 아래 두 줄로:
+# server 127.0.0.1:8080 max_fails=2 fail_timeout=10s;
+# server 172.31.x.x:8080 max_fails=2 fail_timeout=10s;   # 앱-2 사설 IP
