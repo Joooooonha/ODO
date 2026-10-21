@@ -1,6 +1,6 @@
 """구간 피드백을 눈으로 확인할 수 있게 그린다.
 
-`report_generator.py` / `video_renderer.py`를 대체한다.
+초기 프로토타입의 `report_generator.py` / `video_renderer.py`(삭제됨)를 대체한다.
 **기존 두 모듈에는 같은 결함이 있었다: DTW 정렬 결과를 쓰지 않는다.**
 
     # report_generator.generate_report
