@@ -526,7 +526,7 @@ cd ~/SeSAC/Project/dance-analyze-service && git fetch -q origin && git checkout 
 rsync -a deploy/monitoring/ macmini:~/odo-monitoring/      # 다시 돌려도 targets.yml·비밀번호 파일은 그대로(저장소에 없다)
 ssh macmini 'set -e; cd ~/odo-monitoring
   [ -f targets.yml ] || cp targets.example.yml targets.yml
-  umask 077; [ -s grafana-admin-password ] || openssl rand -hex 16 > grafana-admin-password
+  [ -s grafana-admin-password ] || openssl rand -hex 16 > grafana-admin-password; chmod 644 grafana-admin-password   # Grafana 컨테이너(uid 472)가 읽어야 한다. 600이면 기본 비밀번호로 뜬다(10/22 겪음)
   if docker compose version >/dev/null 2>&1; then docker compose up -d; else podman compose up -d; fi'
 ```
 

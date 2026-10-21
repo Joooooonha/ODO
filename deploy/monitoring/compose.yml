@@ -6,7 +6,9 @@
 #   ssh -N -L 3000:127.0.0.1:3000 macmini   → http://localhost:3000
 #
 # 실행: cd deploy/monitoring && cp targets.example.yml targets.yml (주소 확인) && docker compose up -d
-#       Grafana 관리자 비밀번호는 grafana-admin-password 파일(권한 600, 저장소 밖)
+#       Grafana 관리자 비밀번호는 grafana-admin-password 파일(저장소 밖, 권한 644 — 컨테이너 사용자 472가 읽어야 한다.
+#       못 읽으면 Grafana가 기본 비밀번호로 뜬다. 홈 폴더가 본인만 들어갈 수 있으니 644여도 다른 사용자는 못 읽는다)
+#       이미 기본 비밀번호로 떴다면: docker compose exec -T grafana grafana cli admin reset-admin-password --password-from-stdin < grafana-admin-password
 name: odo-monitoring
 
 services:
