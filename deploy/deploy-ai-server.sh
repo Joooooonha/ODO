@@ -70,4 +70,4 @@ print('  장치       ', 'cuda' if torch.cuda.is_available() else 'cpu')
 
 echo
 echo "==> 완료. 서버 실행:"
-echo "   ssh $HOST 'cd ~/$DEST && ./venv/bin/python -m uvicorn main:app --host 100.117.201.13 --port 8000'"
+echo "   ssh $HOST 'cd ~/$DEST && ./venv/bin/python -m uvicorn main:app --host \$(tailscale ip -4) --port 8000'"

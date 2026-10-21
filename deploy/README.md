@@ -400,6 +400,8 @@ ssh macmini 'sudo dnf install -y python3.10 python3.10-devel ffmpeg-free'
 ```bash
 ssh macmini '
   mkdir -p ~/.config/systemd/user
+  # 바인딩 주소(Tailscale)는 저장소가 아니라 환경 파일에 둔다
+  [ -f ~/.config/dance-ai.env ] || echo "AI_BIND_HOST=$(tailscale ip -4)" > ~/.config/dance-ai.env
   cp ~/dance-ai/../deploy/systemd/dance-ai.service ~/.config/systemd/user/ 2>/dev/null || true
   systemctl --user daemon-reload
   systemctl --user enable --now dance-ai
@@ -431,7 +433,7 @@ ssh macmini '
 확인:
 ```bash
 ssh macmini 'systemctl --user status dance-ai --no-pager | head -5'
-curl -m 5 http://100.117.201.13:8000/      # EC2나 맥북에서
+curl -m 5 http://<맥미니 Tailscale IP>:8000/      # EC2나 맥북에서
 
 # 바인딩이 Tailscale 주소에만 잡혔는지 (0.0.0.0이면 안 된다)
 ssh macmini 'ss -tln | grep 8000'
@@ -552,7 +554,7 @@ Spring 쪽 시작 로그만 있고 완료가 없으면 맥미니를 본다. 맥�
 **돌고 있는 분석이 어디쯤인지**는 로그를 기다리지 않고 바로 볼 수 있다:
 
 ```bash
-ssh macmini 'curl -s http://100.117.201.13:8000/progress'
+ssh macmini 'curl -s "http://$(tailscale ip -4):8000/progress"'
 ```
 
 ```

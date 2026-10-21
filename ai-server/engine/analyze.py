@@ -1,7 +1,7 @@
 """검증된 엔진으로 두 영상을 비교한다. `ai-server`의 새 분석 진입점.
 
-기존 `analyzer.DanceAnalyzer`를 대체한다. 방법론 근거는
-`model-research/TASKS.md`(D1~D25)와 `docs/analysis-engine-report.md` 참조.
+초기 프로토타입의 `analyzer.DanceAnalyzer`(삭제됨)를 대체한다. 방법론 근거는
+`docs/analysis-engine-report.md` 참조.
 
 기존 구현 대비 바뀐 것:
 

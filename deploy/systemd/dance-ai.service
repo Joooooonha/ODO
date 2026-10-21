@@ -5,12 +5,14 @@
 #
 # 설치:
 #   mkdir -p ~/.config/systemd/user
+#   # 바인딩할 Tailscale 주소(`tailscale ip -4`)를 환경 파일에 둔다. 저장소에 주소를 적지 않는다.
+#   echo "AI_BIND_HOST=$(tailscale ip -4)" > ~/.config/dance-ai.env
 #   cp deploy/systemd/dance-ai.service ~/.config/systemd/user/
 #   systemctl --user daemon-reload
 #   systemctl --user enable --now dance-ai
 #
 #   # 로그인하지 않아도 부팅 후 자동 시작되게 (필수)
-#   sudo loginctl enable-linger joonha
+#   sudo loginctl enable-linger "$USER"
 #
 # 로그: journalctl --user -u dance-ai -f
 
@@ -27,8 +29,9 @@ WorkingDirectory=%h/dance-ai
 # 이 서버에는 인증이 없고, 접근 통제를 "네트워크에서 닿을 수 없다"에 의존한다.
 # 0.0.0.0으로 열면 같은 공유기의 다른 기기도 분석을 호출할 수 있다.
 Environment="PYTHONUNBUFFERED=1"
+EnvironmentFile=%h/.config/dance-ai.env
 ExecStart=%h/dance-ai/venv/bin/python -m uvicorn main:app \
-    --host 100.117.201.13 --port 8000
+    --host ${AI_BIND_HOST} --port 8000
 
 # Tailscale이 아직 안 올라왔으면 바인딩에 실패한다. 될 때까지 재시도한다.
 Restart=on-failure

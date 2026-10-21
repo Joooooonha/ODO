@@ -414,24 +414,18 @@ deploy/out/
 # 분석 서버의 테스트 영상
 ai-server/testdata/
 
-# Claude Code 로컬 설정·설치된 스킬. 프로젝트 소스가 아니고
-# skills/ 안에는 12MB짜리 실행 바이너리도 들어 있다.
+# 에디터·AI 도구의 로컬 설정과 작업 상태(프로젝트 소스가 아니다)
 .claude/
-
-# 디자인 스킬의 작업 상태. 산출물인 DESIGN.md만 커밋한다.
 .impeccable/
+/DESIGN.md
 
-# 로컬 문서
-새싹_ㅂㅈㅎ_개인프로ㅔㄱ트.pdf
-새싹_박준하_AI 댄스 분석 플랫폼.pdf
+# 실험·분석 실행 산출물(실행할 때마다 쌓인다)
+model-research/analysis_result/
 
-# 사전 작업 지시서·참고 Spec. 로컬에서만 쓰는 작업 문서라 커밋하지 않는다.
-docs/prework/Task-prework.md
-docs/prework/Spec-prework.md
-
-# 작업 일지·개인 작업 목록·옛 명세. 로컬에서만 쓰고 공개 저장소에는 올리지 않는다.
-/DEPLOY-CONSOLE-TASKS.md
-/TASKS-SERVICE.md
-/model-research/TASKS.md
+# 로컬 작업 문서(작업 메모·초안·제출용 문서). 공개 저장소에는 올리지 않는다.
+docs/prework/
+/*.pdf
+/*TASKS*.md
+**/TASKS.md
 /PRODUCT.md
 /web-service/api-server/docs/API_SPEC.md
