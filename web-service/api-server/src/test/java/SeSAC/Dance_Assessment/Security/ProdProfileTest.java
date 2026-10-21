@@ -1,19 +1,29 @@
 package SeSAC.Dance_Assessment.Security;
 
+import SeSAC.Dance_Assessment.Common.ThreadCpuMetrics;
+import SeSAC.Dance_Assessment.Config.LoadtestFaultEndpoint;
+import SeSAC.Dance_Assessment.Service.Chat.ReadAggregator;
+import SeSAC.Dance_Assessment.Service.Chat.ReadFaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /**
@@ -29,17 +39,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 // 운영 설정 중 **인프라에 의존하는 항목만** 테스트용으로 덮어쓴다.
 // 이 테스트가 확인하려는 것은 "프로파일로 꺼지는 빈"이지 DB/네트워크가 아니다.
 //
-// - ddl-auto: 운영은 validate가 맞다(운영 DB 스키마를 앱이 멋대로 바꾸면 안 된다).
-//   다만 빈 H2에 대고 validate하면 스키마가 없어서 컨텍스트가 뜨지 않는다.
+// - DB는 덮어쓰지 않는다. 운영과 같이 Flyway + validate로 뜬다(테스트 DB는 PostgreSQL).
+//   그래서 이 테스트는 "운영 설정으로 마이그레이션과 엔티티가 맞는지"도 함께 확인한다.
+//   H2 시절에는 ddl-auto=create-drop으로 덮어썼는데, 공유 PostgreSQL에서 그러면
+//   Flyway가 만든 테이블을 전부 지우고 엔티티 기준으로 다시 만들어 버려서(부분 인덱스·
+//   CHECK가 사라짐) 뒤에 도는 테스트가 엉뚱한 스키마에서 통과했다.
 // - ai.server.url: 운영에서는 값이 없으면 **즉시 실패하는 편이 옳다**
 //   (맥미니 주소를 빠뜨린 채 뜨면 분석이 전부 실패한다). 그래서 기본값을 두지
 //   않았고, 대신 테스트에서만 채운다.
-// - flyway: 마이그레이션은 PostgreSQL 문법이라 H2에서는 돌지 않는다. V1만 있을 때는
-//   다른 테스트가 먼저 만든 테이블 때문에 baseline으로 건너뛰어져 우연히 통과했지만,
-//   V2부터는 실제로 실행되어 실패한다. 마이그레이션은 로컬 PostgreSQL에서 따로 검증한다.
+// - 비밀값: 운영 프로필은 기본값이 없다(ProdSecretsCheck). 테스트용 값을 환경 변수 이름으로 채운다.
 @TestPropertySource(properties = {
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.flyway.enabled=false",
+        "JWT_SECRET=test-only-jwt-secret-for-prod-profile-test-0123456789",
+        "KAKAO_CLIENT_ID=test", "KAKAO_CLIENT_SECRET=test",
+        "NAVER_CLIENT_ID=test", "NAVER_CLIENT_SECRET=test",
         "ai.server.url=http://127.0.0.1:8000",
         // 저장소도 이 테스트의 관심사가 아니다. 운영은 r2지만 자격증명이 없으면
         // 뜨지 않는 것이 맞고(빠뜨린 채 배포되면 안 되므로), 여기서는 local로 둔다.
@@ -55,6 +67,22 @@ class ProdProfileTest {
 
     @Autowired
     org.springframework.context.ApplicationContext context;
+
+    @Autowired
+    ReadAggregator aggregator;
+
+    @Autowired
+    @Qualifier("clientInboundChannelExecutor")
+    Executor inbound;
+
+    @Value("${chat.read.bulkhead.max-concurrent}")
+    int bulkhead;
+
+    @Value("${chat.metrics.send-stages}")
+    boolean sendStages;
+
+    @Value("${chat.metrics.read-agg-slow}")
+    boolean readAggSlow;
 
     @Test
     @DisplayName("[핵심] 운영에서는 로컬 로그인 엔드포인트가 존재하지 않는다")
@@ -105,5 +133,41 @@ class ProdProfileTest {
                 .andReturn().getResponse().getStatus();
 
         assertThat(status).isEqualTo(204);
+    }
+
+    @Test
+    @DisplayName("[read 5절] 운영에서는 Prometheus 레지스트리가 만들어지지 않는다(jar에는 들어 있지만 기본 꺼짐)")
+    void prometheusIsOffInProd() {
+        assertThat(context.getBeanNamesForType(io.micrometer.prometheusmetrics.PrometheusMeterRegistry.class)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("[10/21 병합 준비] actuator·측정 전용 경로는 로그인 없이 열리지 않는다(401 또는 404) — 지표·상태를 밖에서 볼 수 없다")
+    void actuatorAndLoadtestPathsAreClosed() throws Exception {
+        for (String path : List.of("/actuator", "/actuator/health", "/actuator/prometheus", "/actuator/metrics",
+                "/actuator/env", "/actuator/loadtest")) {
+            assertThat(mvc.perform(get(path)).andReturn().getResponse().getStatus()).as(path).isIn(401, 404);
+        }
+        int status = mvc.perform(post("/actuator/loadtest").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"action\":\"read-fault\",\"seconds\":10}")).andReturn().getResponse().getStatus();
+        assertThat(status).isIn(401, 403, 404);
+    }
+
+    @Test
+    @DisplayName("[10/21 병합 준비] 측정 전용 빈(장애 주입 끝점·ReadFaults·스레드별 CPU 지표)은 만들어지지 않고, 측정용 상세 지표는 꺼져 있다")
+    void measurementBeansAreNotRegistered() {
+        assertThat(context.getBeanNamesForType(LoadtestFaultEndpoint.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(ReadFaults.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(ThreadCpuMetrics.class)).isEmpty();
+        assertThat(sendStages).isFalse();
+        assertThat(readAggSlow).isFalse();
+    }
+
+    @Test
+    @DisplayName("[10/21 병합 준비] 채택한 운영 기본값: 메시지 처리 스레드 8개, 서버 쪽 읽음 모으기 켬(서버 한 대 → 위상 0), 벌크헤드 32")
+    void adoptedDefaults() {
+        assertThat(((ThreadPoolTaskExecutor) inbound).getCorePoolSize()).isEqualTo(8);
+        assertThat(aggregator.enabled()).isTrue();
+        assertThat(bulkhead).isEqualTo(32);
     }
 }

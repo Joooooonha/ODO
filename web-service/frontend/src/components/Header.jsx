@@ -47,6 +47,7 @@ export default function Header() {
                         <Link to="/" className="nav-link" onClick={closeMenu}>대시보드</Link>
                         <Link to="/practice" className="nav-link" onClick={closeMenu}>자유 연습</Link>
                         <Link to="/teams" className="nav-link" onClick={closeMenu}>팀</Link>
+                        <Link to="/chats" className="nav-link" onClick={closeMenu}>채팅</Link>
                         <Link to="/logs" className="nav-link" onClick={closeMenu}>내 기록</Link>
                     </nav>
                 )}

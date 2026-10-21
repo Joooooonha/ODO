@@ -423,3 +423,70 @@ export const analyzeLog = async (logId) => {
     method: 'POST',
   });
 };
+
+// ============ Chat API ============
+//
+// 메시지 전송은 HTTP가 아니라 웹소켓(STOMP)으로 한다(src/chat/chatStore.js).
+// 실패하면 Error에 status와 code가 붙는다: 403 NOT_CHAT_MEMBER / 403 DM_NOT_ALLOWED / 400 CANNOT_DM_SELF
+
+/**
+ * 채팅 웹소켓 주소. API 주소에서 만든다 — 운영은 빈 문자열(같은 오리진)이라 지금 페이지의 호스트를 쓴다.
+ * 인증은 핸드셰이크에 실리는 httpOnly 쿠키로 한다(자바스크립트는 토큰을 다루지 않는다).
+ */
+export const chatSocketUrl = () => {
+  if (API_BASE_URL) {
+    return API_BASE_URL.replace(/^http/, 'ws') + '/api/ws';
+  }
+  const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${scheme}://${window.location.host}/api/ws`;
+};
+
+/**
+ * 내 방 목록(최근 순): [{ roomId, type, displayName, teamId, peerUserId, lastSeq,
+ *  lastMessage: { seq, type, senderId, senderNickname, content, createdAt, targetNickname } | null,
+ *  myReadSeq, unread, empty }]
+ * 메시지 없는 DM은 empty: true로 온다 — 화면은 숨기되 구독은 한다.
+ */
+export const getChatRooms = async () => {
+  return fetchAPI('/api/chat/rooms');
+};
+
+/**
+ * 메시지 조회(항상 오름차순): { roomId, lastSeq, messages: [...] }
+ * 옵션 없음 → 최신 50 / afterSeq → 그 이후 / beforeSeq → 그 이전.
+ */
+export const getChatMessages = async (roomId, { afterSeq, beforeSeq, limit } = {}) => {
+  const params = new URLSearchParams();
+  if (afterSeq != null) params.set('afterSeq', afterSeq);
+  if (beforeSeq != null) params.set('beforeSeq', beforeSeq);
+  if (limit != null) params.set('limit', limit);
+  const query = params.toString();
+  return fetchAPI(`/api/chat/rooms/${roomId}/messages${query ? `?${query}` : ''}`);
+};
+
+/** DM 열기. 이미 있으면 그 방, 없으면 같은 팀일 때만 만든다: { roomId, created } */
+export const openDm = async (userId) => {
+  return fetchAPI('/api/chat/dms', {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+};
+
+/**
+ * 읽음 보고: 이 방을 seq(빈틈 없이 이어진 마지막 번호)까지 읽었다. 204(서버 쪽 모으기를 켜면 202 = 받았음, 반영은 다음 주기).
+ * 사용자는 쿠키에서 서버가 꺼낸다. 다시 보낼지는 readThrottle.js가 정한다.
+ */
+export const reportRead = async (roomId, seq) => {
+  return fetchAPI(`/api/chat/rooms/${roomId}/read`, {
+    method: 'POST',
+    body: JSON.stringify({ seq }),
+  });
+};
+
+/**
+ * 방의 읽음 상태: { version, positions: [{ userId, lastReadSeq }], ranges: [{ toSeq, unread }] }.
+ * 방송되는 READ 프레임과 같은 계산 결과. 구독 → SYNC 뒤에 조회한다.
+ */
+export const getReadState = async (roomId) => {
+  return fetchAPI(`/api/chat/rooms/${roomId}/read-state`);
+};

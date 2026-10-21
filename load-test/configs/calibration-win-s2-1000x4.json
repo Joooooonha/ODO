@@ -1,0 +1,50 @@
+{
+  "note": "시나리오 2 (나) 보정: 같은 배치·같은 K, 가짜 서버(4 CPU, 압축)가 감당하는 속도(≈ 9,000프레임/초 = 700건/초)까지. 그 위는 실측 포화 판정",
+  "errorLimitMs": 5,
+  "readErrorLimitMs": 50,
+  "defaults": {
+    "rateMode": "total",
+    "senders": "watchers",
+    "dmRatePerSec": 10,
+    "connectRatePerSec": 300,
+    "warmupSec": 10,
+    "measureSec": 30,
+    "contentLength": 40,
+    "workers": 4,
+    "topology": {
+      "rooms": 1000,
+      "members": 4,
+      "teamsPerUser": 1,
+      "dmPairsPerRoom": 1,
+      "watchersPerRoom": 2,
+      "activeRoomRatio": 0.1
+    }
+  },
+  "cases": [
+    {
+      "name": "시나리오2 2:2 1000x4 r=50 고정 50ms",
+      "delay": "fixed:50",
+      "r": 50
+    },
+    {
+      "name": "시나리오2 2:2 1000x4 r=100 고정 50ms",
+      "delay": "fixed:50",
+      "r": 100
+    },
+    {
+      "name": "시나리오2 2:2 1000x4 r=200 고정 50ms",
+      "delay": "fixed:50",
+      "r": 200
+    },
+    {
+      "name": "시나리오2 2:2 1000x4 r=400 고정 50ms",
+      "delay": "fixed:50",
+      "r": 400
+    },
+    {
+      "name": "시나리오2 2:2 1000x4 r=700 고정 50ms",
+      "delay": "fixed:50",
+      "r": 700
+    }
+  ]
+}

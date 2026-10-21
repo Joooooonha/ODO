@@ -1,0 +1,20 @@
+# sql_exporter(burningalchemist) 0.24.9 — DB 관찰 3개 쿼리(Task-chat-read 2-4 DB 관찰).
+# 대상 DSN은 환경 변수 SQLEXPORTER_TARGET_DSN으로 받는다(비밀번호를 파일에 두지 않는다).
+# 접속 DB는 postgres(= 측정 DB가 아님): pg_stat_activity는 클러스터 전체를 보여 주고,
+# db-template reset(DROP DATABASE dance_db WITH (FORCE))이 이 연결을 끊지 않게 한다.
+global:
+  # 0s = 수집(scrape)마다 쿼리를 실제로 돌린다(결과를 재사용하지 않음)
+  min_interval: 0s
+  scrape_timeout_offset: 200ms
+  # 앱 Hikari 풀과 별도로 DB 커넥션 1개만 쓴다
+  max_connections: 1
+  max_idle_connections: 1
+  max_connection_lifetime: 0s
+
+target:
+  name: pg
+  data_source_name: placeholder-overridden-by-env
+  collectors: [pg_activity]
+
+collector_files:
+  - "*.collector.yml"

@@ -1,0 +1,73 @@
+{
+  "note": "윈도우 보정(2-4) 대조: stress 없이(같은 호스트 간섭 크기를 따로 보려고). calibration-win-s1·scale의 일부와 같은 경우",
+  "errorLimitMs": 5,
+  "defaults": {
+    "workers": 1,
+    "connectRatePerSec": 100,
+    "rateMode": "perRoom",
+    "senders": "watchers",
+    "dmRatePerSec": 1,
+    "warmupSec": 5,
+    "measureSec": 20,
+    "contentLength": 40,
+    "topology": {
+      "rooms": 1,
+      "members": 20,
+      "teamsPerUser": 1,
+      "dmPairsPerRoom": 5,
+      "watchersPerRoom": 20,
+      "activeRoomRatio": 1
+    }
+  },
+  "cases": [
+    {
+      "name": "시나리오1 1:19 r=20 고정 50ms",
+      "delay": "fixed:50",
+      "r": 20,
+      "topology": {
+        "watchersPerRoom": 1
+      }
+    },
+    {
+      "name": "시나리오1 20:0 r=10 고정 50ms",
+      "delay": "fixed:50",
+      "r": 10,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 20:0 r=20 고정 50ms",
+      "delay": "fixed:50",
+      "r": 20,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 10:10 r=20 고정 50ms",
+      "delay": "fixed:50",
+      "r": 20,
+      "topology": {
+        "watchersPerRoom": 10
+      }
+    },
+    {
+      "name": "규모 4000세션 / 4프로세스 · 전체 100건/초 10:10",
+      "delay": "fixed:50",
+      "r": 100,
+      "workers": 4,
+      "topology": {
+        "rooms": 200,
+        "members": 20,
+        "watchersPerRoom": 10,
+        "activeRoomRatio": 0.1,
+        "teamsPerUser": 1,
+        "dmPairsPerRoom": 0
+      },
+      "rateMode": "total",
+      "dmRatePerSec": 0,
+      "connectRatePerSec": 300
+    }
+  ]
+}

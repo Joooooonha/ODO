@@ -16,7 +16,7 @@ public final class Constraints {
      *
      * <p>동시 요청이 UNIQUE에 걸린 경우만 409 같은 정상 응답으로 바꾸고, 다른 제약 위반은
      * 원인이 다르므로 그대로 던지기 위해 쓴다. Hibernate가 제약 이름을 뽑아주면 그것을,
-     * 아니면 메시지를 본다(H2는 이름을 대문자로 돌려준다).
+     * 아니면 메시지를 본다(대소문자는 무시한다).
      */
     public static boolean violates(DataIntegrityViolationException e, String constraint) {
         for (Throwable t = e; t != null; t = t.getCause()) {

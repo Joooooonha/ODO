@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 팀·영상·미션 테스트의 공통 준비 — 모두 실제 API를 거친다.
- * 사용자는 {@link TestUsers}로 매번 새로 만든다(H2 메모리 DB를 컨텍스트끼리 공유하므로).
+ * 사용자는 {@link TestUsers}로 매번 새로 만든다(테스트 DB를 전체가 공유하므로).
  */
 public final class TestTeams {
 

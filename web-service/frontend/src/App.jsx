@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthProvider';
 import { useAuth } from './auth/useAuth';
+import { ChatProvider } from './chat/ChatProvider';
 import Header from './components/Header';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -14,6 +15,8 @@ import MissionEditor from './pages/MissionEditor';
 import MissionDetail from './pages/MissionDetail';
 import Logs from './pages/Logs';
 import LogDetail from './pages/LogDetail';
+import ChatList from './pages/ChatList';
+import ChatRoomPage from './pages/ChatRoomPage';
 import { DEV_LOGIN } from './devLogin';
 import './App.css';
 
@@ -52,6 +55,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+      <ChatProvider>
       <div className="app">
         <Header />
         <main className="main-content">
@@ -168,11 +172,29 @@ function App() {
               }
             />
 
+            <Route
+              path="/chats"
+              element={
+                <ProtectedRoute>
+                  <ChatList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/chats/:roomId"
+              element={
+                <ProtectedRoute>
+                  <ChatRoomPage />
+                </ProtectedRoute>
+              }
+            />
+
             {/* 404 리다이렉트 */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
       </div>
+      </ChatProvider>
       </AuthProvider>
     </BrowserRouter>
   );

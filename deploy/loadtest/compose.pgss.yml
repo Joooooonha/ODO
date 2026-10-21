@@ -1,0 +1,20 @@
+# 진단 실행에만 덧붙이는 설정(10/20 작업 3): pg_stat_statements로 DB 쪽 문장별 실행 시간을 잰다.
+#   docker compose -f deploy/loadtest/compose.yml -f deploy/loadtest/compose.pgss.yml up -d postgres
+# 문장마다 통계를 쌓는 비용이 있어 기준선·비교 실행에는 쓰지 않는다(측정 환경 v2 그대로). command는 compose.yml과 같고
+# shared_preload_libraries만 더한다. 확장은 측정 DB(dance_db)에 CREATE EXTENSION으로 켠다(템플릿 dance_seed는 그대로)
+services:
+  postgres:
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - max_connections=100
+      - -c
+      - work_mem=4MB
+      - -c
+      - effective_cache_size=4GB
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all

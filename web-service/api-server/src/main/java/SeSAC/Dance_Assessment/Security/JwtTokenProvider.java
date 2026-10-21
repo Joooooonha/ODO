@@ -11,7 +11,9 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Date;
+import java.util.Optional;
 
 /**
  * JWT 발급·검증.
@@ -59,17 +61,31 @@ public class JwtTokenProvider {
      *         만료·위조 모두 "인증 안 됨"으로 같게 취급하므로 예외를 던지지 않는다.
      */
     public Long parseUserId(String token) {
+        return parse(token).map(TokenClaims::userId).orElse(null);
+    }
+
+    /**
+     * 사용자 id와 만료 시각. 웹소켓은 핸드셰이크 때 한 번만 인증하므로, 연결 중에 토큰이 만료되면
+     * 서버가 주기적으로 끊는다 — 그때 쓸 만료 시각이 필요하다.
+     *
+     * @return 유효하면 값, 만료·위조면 empty
+     */
+    public Optional<TokenClaims> parse(String token) {
         try {
             Claims claims = Jwts.parser()
                     .verifyWith(key)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
-            return Long.valueOf(claims.getSubject());
+            return Optional.of(new TokenClaims(
+                    Long.valueOf(claims.getSubject()), claims.getExpiration().toInstant()));
         } catch (JwtException | IllegalArgumentException e) {
             log.debug("JWT 검증 실패: {}", e.getMessage());
-            return null;
+            return Optional.empty();
         }
+    }
+
+    public record TokenClaims(Long userId, Instant expiresAt) {
     }
 
     public Duration getValidity() {

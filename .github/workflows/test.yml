@@ -1,0 +1,78 @@
+name: 테스트 (PR)
+
+# main으로 가는 PR을 merge 전에 검증한다. **배포하지 않는다.**
+#
+# deploy.yml은 main push 때만 돌아서, 그전까지는 PR에서 아무것도 확인되지
+# 않았다. 깨진 코드가 merge되면 그 push가 곧 운영 배포다.
+#
+# **경로 필터를 걸지 않는다.** 이 워크플로의 `test` 검사를 main 보호 규칙의
+# 필수 검사로 지정할 예정인데, 경로 필터로 실행되지 않으면 검사가 "대기"로
+# 남아 문서만 바꾼 PR을 영영 merge할 수 없게 된다.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# 같은 PR에 새 push가 오면 이전 실행은 의미가 없다. 배포가 아니라서
+# 중간에 취소해도 안전하다(deploy.yml은 반대로 취소하지 않는다).
+concurrency:
+  group: test-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # 이 job 이름(test)이 main 보호 규칙의 필수 검사 이름이 된다. 바꾸면 규칙도 바꿔야 한다.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web-service/frontend/package-lock.json
+
+      # 백엔드 테스트는 Testcontainers로 PostgreSQL·Redis를 띄운다.
+      # Docker가 없으면 테스트를 건너뛰지 않고 **실패해야** 한다 — 건너뛰면
+      # 초록불로 보여서 "불변식 테스트 통과 = 완료" 기준이 조용히 사라진다.
+      # 원인을 바로 알 수 있게 여기서 먼저 확인한다.
+      - name: Docker 확인
+        run: docker version
+
+      - name: 백엔드 테스트
+        working-directory: web-service/api-server
+        run: ./gradlew test
+
+      - name: 프론트엔드 린트
+        working-directory: web-service/frontend
+        run: |
+          npm ci
+          npx eslint src --max-warnings=0
+
+      # 읽음 보고 묶기 규칙(화면과 부하 생성기가 같이 쓰는 파일)
+      - name: 프론트엔드 단위 테스트
+        working-directory: web-service/frontend
+        run: node --test src/chat/readThrottle.test.js
+
+      # deploy.yml과 같은 조건으로 빌드한다. 빌드가 깨지는 것도 merge 전에 알아야 한다.
+      - name: 프론트엔드 빌드
+        working-directory: web-service/frontend
+        run: VITE_API_BASE_URL= npm run build
+
+      - name: 실패 시 테스트 리포트 보관
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: web-service/api-server/build/reports/tests/test
+          retention-days: 7

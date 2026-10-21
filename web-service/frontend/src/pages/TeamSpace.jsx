@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Copy, Crown, MessageCircle, Users } from 'lucide-react';
-import { getJoinCode, getTeam, getTeamMembers, kickMember, leaveTeam } from '../api/client';
+import { Copy, Crown, Users } from 'lucide-react';
+import { getJoinCode, getTeam, getTeamMembers, kickMember, leaveTeam, openDm } from '../api/client';
+import { useAuth } from '../auth/useAuth';
+import ChatRoomView from '../components/ChatRoomView';
 import { RoleBadge } from './Teams';
 import MissionsTab from './MissionsTab';
 import { isNoAccess, teamErrorMessage } from './teamErrors';
@@ -72,8 +74,8 @@ export default function TeamSpace() {
         setLeaving(true);
         setError('');
         try {
+            // 팀 채팅방 구독은 서버가 REVOKED로 끊는다(TeamService.leave → 제어 이벤트)
             await leaveTeam(teamId);
-            // TODO(chat): 팀 채팅방 구독 해제 (서버 쪽 연결 지점은 TeamService.leave)
             navigate('/teams', { replace: true });
         } catch (err) {
             if (isNoAccess(err)) {
@@ -151,12 +153,9 @@ export default function TeamSpace() {
                 </div>
 
                 <div className="team-tab-panel" role="tabpanel">
-                    {tab === 'chat' && (
-                        // TODO(chat): 팀 채팅 화면 연결
-                        <div className="empty-state">
-                            <span className="empty-state-icon"><MessageCircle size={48} /></span>
-                            <h3 className="empty-state-title">채팅은 준비 중입니다</h3>
-                        </div>
+                    {tab === 'chat' && team.chatRoomId && (
+                        // 차단(추방·나가기)되면 팀 정보를 다시 읽는다 — 멤버가 아니면 TEAM 탭으로 나간다
+                        <ChatRoomView key={team.chatRoomId} roomId={team.chatRoomId} onRevoked={reloadTeam} compact />
                     )}
                     {tab === 'missions' && (
                         <MissionsTab teamId={teamId} isLeader={isLeader} onNoAccess={leaveSpace} />
@@ -186,6 +185,9 @@ function MembersTab({ teamId, isLeader, onNoAccess, onChanged }) {
     const [error, setError] = useState('');
     const [confirmKickId, setConfirmKickId] = useState(null);
     const [kicking, setKicking] = useState(false);
+    const [openingDm, setOpeningDm] = useState(null);
+    const { user } = useAuth();
+    const navigate = useNavigate();
 
     const [reloadKey, setReloadKey] = useState(0);
 
@@ -249,6 +251,20 @@ function MembersTab({ teamId, isLeader, onNoAccess, onChanged }) {
         }
     };
 
+    const handleDm = async (userId) => {
+        setOpeningDm(userId);
+        setError('');
+        try {
+            const { roomId } = await openDm(userId);
+            navigate(`/chats/${roomId}`);
+        } catch (err) {
+            setError(err?.code === 'DM_NOT_ALLOWED'
+                ? '같은 팀 멤버에게만 DM을 보낼 수 있어요.'
+                : teamErrorMessage(err, 'DM을 열지 못했어요.'));
+            setOpeningDm(null);
+        }
+    };
+
     if (!members) {
         return error ? <div className="auth-error">{error}</div>
             : <div className="loading"><div className="spinner"></div></div>;
@@ -281,11 +297,12 @@ function MembersTab({ teamId, isLeader, onNoAccess, onChanged }) {
                             )}
                         </span>
                         <span className="team-member-actions">
-                            {/* TODO(chat): DM 화면 연결 */}
-                            <button type="button" className="btn btn-secondary btn-sm" disabled
-                                title="DM은 준비 중입니다">
-                                DM
-                            </button>
+                            {m.userId !== user?.id && (
+                                <button type="button" className="btn btn-secondary btn-sm"
+                                    onClick={() => handleDm(m.userId)} disabled={openingDm != null}>
+                                    {openingDm === m.userId ? '여는 중...' : 'DM'}
+                                </button>
+                            )}
                             {isLeader && m.role !== 'LEADER' && (
                                 confirmKickId === m.userId ? (
                                     <>

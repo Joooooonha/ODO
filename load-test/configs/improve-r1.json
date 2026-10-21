@@ -1,0 +1,52 @@
+{
+  "note": "개선 R1 B만(W=500, K=0): (나) 전체 단계 + 예상 무릎(≈1,490~1,940) 너머 2단계. 보고 수·보고 1건당 비용·무릎점 이동·읽음 반영 p95",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 50
+    },
+    {
+      "r": 100
+    },
+    {
+      "r": 200
+    },
+    {
+      "r": 400
+    },
+    {
+      "r": 700
+    },
+    {
+      "r": 800
+    },
+    {
+      "r": 1200
+    },
+    {
+      "r": 1600
+    },
+    {
+      "r": 2000
+    },
+    {
+      "r": 2400
+    }
+  ],
+  "readThrottleMs": 500
+}

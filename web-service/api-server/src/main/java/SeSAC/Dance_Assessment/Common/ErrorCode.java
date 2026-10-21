@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
  * "멤버가 아님"과 "추방됨"이 갈린다. 그래서 응답에 {@code code}를 함께 싣는다.
  *
  * <ul>
+ *   <li>400 — 요청 자체가 성립하지 않음 (자기 자신에게 DM 등)</li>
  *   <li>404 — 대상이 없음</li>
  *   <li>403 — 대상은 있지만 이 사용자에게 권한이 없음</li>
  *   <li>409 — 현재 상태와 충돌 (이미 참여 중, 팀장은 나갈 수 없음 등)</li>
@@ -33,6 +34,19 @@ public enum ErrorCode {
     KICKED_FROM_TEAM(HttpStatus.FORBIDDEN, "추방되어 이 팀에 참여할 수 없습니다."),
     NOT_MISSION_TARGET(HttpStatus.FORBIDDEN, "이 미션의 대상자가 아닙니다."),
     COMMENT_NOT_ALLOWED(HttpStatus.FORBIDDEN, "팀장과 제출자만 코멘트를 남길 수 있습니다."),
+    // 방이 없을 때도 이 코드다(404가 아니라). 방 번호만으로 방이 있는지 알아낼 수 없게 한다.
+    NOT_CHAT_MEMBER(HttpStatus.FORBIDDEN, "이 채팅방의 멤버가 아닙니다."),
+    // 지금 같은 팀도 아니고 예전 DM도 없다. 다시 같은 팀이 되면 열 수 있다.
+    DM_NOT_ALLOWED(HttpStatus.FORBIDDEN, "같은 팀 멤버에게만 DM을 보낼 수 있습니다."),
+
+    CANNOT_DM_SELF(HttpStatus.BAD_REQUEST, "자기 자신에게는 DM을 보낼 수 없습니다."),
+    // 읽음 보고: seq가 없거나 음수 / 그 방의 마지막 번호보다 크다(아직 없는 메시지는 읽을 수 없다)
+    INVALID_READ_SEQ(HttpStatus.BAD_REQUEST, "읽은 위치(seq)는 0 이상의 정수여야 합니다."),
+    READ_SEQ_AHEAD(HttpStatus.BAD_REQUEST, "아직 없는 메시지를 읽음으로 보고할 수 없습니다."),
+    // 읽음 벌크헤드(ReadBulkhead)가 거절했다. 화면은 같은 값을 다음 창(또는 500ms 뒤)에 다시 보낸다
+    READ_BUSY(HttpStatus.TOO_MANY_REQUESTS, "읽음 보고가 많아 잠시 뒤 다시 보냅니다."),
+    // 측정 전용 장애 주입(ReadFaults, loadtest 프로필의 actuator로만 켠다). 운영에서는 나오지 않는다
+    READ_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "읽음 보고를 잠시 받을 수 없습니다."),
 
     ALREADY_MEMBER(HttpStatus.CONFLICT, "이미 참여 중인 팀입니다."),
     LEADER_CANNOT_LEAVE(HttpStatus.CONFLICT, "팀장은 팀을 나갈 수 없습니다."),

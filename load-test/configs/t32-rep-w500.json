@@ -1,0 +1,37 @@
+{
+  "note": "작업 3-2 반복(스레드 8개 2회 더) + 스레드 4개 WAL 동기화 비교 1회. 1,000은 작업 3 진단과 같은 단계",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 1000
+    },
+    {
+      "r": 1600
+    },
+    {
+      "r": 2000
+    },
+    {
+      "r": 2400
+    },
+    {
+      "r": 3000
+    }
+  ],
+  "readThrottleMs": 500
+}

@@ -18,13 +18,16 @@ repositories {
 	mavenCentral()
 }
 
+// Boot 3.4.0이 고정한 Testcontainers 1.20.4는 Docker API 1.32로 요청하는데, Docker Engine 29부터
+// 1.44 미만을 거부한다("client version 1.32 is too old"). 1.21.4가 같은 1.x 줄의 수정판이다
+// (기본 1.44, 옛 엔진이면 1.32로 되돌아감). 2.0은 모듈 이름이 바뀌어 여기서는 쓰지 않는다.
+ext['testcontainers.version'] = '1.21.4'
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	// 개발·테스트용 인메모리 DB
-	runtimeOnly 'com.h2database:h2'
-	// 운영용. 없으면 prod 프로파일에서 "Cannot load driver class:
-	// org.postgresql.Driver"로 기동 자체가 실패한다.
+	// 개발·테스트·운영 모두 PostgreSQL이다. H2는 뺐다 — 잠금·부분 인덱스·읽기 전용
+	// 트랜잭션 동작이 달라서, H2에서 통과한 테스트가 운영에서 깨지는 일이 반복됐다.
 	runtimeOnly 'org.postgresql:postgresql'
 	// 'spring-boot-starter-web-test'로 적혀 있었는데 그런 아티팩트는 없어서
 	// 테스트가 아예 컴파일되지 않는 상태였다 (Could not find ...:spring-boot-starter-web-test:).
@@ -40,6 +43,16 @@ dependencies {
 
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
+	// 채팅 실시간 전달. STOMP over WebSocket(서버 메모리 브로커) + 서버 간 전달은 Redis Pub/Sub.
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+	// 지표(Micrometer). HTTP로는 아무것도 노출하지 않는다(management 엔드포인트 전부 끔).
+	// 커넥션 풀·실행기 지표가 자동으로 붙고, 채팅 지표와 함께 주기적으로 로그에 요약한다.
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	// 측정 환경(loadtest 프로필)에서만 내보낸다. 운영과 같은 jar를 측정하려고 의존성은 늘 넣고, 내보내기는 기본 꺼짐
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+
 	// 인증. 지금까지는 X-User-Id 헤더 하나로 사용자를 판별해서,
 	// 헤더 값만 바꾸면 남의 계정이 되는 상태였다.
 	implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -52,6 +65,10 @@ dependencies {
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 
 	testImplementation 'org.springframework.security:spring-security-test'
+
+	// 테스트 DB. 진짜 PostgreSQL을 Docker로 띄운다(테스트 전체에서 하나를 공유).
+	// Docker가 없으면 테스트는 건너뛰지 않고 실패한다.
+	testImplementation 'org.testcontainers:postgresql'
 
 	// R2는 S3 호환 API라 AWS SDK를 그대로 쓴다.
 	// presigner(S3Presigner)는 s3 아티팩트 안에 들어 있다 —

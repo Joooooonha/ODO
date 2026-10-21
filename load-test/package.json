@@ -1,0 +1,17 @@
+{
+  "name": "odo-load-test",
+  "private": true,
+  "type": "module",
+  "description": "ODO 채팅 읽음 기준선 부하 생성기·가짜 서버·시드 (Task-chat-read 6절)",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@stomp/stompjs": "7.3.0",
+    "hdr-histogram-js": "3.0.1",
+    "ws": "8.21.0"
+  }
+}

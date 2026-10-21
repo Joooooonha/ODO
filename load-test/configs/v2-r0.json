@@ -1,0 +1,37 @@
+{
+  "note": "기준선 v2 R0(10/20 작업 2): 측정 환경 v2(nginx 2 CPU), 묶기·벌크헤드 끔. 700·800은 반복 2회(improve-rep-w0.json)와 3회 중앙값. W=0 생성기 범위(ELU < 0.9)는 1,200까지 — 1,600은 생성기 포화로 무효가 예상되지만 지시대로 잰다",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 400
+    },
+    {
+      "r": 700
+    },
+    {
+      "r": 800
+    },
+    {
+      "r": 1200
+    },
+    {
+      "r": 1600
+    }
+  ],
+  "readThrottleMs": 0
+}

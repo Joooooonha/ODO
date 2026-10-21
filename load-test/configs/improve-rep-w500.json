@@ -1,0 +1,31 @@
+{
+  "note": "반복 측정(W=500): 무릎 근처 단계 700·800을 세 번 재 중앙값으로 비교(준하 10/20). R1·R3 공용, K는 실행 때 env로",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 400
+    },
+    {
+      "r": 700
+    },
+    {
+      "r": 800
+    }
+  ],
+  "readThrottleMs": 500
+}

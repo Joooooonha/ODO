@@ -1,0 +1,224 @@
+{
+  "note": "윈도우 보정(2-4): 시나리오 1 설정 그대로(DM 배경 포함), 생성기 컨테이너 상한 그대로, 서버 몫 8 CPU = 가짜 서버 1 + stress 7. 판정 A: 직접 잰 오차 p99 ≤ 5ms",
+  "errorLimitMs": 5,
+  "defaults": {
+    "workers": 1,
+    "connectRatePerSec": 100,
+    "rateMode": "perRoom",
+    "senders": "watchers",
+    "dmRatePerSec": 1,
+    "warmupSec": 5,
+    "measureSec": 20,
+    "contentLength": 40,
+    "topology": {
+      "rooms": 1,
+      "members": 20,
+      "teamsPerUser": 1,
+      "dmPairsPerRoom": 5,
+      "watchersPerRoom": 20,
+      "activeRoomRatio": 1
+    }
+  },
+  "cases": [
+    {
+      "name": "시나리오1 1:19 r=1 고정 50ms",
+      "delay": "fixed:50",
+      "r": 1,
+      "topology": {
+        "watchersPerRoom": 1
+      }
+    },
+    {
+      "name": "시나리오1 1:19 r=2 고정 50ms",
+      "delay": "fixed:50",
+      "r": 2,
+      "topology": {
+        "watchersPerRoom": 1
+      }
+    },
+    {
+      "name": "시나리오1 1:19 r=5 고정 50ms",
+      "delay": "fixed:50",
+      "r": 5,
+      "topology": {
+        "watchersPerRoom": 1
+      }
+    },
+    {
+      "name": "시나리오1 1:19 r=10 고정 50ms",
+      "delay": "fixed:50",
+      "r": 10,
+      "topology": {
+        "watchersPerRoom": 1
+      }
+    },
+    {
+      "name": "시나리오1 1:19 r=20 고정 50ms",
+      "delay": "fixed:50",
+      "r": 20,
+      "topology": {
+        "watchersPerRoom": 1
+      }
+    },
+    {
+      "name": "시나리오1 1:19 r=50 고정 50ms",
+      "delay": "fixed:50",
+      "r": 50,
+      "topology": {
+        "watchersPerRoom": 1
+      }
+    },
+    {
+      "name": "시나리오1 1:19 r=100 고정 50ms",
+      "delay": "fixed:50",
+      "r": 100,
+      "topology": {
+        "watchersPerRoom": 1
+      }
+    },
+    {
+      "name": "시나리오1 20:0 r=1 고정 50ms",
+      "delay": "fixed:50",
+      "r": 1,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 20:0 r=2 고정 50ms",
+      "delay": "fixed:50",
+      "r": 2,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 20:0 r=5 고정 50ms",
+      "delay": "fixed:50",
+      "r": 5,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 20:0 r=10 고정 50ms",
+      "delay": "fixed:50",
+      "r": 10,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 20:0 r=15 고정 50ms",
+      "delay": "fixed:50",
+      "r": 15,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 20:0 r=20 고정 50ms",
+      "delay": "fixed:50",
+      "r": 20,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 20:0 r=30 고정 50ms",
+      "delay": "fixed:50",
+      "r": 30,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 10:10 r=1 고정 50ms",
+      "delay": "fixed:50",
+      "r": 1,
+      "topology": {
+        "watchersPerRoom": 10
+      }
+    },
+    {
+      "name": "시나리오1 10:10 r=2 고정 50ms",
+      "delay": "fixed:50",
+      "r": 2,
+      "topology": {
+        "watchersPerRoom": 10
+      }
+    },
+    {
+      "name": "시나리오1 10:10 r=5 고정 50ms",
+      "delay": "fixed:50",
+      "r": 5,
+      "topology": {
+        "watchersPerRoom": 10
+      }
+    },
+    {
+      "name": "시나리오1 10:10 r=10 고정 50ms",
+      "delay": "fixed:50",
+      "r": 10,
+      "topology": {
+        "watchersPerRoom": 10
+      }
+    },
+    {
+      "name": "시나리오1 10:10 r=20 고정 50ms",
+      "delay": "fixed:50",
+      "r": 20,
+      "topology": {
+        "watchersPerRoom": 10
+      }
+    },
+    {
+      "name": "시나리오1 10:10 r=40 고정 50ms",
+      "delay": "fixed:50",
+      "r": 40,
+      "topology": {
+        "watchersPerRoom": 10
+      }
+    },
+    {
+      "name": "시나리오1 1:19 r=20 바닥(지연 0)",
+      "delay": "fixed:0",
+      "r": 20,
+      "topology": {
+        "watchersPerRoom": 1
+      }
+    },
+    {
+      "name": "시나리오1 20:0 r=10 바닥(지연 0)",
+      "delay": "fixed:0",
+      "r": 10,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 10:10 r=20 바닥(지연 0)",
+      "delay": "fixed:0",
+      "r": 20,
+      "topology": {
+        "watchersPerRoom": 10
+      }
+    },
+    {
+      "name": "시나리오1 20:0 r=10 균등 20~80ms",
+      "delay": "uniform:20:80",
+      "r": 10,
+      "topology": {
+        "watchersPerRoom": 20
+      }
+    },
+    {
+      "name": "시나리오1 10:10 r=20 균등 20~80ms",
+      "delay": "uniform:20:80",
+      "r": 20,
+      "topology": {
+        "watchersPerRoom": 10
+      }
+    }
+  ]
+}

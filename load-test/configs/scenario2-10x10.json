@@ -1,0 +1,36 @@
+{
+  "note": "8절 4번: 시나리오 2 × 10:10. 방 1,000 × 20명 = 2만 세션 — 보정(8절 0번) 결과로 rooms를 줄여 세션 수를 맞춘다. 프로세스당 1,000세션까지 검증됨(보정 2-3)",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 100,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 6,
+  "topology": {
+    "rooms": 1000,
+    "members": 20,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 10,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 10
+    },
+    {
+      "r": 20
+    },
+    {
+      "r": 50
+    },
+    {
+      "r": 100
+    },
+    {
+      "r": 200
+    }
+  ]
+}

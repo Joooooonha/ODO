@@ -1,0 +1,28 @@
+{
+  "note": "작업 3 진단: v2·R1 설정(W=500)에서 1,000·1,600. 메시지 1건 처리 단계별 시간(chat.send.stage) + pg_stat_statements(진단 실행에만)",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 1000
+    },
+    {
+      "r": 1600
+    }
+  ],
+  "readThrottleMs": 500
+}

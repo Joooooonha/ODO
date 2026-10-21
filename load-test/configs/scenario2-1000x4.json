@@ -1,0 +1,42 @@
+{
+  "note": "8절 4번 시나리오 2 (나): 방 1,000 × 4명 = 4,000세션, 시청 2:2, 활발한 방 10%(100방), 전체 메시지 속도를 올림. 목적: 용량 모델 검증(무엇이 먼저 포화되는가)",
+  "rateMode": "total",
+  "senders": "watchers",
+  "dmRatePerSec": 10,
+  "connectRatePerSec": 200,
+  "warmupSec": 30,
+  "measureSec": 120,
+  "contentLength": 40,
+  "workers": 4,
+  "topology": {
+    "rooms": 1000,
+    "members": 4,
+    "teamsPerUser": 1,
+    "dmPairsPerRoom": 1,
+    "watchersPerRoom": 2,
+    "activeRoomRatio": 0.1
+  },
+  "stages": [
+    {
+      "r": 50
+    },
+    {
+      "r": 100
+    },
+    {
+      "r": 200
+    },
+    {
+      "r": 400
+    },
+    {
+      "r": 800
+    },
+    {
+      "r": 1200
+    },
+    {
+      "r": 1600
+    }
+  ]
+}
