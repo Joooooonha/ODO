@@ -1,0 +1,6 @@
+# targets.yml로 복사해서 쓴다(맥미니에만, 저장소에 올리지 않음). 주소는 Tailscale 이름 또는 100.x 주소.
+# 이름이 안 풀리면(MagicDNS 꺼짐) `tailscale ip -4`로 본 100.x 주소를 넣는다.
+- targets: ['odo-ec2:9091', 'odo-ec2:9100']
+  labels: { server: app1 }
+- targets: ['odo-app-2:9091', 'odo-app-2:9100']
+  labels: { server: app2 }
