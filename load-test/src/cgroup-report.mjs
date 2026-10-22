@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 /**
- * 단계마다 컨테이너별 CPU 사용량·throttle(2-4 지시). 사용:
+ * 단계마다 컨테이너별 CPU 사용량·throttle. 사용:
  *   node src/cgroup-report.mjs results/raw/<실행 id>/stages.json results/raw/recorder/cgroup.jsonl
  *
  * recorder(5초 간격)의 누적 cpu.stat에서, 단계 측정 구간 [startedAt, endedAt]을 감싸는 가장 가까운 두 기록의 차이를 쓴다

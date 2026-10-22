@@ -31,26 +31,26 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * 서버 쪽 읽음 모으기(10/20 작업 4, D-29·D-32·D-42~D-46). {@code chat.read.aggregate.enabled}(기본 false)로 켜고 끈다.
+ * 서버 쪽 읽음 모으기. {@code chat.read.aggregate.enabled}(기본 false)로 켜고 끈다.
  * 꺼져 있으면 아무것도 하지 않고 읽음 보고는 기준선 경로(보고마다 갱신·스냅샷·발행)를 탄다.
  *
  * <p><b>받기</b>({@link #offer}): DB에 가지 않고 메모리에 (방, 사용자)별 가장 큰 값만 남긴다. 범위(방의 마지막 번호)는
  * 처리할 때 본다.
  *
  * <p><b>주기</b>: {@code period-ms}(500) 시간 기준만. 모인 게 없으면 처리하지 않는다. 처리 시점은 벽시계(epoch ms) 기준
- * {@code i × period / N}(서버 순번 i, 서버 수 N — 2대면 0ms와 250ms, D-46). {@code phase-ms}로 덮어쓸 수 있다(F1: 둘 다 0).
+ * {@code i × period / N}(서버 순번 i, 서버 수 N — 2대면 0ms와 250ms). {@code phase-ms}로 덮어쓸 수 있다(F1: 둘 다 0).
  *
- * <p><b>처리</b>(스레드 하나, 커넥션 하나씩, D-43):
+ * <p><b>처리</b>(스레드 하나, 커넥션 하나씩):
  * <ol>
  *   <li>버퍼에서 꺼낸다 — 항목마다 {@code remove(key, value)}라 꺼내는 사이 더 큰 값이 오면 남아서 다음 주기로 간다</li>
- *   <li>한 트랜잭션: 현재 ACTIVE 멤버 행을 <b>방 번호, 사용자 번호 순으로</b> {@code FOR UPDATE}(교착 방지, I-13) →
+ *   <li>한 트랜잭션: 현재 ACTIVE 멤버 행을 <b>방 번호, 사용자 번호 순으로</b> {@code FOR UPDATE}(교착 방지) →
  *       잠근 값으로 "더 큰 값이고 방의 마지막 번호 이하"만 한 문장으로 갱신 → 커밋 1번</li>
  *   <li>바뀐 방들의 스냅샷: 읽기 전용 트랜잭션 하나(커넥션 하나)에서 <b>한 문장으로</b> 읽고, <b>커넥션을 놓은 뒤</b>
  *       같은 스레드에서 파이프라인 한 번으로 발행한다(10/21 개선 — 방마다 왕복하던 것이 바뀐 방 약 320개에서 t 200ms를 넘겼다).
- *       작업 0에서 찾은 "커넥션을 쥔 채 Redis 발행"은 여기서 만들지 않는다</li>
+ *       첫 측정에서 찾은 "커넥션을 쥔 채 Redis 발행"은 여기서 만들지 않는다</li>
  * </ol>
  *
- * <p><b>안전 항목</b>(D-44): 트랜잭션이 실패하면(교착·시간 제한 등) 꺼낸 값을 버퍼에 되돌린다(큰 값 유지). 종료 직전에
+ * <p><b>안전 항목</b>: 트랜잭션이 실패하면(교착·시간 제한 등) 꺼낸 값을 버퍼에 되돌린다(큰 값 유지). 종료 직전에
  * 한 번 처리한다. 갱신은 현재 ACTIVE 멤버 행에만 한다(받을 때 권한 캐시가 늦어도 쓰지 못한다).
  *
  * <p>같은 방을 두 서버가 각자 처리하는 것은 허용한다: "큰 값만 갱신"이라 결과가 같고, 스냅샷 version으로 브라우저가
@@ -150,7 +150,7 @@ public class ReadAggregator {
         this.publisher = publisher;
         this.readMetrics = readMetrics;
 
-        // 지표(작업 4 지표 목록). 처리 시간 t·커넥션 보유·잠금 대기는 합·횟수·최대(Prometheus에서 평균과 최대)
+        // 지표. 처리 시간 t·커넥션 보유·잠금 대기는 합·횟수·최대(Prometheus에서 평균과 최대)
         this.cycle = Timer.builder("chat.read.agg.cycle").publishPercentiles(0.5, 0.95, 0.99).register(registry);
         this.writeHold = Timer.builder("chat.read.agg.connection").tag("phase", "write").register(registry);
         this.snapshotHold = Timer.builder("chat.read.agg.connection").tag("phase", "snapshot").register(registry);
@@ -185,7 +185,7 @@ public class ReadAggregator {
         buffer.merge(new Key(roomId, userId), seq, Math::max);
     }
 
-    /** 측정 전용(작업 5-4): 다음 주기에 모아 둔 값을 처리하지 않고 버린다. */
+    /** 측정 전용: 다음 주기에 모아 둔 값을 처리하지 않고 버린다. */
     public void dropNextCycle() {
         dropNext.set(true);
     }

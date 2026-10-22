@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 읽음 벌크헤드(Task-chat-read-improve 3절, 개선 A) — 켠 상태(K = 2). 끈 상태(기본 0)는 {@link ChatReadTest}.
+ * 읽음 벌크헤드 — 켠 상태(K = 2). 끈 상태(기본 0)는 {@link ChatReadTest}.
  * 허가를 테스트가 직접 쥐어 "동시 처리 K건이 이미 돌고 있는" 상황을 만든다(실제 경합을 기다리지 않게).
  */
 @SpringBootTest(properties = "chat.read.bulkhead.max-concurrent=2")

@@ -1,5 +1,5 @@
 {
-  "note": "작업 3 진단: v2·R1 설정(W=500)에서 1,000·1,600. 메시지 1건 처리 단계별 시간(chat.send.stage) + pg_stat_statements(진단 실행에만)",
+  "note": "진단: v2·R1 설정(W=500)에서 1,000·1,600. 메시지 1건 처리 단계별 시간(chat.send.stage) + pg_stat_statements(진단 실행에만)",
   "rateMode": "total",
   "senders": "watchers",
   "dmRatePerSec": 10,

@@ -1,5 +1,5 @@
 {
-  "note": "기준선 v2 R0(10/20 작업 2): 측정 환경 v2(nginx 2 CPU), 묶기·벌크헤드 끔. 700·800은 반복 2회(improve-rep-w0.json)와 3회 중앙값. W=0 생성기 범위(ELU < 0.9)는 1,200까지 — 1,600은 생성기 포화로 무효가 예상되지만 지시대로 잰다",
+  "note": "기준선 v2 R0: 측정 환경 v2(nginx 2 CPU), 묶기·벌크헤드 끔. 700·800은 반복 2회(improve-rep-w0.json)와 3회 중앙값. W=0 생성기 범위(ELU < 0.9)는 1,200까지 — 1,600은 생성기 포화로 무효가 예상되지만 지시대로 잰다",
   "rateMode": "total",
   "senders": "watchers",
   "dmRatePerSec": 10,

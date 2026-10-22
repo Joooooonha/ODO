@@ -1,5 +1,5 @@
 {
-  "note": "작업 4 큰 K 근거(W=500 + 모으기, K=0 = 무제한): 800 단계의 평균 동시 처리 수 L → K = max(32, 10 × L)",
+  "note": "큰 K 근거(W=500 + 모으기, K=0 = 무제한): 800 단계의 평균 동시 처리 수 L → K = max(32, 10 × L)",
   "rateMode": "total",
   "senders": "watchers",
   "dmRatePerSec": 10,

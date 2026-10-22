@@ -48,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 읽음 표시 기준선(Task-chat-read 3절, 9.1) — 한 서버 안. 서버 2대는 {@link ChatTwoServerTest}.
+ * 읽음 표시 기준선 — 한 서버 안. 서버 2대는 {@link ChatTwoServerTest}.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc

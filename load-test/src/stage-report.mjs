@@ -1,21 +1,21 @@
 import { readFileSync } from 'node:fs';
 
 /**
- * 측정 결과 단계별 정리(2-4). 생성기 결과 + 보정 오차 + 서버 지표(Prometheus) + 컨테이너 throttle을 한 표로.
+ * 측정 결과 단계별 정리. 생성기 결과 + 보정 오차 + 서버 지표(Prometheus) + 컨테이너 throttle을 한 표로.
  *   node src/stage-report.mjs --stages <stages.json> --calib <calibration.json>[,…] --cgroup <cgroup.jsonl> [--prom http://127.0.0.1:9090]
- *   (맥에서: ssh -L 9090:127.0.0.1:9090 junha@<윈도우> 로 Prometheus를 연 뒤)
+ *   (맥에서: ssh -L 9090:127.0.0.1:9090 <사용자>@<윈도우> 로 Prometheus를 연 뒤)
  *
- * 판정 규칙(준하 결정, 2-4):
+ * 판정 규칙:
  * - 성공 기준: 전달·확정 p95 ≤ 100ms, 읽음 반영 p95 ≤ 1초
  * - 측정 유효: 같은 설정(비율·r)의 보정 오차 p99 ≤ 기준의 5%(전달·확정 5ms, 읽음 50ms)
  * - 한도를 넘어도 |측정 p95 − 기준| > 보정 오차 p99 이면 통과/실패 판정은 유효(guard band). 그 안이면 "판정 보류"
  * - 개선 전후 비교는 차이가 그 단계 보정 오차보다 클 때만 개선 효과로 본다(이 스크립트는 값만 낸다)
  * - app·PG 밖의 컨테이너가 throttle되면(그 단계 주기의 1% 이상) 그 단계는 무효 표시
- * - 포화(Task-chat-read-improve 4절, 준하 승인 — 결과를 본 뒤 바꾼 규칙이라 원래 규칙의 판정도 함께 낸다):
+ * - 포화(결과를 본 뒤 바꾼 규칙이라 원래 규칙의 판정도 함께 낸다):
  *   서버 쪽 신호가 작다 = 앱 throttle < 5%(두 대 모두) 이고 인바운드 대기 p99 < 100ms 이고 보내기 대기열 최대 < 100
  *   생성기 포화 = 이벤트 루프 사용률 ≥ 0.9, 또는 (받은 방 프레임 < 99% 이면서 서버 쪽 신호가 작음)
  *   서버 포화 = 받은 방 프레임 < 99% 이면서 서버 쪽 신호가 큼. 생성기 포화(루프 사용률)와 서버 포화가 함께면 판정 불가
- *   원래 규칙(2-4): 루프 사용률 ≥ 0.9 또는 받은 방 프레임 < 99% → 생성기 포화
+ *   원래 규칙: 루프 사용률 ≥ 0.9 또는 받은 방 프레임 < 99% → 생성기 포화
  */
 const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) => {
   if (a.startsWith('--')) acc.push([a.slice(2), all[i + 1]]);
@@ -120,7 +120,7 @@ for (const s of stagesDoc) {
     sendP99Ms: await one(`max_over_time(chat_send_duration_seconds{quantile="0.99"}[${w}]) * 1000`, to),
     hikariAcquireAvgMs: await one(`sum by (server) (increase(hikaricp_connections_acquire_seconds_sum[${w}])) / sum by (server) (increase(hikaricp_connections_acquire_seconds_count[${w}])) * 1000`, to),
     hikariUsageAvgMs: await one(`sum by (server) (increase(hikaricp_connections_usage_seconds_sum[${w}])) / sum by (server) (increase(hikaricp_connections_usage_seconds_count[${w}])) * 1000`, to),
-    // 작업 3: 메시지 1건 처리 단계별 평균(SendStages). 서버:단계 → ms
+    // 메시지 1건 처리 단계별 평균(SendStages). 서버:단계 → ms
     sendStageAvgMs: Object.fromEntries((await prom(`sum by (server, stage) (increase(chat_send_stage_seconds_sum[${w}])) / sum by (server, stage) (increase(chat_send_stage_seconds_count[${w}])) * 1000`, to))
       .map((r) => [`${r.labels.server}:${r.labels.stage}`, round(r.value, 3)])),
     // 10/21: 메시지 커밋 단계 최대(Timer 최대는 최근 2분 창) — 모으기 주기의 커밋 지연과 같은 순간인지 보려고
@@ -134,7 +134,7 @@ for (const s of stagesDoc) {
     redisQueuedMax: await one(`max_over_time(chat_redis_dispatch_queued[${w}])`, to),
     redisDurP99Ms: Object.fromEntries((await prom(`max by (server, type) (max_over_time(chat_redis_dispatch_duration_seconds{quantile="0.99"}[${w}])) * 1000`, to))
       .map((r) => [`${r.labels.server}:${r.labels.type}`, round(r.value)])),
-    // 개선(Task-chat-read-improve): 스레드 풀별 CPU(코어), Tomcat 사용 중 스레드, 읽음 거절·동시 처리, K 계산 근거
+    // 개선: 스레드 풀별 CPU(코어), Tomcat 사용 중 스레드, 읽음 거절·동시 처리, K 계산 근거
     threadCores: Object.fromEntries((await prom(`sum by (server, pool) (rate(chat_threads_cpu_seconds_total[${w}]))`, to))
       .map((r) => [`${r.labels.server}:${r.labels.pool}`, round(r.value, 3)])),
     tomcatBusyMax: await one(`max_over_time(tomcat_threads_busy_threads[${w}])`, to),
@@ -153,7 +153,7 @@ for (const s of stagesDoc) {
     framesPerSec: await one(`sum by (type) (increase(chat_outbound_frames_total[${w}])) / ${(to - from) / 1000}`, to, 'type'),
     publishPerSec: await one(`sum by (type) (increase(chat_redis_publish_total[${w}])) / ${(to - from) / 1000}`, to, 'type'),
   };
-  // 작업 4: 서버 쪽 읽음 모으기(ReadAggregator). 꺼져 있으면 값이 비어 있다. 처리 시간 t·커넥션 보유·잠금 대기는 ms
+  // 서버 쪽 읽음 모으기(ReadAggregator). 꺼져 있으면 값이 비어 있다. 처리 시간 t·커넥션 보유·잠금 대기는 ms
   const sec = (to - from) / 1000;
   const avgMs = (name, sel = '') => one(`sum by (server) (increase(${name}_sum${sel}[${w}])) / sum by (server) (increase(${name}_count${sel}[${w}])) * 1000`, to);
   const perSec = (expr) => one(`sum by (server) (increase(${expr}[${w}])) / ${sec}`, to);

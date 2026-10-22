@@ -4,14 +4,14 @@ import { Client } from '@stomp/stompjs';
 import { ReadThrottle } from '../../web-service/frontend/src/chat/readThrottle.js';
 
 /**
- * 세션 하나 = 브라우저 탭 하나의 **기준선 동작**(Task-chat-core 9절, Task-chat-read 4절)을 그대로 흉내 낸다.
+ * 세션 하나 = 브라우저 탭 하나의 **기준선 동작**을 그대로 흉내 낸다.
  *
  * - 연결 순서: CONNECT → 개인 목적지 2개·내 모든 방 구독 → SEND /app/sync → SYNC → GET /rooms →
  *   (보고 있는 방이면) 최신 메시지 + read-state → 읽음 보고
  * - 보고 있는 방: 받은 메시지로 contiguousTo를 갱신하고, 커지면 읽음 보고(HTTP). 빈틈은 1초 기다렸다가
  *   afterSeq로 채운다. 보고 값은 contiguousTo. 보내는 시점·재전송은 화면과 같은 readThrottle.js
  *   (설정 readThrottleMs = 화면의 W, 기본 0 = 바로)
- * - 읽음 반영 지연의 시작점은 **contiguousTo가 그 번호에 닿은 순간**(화면에 붙은 순간)이다(Task-chat-read-improve 2.4).
+ * - 읽음 반영 지연의 시작점은 **contiguousTo가 그 번호에 닿은 순간**(화면에 붙은 순간)이다.
  *   보낸 순간부터 재면 묶기로 기다린 시간이 빠진다. 보낸 순간부터 잰 값(readSend)도 함께 남긴다 — W = 0이면 둘이 같다
  * - 전송 창 50(미확정 50개면 그 전송은 막힌 것으로 센다 — 일정표대로 보내는 open-loop라 미뤄 보내지 않는다)
  * - 재연결: 1초 → 2초 → … 최대 30초, 절반~전부 무작위
@@ -152,7 +152,7 @@ export class Session {
     this.reporter ??= new ReadThrottle({
       windowMs: cfg.readThrottleMs ?? 0,
       send: (seq) => this.postRead(seq),
-      // 10/20 작업 4: 재전송 방식(고정·백오프)과 스냅샷 확인 재전송(0 = 끔). 화면과 같은 규칙 파일
+      // 재전송 방식(고정·백오프)과 스냅샷 확인 재전송(0 = 끔). 화면과 같은 규칙 파일
       retryMode: cfg.readRetryMode ?? 'fixed',
       confirmMs: cfg.readConfirmMs ?? 0,
       onResult: (seq, kind, err) => {
@@ -232,7 +232,7 @@ export class Session {
   /** 측정용: 보고 있는 방의 읽음 보고 상태 */
   readStatus() {
     if (!this.reporter || !this.view) return null;
-    // unconfirmed: 화면 위치가 서버 스냅샷(READ·read-state)에 아직 안 보임 — 202로 받았어도 모아 둔 값을 잃었을 수 있다(작업 5-4)
+    // unconfirmed: 화면 위치가 서버 스냅샷(READ·read-state)에 아직 안 보임 — 202로 받았어도 모아 둔 값을 잃었을 수 있다
     return {
       behind: this.view.contiguousTo > this.reporter.acked,
       stuck: this.reporter.isStuck(),
@@ -341,7 +341,7 @@ export class Session {
         body: body ? JSON.stringify(body) : undefined,
       });
     } catch (e) {
-      // 오류 종류별(I-11에서 첫 오류의 원인을 못 가린 빈틈): 응답 없이 실패한 요청은 원인 코드로 센다
+      // 오류 종류별(첫 오류의 원인을 못 가린 빈틈을 막으려고): 응답 없이 실패한 요청은 원인 코드로 센다
       // (undici: cause.code = ECONNRESET·ECONNREFUSED·UND_ERR_SOCKET·UND_ERR_CONNECT_TIMEOUT 등)
       this.ctx.count(`net:${method}:${e?.cause?.code ?? e?.name ?? 'unknown'}`);
       throw e;

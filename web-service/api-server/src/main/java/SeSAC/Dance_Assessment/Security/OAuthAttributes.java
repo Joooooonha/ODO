@@ -10,8 +10,8 @@ import java.util.Map;
  * <p>카카오와 네이버는 같은 정보를 전혀 다른 구조로 준다:
  *
  * <pre>
- * 카카오: { "id": 12345, "properties": { "nickname": "준하" } }
- * 네이버: { "response": { "id": "abc", "nickname": "준하" } }
+ * 카카오: { "id": 12345, "properties": { "nickname": "홍길동" } }
+ * 네이버: { "response": { "id": "abc", "nickname": "홍길동" } }
  * </pre>
  *
  * <p><b>이메일은 받지 않는다.</b> 카카오는 이메일 제공에 비즈앱 전환이나 검수가

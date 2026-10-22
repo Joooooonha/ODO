@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 메시지 1건 처리 시간 분해(10/20 작업 3, 측정용 — 기능 동작은 바꾸지 않는다).
+ * 메시지 1건 처리 시간 분해(측정용 — 기능 동작은 바꾸지 않는다).
  *
  * <p>R1에서 인바운드 실행기 4스레드 × 1건 {@code chat.send.duration} 평균 3.9ms가 처리량 상한(서버당 ≈ 1,025건/초)을
  * 정했다. 그 3.9ms가 어디에 쓰이는지 실제 코드 단계마다 잰다. 한 스레드가 한 메시지를 처음부터 끝까지 처리하므로

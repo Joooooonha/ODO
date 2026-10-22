@@ -161,7 +161,7 @@ class ChatWebSocketTest {
     }
 
     @Test
-    @DisplayName("[작업 3] 메시지 한 건이 처리 단계 지표(chat.send.stage) 열 단계를 한 번씩 남긴다")
+    @DisplayName("메시지 한 건이 처리 단계 지표(chat.send.stage) 열 단계를 한 번씩 남긴다")
     void sendStagesAreRecorded() throws Exception {
         LoggedIn me = users.create("나");
         long room = chat.teamRoomId(me, teams.createTeam(me, "단계 팀"));
