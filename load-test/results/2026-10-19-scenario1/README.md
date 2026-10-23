@@ -21,7 +21,7 @@
 | 생성기 | Node 24.10, `@stomp/stompjs` 7.3.0, 방 하나 = 작업 프로세스 하나, open-loop |
 
 **운영과 다른 한계(기록)**
-- 운영 nginx 연결 상한(준하 확인): 작업 프로세스 2 × min(worker_connections 768, open files soft 1024) = 1,536 슬롯, 웹소켓 1개 = 2슬롯 → **동시 웹소켓 ≈ 768**(HTTP·upstream keepalive와 슬롯을 공유해 실제는 조금 적다). 앱 메모리 한계와 별개의 한계선
+- 운영 nginx 연결 상한(운영 서버 설정에서 확인): 작업 프로세스 2 × min(worker_connections 768, open files soft 1024) = 1,536 슬롯, 웹소켓 1개 = 2슬롯 → **동시 웹소켓 ≈ 768**(HTTP·upstream keepalive와 슬롯을 공유해 실제는 조금 적다). 앱 메모리 한계와 별개의 한계선
 - 운영 메모리: JVM·PG·nginx·OS가 1.8GiB를 공유(available 999Mi, swap 2GiB) → 힙이 차면 스왑 위험. 측정 환경에서는 재현되지 않는다. **운영 기준 세션 한계 ≈ 측정값 × 0.9**
 
 ## 판정 규칙

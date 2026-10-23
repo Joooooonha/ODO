@@ -3,16 +3,28 @@
 도메인·외부 서비스 등록 같은 콘솔 준비 작업은 끝났다고 보고,
 여기는 **서버에서 실행하는 순서**만 적는다.
 
-```
-브라우저 ──HTTPS──> Cloudflare ──HTTPS(Full strict)──> EC2
-                        │                              ├─ Nginx (443)
-                        │                              ├─ Spring (127.0.0.1:8080)
-                        │                              └─ PostgreSQL (127.0.0.1:5432)
-                        │
-                        ├──> R2 (영상 원본 + 결과물, presigned URL로만 접근)
-                   Tailscale
-                        │
-                        └──> 맥미니: FastAPI (분석 전용, 공인 IP 없음)
+처음에는 EC2 한 대에 nginx·Spring·PostgreSQL을 모두 두었고(아래 0~9절이 그 순서다),
+2026-10에 채팅을 넣으며 **앱 2대 + DB 1대 + Redis 1대**로 나눴다(맨 아래 "운영 구성").
+
+```mermaid
+flowchart LR
+    U["브라우저"] -->|HTTPS| CF["Cloudflare"]
+    CF -->|"HTTPS (Full strict)"| A1
+    subgraph VPC["AWS VPC · 같은 가용 영역"]
+        A1["앱-1 EC2<br/>nginx + Spring"]
+        A2["앱-2 EC2<br/>Spring"]
+        DB[("PostgreSQL EC2")]
+        RD[("Redis EC2<br/>Pub/Sub")]
+        A1 -->|"사설망 8080"| A2
+        A1 --> DB
+        A2 --> DB
+        A1 <--> RD
+        A2 <--> RD
+    end
+    U -->|"presigned PUT·GET"| R2["Cloudflare R2"]
+    A1 -.->|Tailscale| MM["맥미니<br/>FastAPI 분석 · Prometheus·Grafana"]
+    A2 -.->|Tailscale| MM
+    MM <-->|"영상·결과"| R2
 ```
 
 영상 파일은 **EC2를 지나가지 않는다.** 브라우저가 R2로 직접 올리고 맥미니가
@@ -606,3 +618,87 @@ ssh macmini 'uptime; free -h; df -h /'
 
 EC2는 메모리 1.8GB뿐이라 `free`의 **free 열은 늘 작다** — 봐야 할 것은
 `available` 열과 swap 사용량이다. 분석은 맥미니에서만 도므로 EC2 load는 보통 0에 가깝다.
+
+---
+
+## 운영 구성 (2026-10~: 앱 2대 + DB 1대 + Redis 1대)
+
+채팅 서버를 두 대로 늘리면서 DB와 Redis를 앱 서버 밖으로 뺐다. 설계 판단은
+[채팅 딥다이브](../docs/chat-deep-dive.md)에 있고, 여기는 운영에 필요한 원칙만 적는다.
+
+### 네트워크
+
+| 대상 | 들어오는 길 | 이유 |
+|---|---|---|
+| 앱-1 443/80 | Cloudflare IP 대역만 | 원 서버 주소로 Cloudflare를 우회하지 못하게 |
+| 앱 8080 | 앱 보안 그룹끼리만(앱-1 nginx → 앱-2) | Spring은 인터넷에 직접 열지 않는다 |
+| DB 5432, Redis 6379 | 앱 보안 그룹에서만 | 공인 IP로는 열지 않는다. Redis는 비밀번호 + 사설 IP 바인딩 |
+| SSH | 앱-1을 거쳐(ProxyJump) 사설망으로 | DB·Redis·앱-2는 인터넷 쪽 SSH가 없다 |
+| 관리 포트 9091·node_exporter 9100 | Tailscale ACL로 맥미니에서만 | 보안 그룹에는 열지 않는다. 앱 포트 8080에는 actuator가 없다 |
+
+Tailscale ACL은 태그로 나눈다: `tag:ci → tag:server:22`(배포), `tag:server → 맥미니:8000`(분석),
+`맥미니 → tag:server:9091,9100`(모니터링). DB·Redis 서버는 tailnet에 붙이지 않는다.
+
+### 서버별 설정 (`/etc/dance-api.env`)
+
+두 앱은 같은 jar·같은 비밀값을 쓰고, 아래 값만 다르다.
+
+| 키 | 앱-1 | 앱-2 | 쓰임 |
+|---|---|---|---|
+| `SERVER_ADDRESS` | `127.0.0.1` | 자기 사설 IP | 앱-1 nginx가 사설망으로 앱-2에 들어온다 |
+| `CHAT_SERVER_INDEX` / `CHAT_SERVER_COUNT` | `0` / `2` | `1` / `2` | 읽음 반영 주기를 서버마다 엇갈리게(0ms·250ms) |
+
+nginx 서버 목록은 `/etc/nginx/dance-api-servers.conf`(예시: `nginx/dance-api-servers.conf.example`)에 둔다.
+웹소켓은 어느 서버로 가도 된다 — 서버 사이 전달은 Redis Pub/Sub이 한다.
+
+앱-2를 새로 만들 때 빠뜨리기 쉬운 것: **GitHub 배포 공개키를 앱-2의 `~/.ssh/authorized_keys`에도 넣어야 한다.** 없으면 배포가
+"SSH 도달 확인"에서 `Permission denied (publickey)`로 멈춘다(서버는 건드리기 전이라 안전하다). 공개키라 앱-1에서 복사해도 된다:
+
+```bash
+ssh odo 'grep "github-actions-deploy@odostudio.site" ~/.ssh/authorized_keys' \
+  | ssh odo-app2 'grep -qF "github-actions-deploy@odostudio.site" ~/.ssh/authorized_keys || cat >> ~/.ssh/authorized_keys'
+```
+
+`DEPLOY_HOSTS`(앱-1 먼저, 공백으로 구분한 Tailscale 주소)와 `DEPLOY_KNOWN_HOSTS`(서버마다 한 줄, 서버에서 `cat /etc/ssh/ssh_host_ed25519_key.pub`로
+읽어 만든다 — `ssh-keyscan`으로 밖에서 받지 않는다)는 GitHub 비밀값이다. 없으면 `DEPLOY_HOST` 한 대로 배포한다.
+
+### 배포 (`scripts/deploy-hosts.sh`, GitHub Actions)
+
+무중단 대신 **짧게 멈추는 방식**을 택했다(배포마다 약 1분). 옛 버전과 새 버전이 함께 돌며
+스키마·메시지 형식이 섞이는 경우를 아예 없앤다.
+
+1. 두 대 모두 멈춤 → 둘 다 jar 교체
+2. 앱-1 먼저 기동(Flyway 마이그레이션은 한 서버에서만) → 확인 → 앱-2 기동 → 확인
+3. 하나라도 실패하면 **두 대 모두** 직전 jar로 되돌린다
+
+앱을 멈추면 JVM이 종료 코드 143으로 끝나서 systemd가 `failed`로 표시한다. 정상이다. 유닛의 `SuccessExitStatus=143`이 이를
+정상 종료로 치게 하지만, 유닛 파일은 배포가 반영하지 않으므로 서버에 직접 복사하고 `daemon-reload`를 한다.
+
+### 함께 바뀐 코드
+
+| 바뀐 것 | 이유 |
+|---|---|
+| 소셜 로그인 인가 요청을 서명된 쿠키에 저장 | 시작과 콜백이 다른 서버로 가도 로그인이 된다(세션에 두면 실패) |
+| 분석 요청은 PostgreSQL advisory lock으로 전체 동시 1건 | 맥미니 한 대가 처리하므로 서버가 늘어도 동시 분석 수는 그대로 |
+
+### 백업과 켜고 끄기
+
+- DB 디스크는 EBS 수명 주기 정책으로 매일 스냅샷(7개 보관) + 필요할 때 `pg_dump -Fc`
+- 켜는 순서: DB·Redis → 앱-1 → 앱-2. 앱은 기동 때 DB·Redis에 닿지 않으면 실패하고, systemd가 10초 뒤 다시 띄운다(5분에 5번까지)
+- 끄는 순서는 반대. 사설 IP는 껐다 켜도 유지되므로 설정을 다시 쓸 필요가 없다
+
+### 모니터링 (`monitoring/`)
+
+맥미니의 Prometheus가 두 앱 서버의 `/actuator/prometheus`(관리 포트 9091, `prod,monitoring` 프로필)와
+node_exporter를 Tailscale로 15초마다 긁고, Grafana 대시보드 "채팅 운영"으로 본다.
+Prometheus·Grafana는 맥미니의 127.0.0.1에만 열고 노트북에서는 SSH 터널로 본다
+(`ssh -N -L 3000:127.0.0.1:3000 macmini` 뒤 http://localhost:3000).
+
+맥미니에서 겪은 것 두 가지:
+
+- **포트가 이미 쓰이고 있다.** 9090은 Fedora의 Cockpit, 19090은 CoCo API의 관리 포트라서 Prometheus는 `127.0.0.1:29090`을 쓴다.
+  새 포트를 고르기 전에 `ss -ltn`으로 전체를 본다.
+- **Grafana 비밀번호 파일은 644여야 한다.** 컨테이너 사용자(uid 472)가 읽지 못하면 Grafana가 비밀번호 파일을 무시하고 기본 비밀번호로 뜬다.
+  이미 그렇게 떴다면 `docker compose exec -T grafana grafana cli admin reset-admin-password --password-from-stdin < grafana-admin-password`로
+  파일의 값으로 다시 설정한다.
+

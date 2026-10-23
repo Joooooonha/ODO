@@ -1,4 +1,4 @@
-"""단위 비용 결합 회귀의 계수 신뢰구간(Task-chat-read-improve 4절 "함께 처리할 검증").
+"""단위 비용 결합 회귀의 계수 신뢰구간.
 
 입력: unit-cost.json(시나리오 1 r ≥ 5 + 시나리오 2 (나) r ≤ 800의 단계별 앱 CPU(코어, 2대 합)·메시지/초·보고/초·프레임/초)
   python3 -I analysis/unit-cost-bootstrap.py results/raw/win/s2-1000x4/unit-cost.json [추가 rows.json ...]

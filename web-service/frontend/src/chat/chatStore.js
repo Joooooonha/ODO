@@ -17,7 +17,7 @@ import { ReadThrottle } from './readThrottle';
  *   곳까지 그린 결과"다. 빈틈은 1초 기다렸다가 afterSeq로 채운다(9.4)
  * - 보낼 목록(outbox): 확정 응답을 받아야만 지운다. 확정을 기다리지 않고 연달아 보내되 미확정 50개(전송
  *   창)에서 멈춘다. 재전송은 재연결과 SERVER_RETRY_EXHAUSTED 두 경우뿐이다(9.5)
- * - 읽음(Task-chat-read 4절): 방이 열려 있고 탭이 보이고 contiguousTo가 마지막 보고값보다 커지면 보고한다.
+ * - 읽음: 방이 열려 있고 탭이 보이고 contiguousTo가 마지막 보고값보다 커지면 보고한다.
  *   보고 값은 contiguousTo — 빈틈 너머를 보고하면 안 본 메시지까지 읽음이 된다. 언제 보낼지는 readThrottle.js
  *   (묶기 간격 W, 기본 0 = 기준선처럼 바로). READ 프레임·read-state는 방마다 마지막 적용 version보다 작으면 버린다
  */

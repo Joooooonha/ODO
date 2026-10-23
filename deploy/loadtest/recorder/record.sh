@@ -1,5 +1,5 @@
 #!/bin/sh
-# 5초마다 이 compose 프로젝트(odo-loadtest)의 모든 컨테이너를 기록한다(Task-chat-read 7절 + 2-4 지시).
+# 5초마다 이 compose 프로젝트(odo-loadtest)의 모든 컨테이너를 기록한다.
 #   $OUT/cgroup.jsonl : {"t", "name", "usage_usec", "nr_periods", "nr_throttled", "throttled_usec", "cpu_max"}
 #                       → 단계(시각 구간)마다 앞뒤 차이로 CPU 사용량·throttle 비율을 낸다 (load-test/src/cgroup-report.mjs)
 #   $OUT/stats.jsonl  : docker stats --no-stream 한 줄씩(CPU%·메모리)

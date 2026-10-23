@@ -4,7 +4,7 @@ import { buildTopology } from './topology.mjs';
 import { createHistogram, encode, recordNs, summarize } from './hist.mjs';
 
 /**
- * 측정기를 먼저 측정하기 위한 가짜 서버(Task-chat-read 9.3, 단계 1 E1). 사용:
+ * 측정기를 먼저 측정하기 위한 가짜 서버. 사용:
  *   node src/fake-server.mjs --port 18080 --delay fixed:50 --topology '{"rooms":1,"members":20}'
  *
  * 실제 서버와 같은 목적지·응답 모양을 흉내 내되, 처리 대신 **정해 둔 지연**만 넣는다:

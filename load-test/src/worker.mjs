@@ -12,7 +12,7 @@ import { createHistogram, encode, recordNs } from './hist.mjs';
  */
 // read = 화면에 붙은 순간 → 다른 사람의 READ에서 반영을 본 순간(2.4의 정의), readSend = 보낸 순간부터(기준선 정의)
 const KINDS = ['delivery', 'ack', 'read', 'readSend', 'readHttp', 'lag', 'deliveryNear', 'deliveryFar'];
-// 초 단위 시간선(설정 timeline: true, 작업 5-3): 이 이름의 카운터와 전달 지연을 측정 시작부터 초마다 따로 센다
+// 초 단위 시간선(설정 timeline: true): 이 이름의 카운터와 전달 지연을 측정 시작부터 초마다 따로 센다
 const TIMELINE_COUNTERS = /^(readPosts|readReports|readRejected|readReportErrors|readRetry:|readConfirmResend|sent|acked|http202:|http5|net:)/;
 const REPORT_TTL_NS = 60_000_000_000n;
 
@@ -62,7 +62,7 @@ const ctx = {
   },
   /**
    * 전달 지연을 보낸 시각으로 나눠 기록: (1) 처리 시점 근처(flushWindows: 주기·위상들·± nearMs 안에 보낸 메시지)와 그 밖,
-   * (2) 시간선(초마다). 서버 쪽 모으기의 처리 몰림(작업 6)과 장애 동안의 전달 지연(작업 5-3)
+   * (2) 시간선(초마다). 서버 쪽 모으기의 처리 몰림과 장애 동안의 전달 지연
    */
   deliveryAt(sentAtNs, diffNs) {
     if (!measuring) return;

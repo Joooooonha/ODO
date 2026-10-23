@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 /**
- * 메시지 저장 뒤 Redis 발행을 <b>커넥션을 돌려준 다음</b>으로 미룬다(10/20 작업 3-2 조건부 E, 기본 끔).
+ * 메시지 저장 뒤 Redis 발행을 <b>커넥션을 돌려준 다음</b>으로 미룬다(기본 끔).
  *
  * <p>지금은 커밋 뒤 발행({@code @TransactionalEventListener})이 트랜잭션 정리 전에 돌아서, 발행하는 동안(0.2~0.5ms)
  * DB 커넥션을 쥐고 있다. 메시지 처리 스레드를 8개로 늘리자 Hikari 대기가 생겨서, 그 몫만큼 커넥션을 빨리 돌려주려는 것이다.

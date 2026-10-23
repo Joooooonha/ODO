@@ -35,7 +35,7 @@ public class Video extends BaseTimeEntity {
     /**
      * 저장소 객체 키. 예: {@code videos/3/9f2c....mov}
      *
-     * <p>예전에는 서버의 <b>로컬 절대경로</b>였다(`/Users/parkjooha/.../VideoUpload/x.mp4`).
+     * <p>예전에는 서버의 <b>로컬 절대경로</b>였다(`/Users/.../VideoUpload/x.mp4`).
      * 그 방식은 특정 머신에 묶여서, Spring이 EC2로 가고 분석이 맥미니로 가는 순간
      * 어느 쪽도 그 경로를 찾을 수 없다. 이제 위치는 저장소가 알고, 접근은
      * presigned URL로만 한다.

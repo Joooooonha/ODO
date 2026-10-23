@@ -31,7 +31,7 @@ import java.util.concurrent.Executor;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 메시지 처리 스레드 수 설정(10/20 작업 3-2, {@code chat.ws.inbound-threads}). 스레드를 8개로 늘려도
+ * 메시지 처리 스레드 수 설정({@code chat.ws.inbound-threads}). 스레드를 8개로 늘려도
  * 세션별 순서(보낸 순서 = 확정 순서 = 저장 순서)와 방 순번(빈틈·중복 없음)이 그대로인지 본다.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "chat.ws.inbound-threads=8")

@@ -18,7 +18,7 @@ import java.util.Map;
  * 스레드 풀별 CPU 시간 합 {@code chat.threads.cpu{pool}}(초, 누적) — 측정에서만 켠다({@code chat.metrics.thread-cpu=true}).
  *
  * <p>과부하 때 "읽음(Tomcat 요청 스레드)이 메시지(인바운드 실행기)보다 CPU를 더 가져간다"를 추정이 아니라 숫자로
- * 보려고 만든다(Task-chat-read-improve 4절). 스레드 이름 접두어로 나눈다.
+ * 보려고 만든다. 스레드 이름 접두어로 나눈다.
  * <ul>
  *   <li>{@code inbound} — {@code clientInboundChannel-}: STOMP SEND(메시지 저장·확정)</li>
  *   <li>{@code tomcat} — {@code http-nio-…-exec-}: HTTP 요청(읽음 보고·조회) + 웹소켓 프레임 읽기</li>

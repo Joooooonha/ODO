@@ -1,4 +1,4 @@
-# 운영 모니터링 — 맥미니에서 돈다(10/21, deploy/distributed-rollout.md 단계 10).
+# 운영 모니터링 — 맥미니에서 돈다(deploy/README.md "운영 구성").
 #
 # 앱 서버 두 대(odo-ec2, odo-app-2)의 관리 포트 9091(/actuator/prometheus)과 node_exporter 9100을 Tailscale로 긁는다.
 # 두 컨테이너 모두 host 네트워크 — 맥미니의 Tailscale 주소·MagicDNS를 그대로 쓴다. 바깥에는 열지 않는다:

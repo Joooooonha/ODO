@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { buildTopology, DM_ROOM_BASE, TEAM_BASE, USER_BASE } from '../src/topology.mjs';
 
 /**
- * 측정 DB 시드 SQL(Task-chat-read 6.2). 사용: `node seed/generate-sql.mjs configs/<설정>.json > seed.sql`
+ * 측정 DB 시드 SQL. 사용: `node seed/generate-sql.mjs configs/<설정>.json > seed.sql`
  * → `psql -v ON_ERROR_STOP=1 -d dance_db -f seed.sql`
  *
  * 생성기와 **같은 배치 함수**(src/topology.mjs)를 쓴다. 사용자·팀·팀 멤버·팀 채팅방·채팅 멤버·DM을 SQL로 직접

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 측정 DB 출발점 만들기·되돌리기(Task-chat-read 6.2, 단계 1 D3 — 템플릿 DB).
+# 측정 DB 출발점 만들기·되돌리기.
 #
 #   PSQL="docker compose -f deploy/loadtest/compose.yml exec -T postgres psql -U dance" \
 #     load-test/seed/db-template.sh save     # 시드를 넣은 dance_db → dance_seed(템플릿)로 남긴다

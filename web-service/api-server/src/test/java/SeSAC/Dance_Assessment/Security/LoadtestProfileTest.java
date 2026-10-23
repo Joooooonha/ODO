@@ -17,7 +17,7 @@ import java.net.http.HttpResponse;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 측정 프로필(prod,loadtest, Task-chat-read 5·7절): 운영 설정 위에 덮어 뜨고, Prometheus는 <b>관리 포트에서만</b>
+ * 측정 프로필(prod,loadtest): 운영 설정 위에 덮어 뜨고, Prometheus는 <b>관리 포트에서만</b>
  * 보인다. 앱 포트에는 actuator가 없다.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)

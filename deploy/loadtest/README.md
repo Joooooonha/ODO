@@ -1,6 +1,6 @@
 # 측정 환경 (윈도우 한 대, Docker Compose)
 
-읽음 기준선 측정(Task-chat-read 7·8절, 2-4)용. 서버·생성기가 한 호스트에 있고, cgroup CPU 상한으로 나눈다.
+읽음 기준선 측정용. 서버·생성기가 한 호스트에 있고, cgroup CPU 상한으로 나눈다.
 같은 호스트 안의 간섭은 같은 조건의 보정으로 확인한다. 네트워크 홉이 없으므로 측정값은 서버 몫이다.
 사용자 체감 = 측정값 + 인터넷 RTT(A2 지연 예산). 운영은 jar + systemd 그대로다.
 
@@ -24,8 +24,8 @@
 
 ```bat
 :: SSH 세션에서는 Windows 자격 증명 저장소를 못 쓴다 → 익명 자격 도우미 설정으로 pull
-set PATH=C:\Users\junha\odo-loadtest\bin;%PATH%
-set DOCKER_CONFIG=C:\Users\junha\odo-loadtest\docker-config
+set PATH=%USERPROFILE%\odo-loadtest\bin;%PATH%
+set DOCKER_CONFIG=%USERPROFILE%\odo-loadtest\docker-config
 
 powershell -NoProfile -ExecutionPolicy Bypass -File deploy\loadtest\scripts\make-env.ps1
 docker compose -f deploy/loadtest/compose.yml --profile build run --rm builder
@@ -34,11 +34,11 @@ docker compose -f deploy/loadtest/compose.yml --profile tools run --rm generator
 docker compose -f deploy/loadtest/compose.yml --profile tools run --rm generator node src/run.mjs configs/scenario1-1x19.json
 ```
 
-- Grafana `127.0.0.1:3000`, Prometheus `127.0.0.1:9090`에만 열린다. 맥에서 보기: `ssh -L 3000:127.0.0.1:3000 junha@<윈도우>`
+- Grafana `127.0.0.1:3000`, Prometheus `127.0.0.1:9090`에만 열린다. 맥에서 보기: `ssh -L 3000:127.0.0.1:3000 <사용자>@<윈도우>`
 - 데이터 되돌리기: 앱을 멈춘 뒤 `PSQL="docker compose -f deploy/loadtest/compose.yml exec -T postgres psql -U dance" load-test/seed/db-template.sh reset`
 - 끝나면 `docker compose -f deploy/loadtest/compose.yml --profile calib --profile tools down`(볼륨은 남는다. 지우려면 `-v`)
 
-## 개선 측정(Task-chat-read-improve)
+## 개선 측정
 
 - 개선 B(읽음 보고 묶기): 생성기 설정 `readThrottleMs`(화면의 `VITE_CHAT_READ_THROTTLE_MS`와 같은 뜻, 기본 0). 규칙은 화면 파일
   `web-service/frontend/src/chat/readThrottle.js`를 생성기 컨테이너에 그대로 붙여 쓴다(compose `x-node` volumes)

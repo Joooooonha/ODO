@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 읽음 지표(Task-chat-read 5절).
+ * 읽음 지표.
  *
  * <ul>
  *   <li>{@code chat.read.requests{outcome}} — 읽음 보고 수와 결과.
@@ -33,7 +33,7 @@ public class ChatReadMetrics {
     public static final String FORBIDDEN = "forbidden";
     public static final String INVALID = "invalid";
     public static final String REJECTED = "rejected";
-    /** 서버 쪽 모으기(작업 4): 버퍼에 받음 → 202 */
+    /** 서버 쪽 모으기: 버퍼에 받음 → 202 */
     public static final String ACCEPTED = "accepted";
     /** 측정 전용 장애 주입으로 503 */
     public static final String FAULT = "fault";

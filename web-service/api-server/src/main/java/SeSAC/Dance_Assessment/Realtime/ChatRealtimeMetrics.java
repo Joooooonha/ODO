@@ -76,7 +76,7 @@ public class ChatRealtimeMetrics {
                 .tag("type", t).register(registry)).record(nanos, TimeUnit.NANOSECONDS);
     }
 
-    /** 메시지 발행 때 DB 커넥션을 쥐고 있었는지(커밋 뒤 정리 전 = held, 반납 뒤 = released). 작업 3-2 E 비교용 */
+    /** 메시지 발행 때 DB 커넥션을 쥐고 있었는지(커밋 뒤 정리 전 = held, 반납 뒤 = released). 발행 시점 비교용 */
     public void publishConnection(boolean held) {
         registry.counter("chat.redis.publish.connection", "state", held ? "held" : "released").increment();
     }

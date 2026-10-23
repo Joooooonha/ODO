@@ -37,7 +37,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 서버 쪽 읽음 모으기(10/20 작업 4). 이 컨텍스트는 모으기를 켠다(받기 → 202, 500ms 주기로 처리).
+ * 서버 쪽 읽음 모으기. 이 컨텍스트는 모으기를 켠다(받기 → 202, 500ms 주기로 처리).
  * 두 서버가 겹치는 행을 동시에 처리하는 경우는 같은 DB에 모으기 두 개(주기 없이 직접 처리)를 만들어 흉내 낸다.
  */
 @SpringBootTest(properties = {"chat.read.aggregate.enabled=true"})
