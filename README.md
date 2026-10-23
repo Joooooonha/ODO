@@ -1,7 +1,7 @@
 # ODO — 댄스 팀 연습 플랫폼
 
-> 댄스 팀이 공연을 준비하며 연습 과제·일정·공지를 주고받는 **팀 스페이스(미션·채팅)**와,
-> 프로 댄서 영상과 내 연습 영상을 비교해 어긋난 구간을 짚어 주는 **춤 분석**을 제공합니다.
+> 댄스 팀이 공연을 준비하며 연습 과제·일정·공지를 주고받는 팀 스페이스(미션·채팅)와,
+> 프로 댄서 영상과 내 연습 영상을 비교해 어긋난 구간을 짚어 주는 춤 분석을 제공합니다.
 
 ![Java](https://img.shields.io/badge/Java-17-007396?style=flat-square&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.4-6DB33F?style=flat-square&logo=springboot&logoColor=white)
