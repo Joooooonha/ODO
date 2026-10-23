@@ -651,6 +651,17 @@ Tailscale ACL은 태그로 나눈다: `tag:ci → tag:server:22`(배포), `tag:s
 nginx 서버 목록은 `/etc/nginx/dance-api-servers.conf`(예시: `nginx/dance-api-servers.conf.example`)에 둔다.
 웹소켓은 어느 서버로 가도 된다 — 서버 사이 전달은 Redis Pub/Sub이 한다.
 
+앱-2를 새로 만들 때 빠뜨리기 쉬운 것: **GitHub 배포 공개키를 앱-2의 `~/.ssh/authorized_keys`에도 넣어야 한다.** 없으면 배포가
+"SSH 도달 확인"에서 `Permission denied (publickey)`로 멈춘다(서버는 건드리기 전이라 안전하다). 공개키라 앱-1에서 복사해도 된다:
+
+```bash
+ssh odo 'grep "github-actions-deploy@odostudio.site" ~/.ssh/authorized_keys' \
+  | ssh odo-app2 'grep -qF "github-actions-deploy@odostudio.site" ~/.ssh/authorized_keys || cat >> ~/.ssh/authorized_keys'
+```
+
+`DEPLOY_HOSTS`(앱-1 먼저, 공백으로 구분한 Tailscale 주소)와 `DEPLOY_KNOWN_HOSTS`(서버마다 한 줄, 서버에서 `cat /etc/ssh/ssh_host_ed25519_key.pub`로
+읽어 만든다 — `ssh-keyscan`으로 밖에서 받지 않는다)는 GitHub 비밀값이다. 없으면 `DEPLOY_HOST` 한 대로 배포한다.
+
 ### 배포 (`scripts/deploy-hosts.sh`, GitHub Actions)
 
 무중단 대신 **짧게 멈추는 방식**을 택했다(배포마다 약 1분). 옛 버전과 새 버전이 함께 돌며
@@ -659,6 +670,9 @@ nginx 서버 목록은 `/etc/nginx/dance-api-servers.conf`(예시: `nginx/dance-
 1. 두 대 모두 멈춤 → 둘 다 jar 교체
 2. 앱-1 먼저 기동(Flyway 마이그레이션은 한 서버에서만) → 확인 → 앱-2 기동 → 확인
 3. 하나라도 실패하면 **두 대 모두** 직전 jar로 되돌린다
+
+앱을 멈추면 JVM이 종료 코드 143으로 끝나서 systemd가 `failed`로 표시한다. 정상이다. 유닛의 `SuccessExitStatus=143`이 이를
+정상 종료로 치게 하지만, 유닛 파일은 배포가 반영하지 않으므로 서버에 직접 복사하고 `daemon-reload`를 한다.
 
 ### 함께 바뀐 코드
 
@@ -677,5 +691,14 @@ nginx 서버 목록은 `/etc/nginx/dance-api-servers.conf`(예시: `nginx/dance-
 
 맥미니의 Prometheus가 두 앱 서버의 `/actuator/prometheus`(관리 포트 9091, `prod,monitoring` 프로필)와
 node_exporter를 Tailscale로 15초마다 긁고, Grafana 대시보드 "채팅 운영"으로 본다.
-Prometheus·Grafana는 맥미니의 127.0.0.1에만 열고 노트북에서는 SSH 터널로 본다.
+Prometheus·Grafana는 맥미니의 127.0.0.1에만 열고 노트북에서는 SSH 터널로 본다
+(`ssh -N -L 3000:127.0.0.1:3000 macmini` 뒤 http://localhost:3000).
+
+맥미니에서 겪은 것 두 가지:
+
+- **포트가 이미 쓰이고 있다.** 9090은 Fedora의 Cockpit, 19090은 CoCo API의 관리 포트라서 Prometheus는 `127.0.0.1:29090`을 쓴다.
+  새 포트를 고르기 전에 `ss -ltn`으로 전체를 본다.
+- **Grafana 비밀번호 파일은 644여야 한다.** 컨테이너 사용자(uid 472)가 읽지 못하면 Grafana가 비밀번호 파일을 무시하고 기본 비밀번호로 뜬다.
+  이미 그렇게 떴다면 `docker compose exec -T grafana grafana cli admin reset-admin-password --password-from-stdin < grafana-admin-password`로
+  파일의 값으로 다시 설정한다.
 

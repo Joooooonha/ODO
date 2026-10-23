@@ -2,11 +2,13 @@
 #
 # 앱 서버 두 대(odo-ec2, odo-app-2)의 관리 포트 9091(/actuator/prometheus)과 node_exporter 9100을 Tailscale로 긁는다.
 # 두 컨테이너 모두 host 네트워크 — 맥미니의 Tailscale 주소·MagicDNS를 그대로 쓴다. 바깥에는 열지 않는다:
-#   Prometheus 127.0.0.1:9090, Grafana 127.0.0.1:3000. 노트북에서는 SSH 터널로 본다
+#   Prometheus 127.0.0.1:29090(맥미니에서 9090은 Fedora Cockpit, 19090은 CoCo API 관리 포트가 쓴다), Grafana 127.0.0.1:3000. 노트북에서는 SSH 터널로 본다
 #   ssh -N -L 3000:127.0.0.1:3000 macmini   → http://localhost:3000
 #
 # 실행: cd deploy/monitoring && cp targets.example.yml targets.yml (주소 확인) && docker compose up -d
-#       Grafana 관리자 비밀번호는 grafana-admin-password 파일(권한 600, 저장소 밖)
+#       Grafana 관리자 비밀번호는 grafana-admin-password 파일(저장소 밖, 권한 644 — 컨테이너 사용자 472가 읽어야 한다.
+#       못 읽으면 Grafana가 기본 비밀번호로 뜬다. 홈 폴더가 본인만 들어갈 수 있으니 644여도 다른 사용자는 못 읽는다)
+#       이미 기본 비밀번호로 떴다면: docker compose exec -T grafana grafana cli admin reset-admin-password --password-from-stdin < grafana-admin-password
 name: odo-monitoring
 
 services:
@@ -19,7 +21,7 @@ services:
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=30d
       - --storage.tsdb.retention.size=2GB
-      - --web.listen-address=127.0.0.1:9090
+      - --web.listen-address=127.0.0.1:29090
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
       - ./targets.yml:/etc/prometheus/targets.yml:ro,Z
