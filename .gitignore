@@ -1,0 +1,7 @@
+InternalDocs/
+.env
+.idea/
+.DS_Store
+build/
+.gradle/
+node_modules/
