@@ -87,7 +87,7 @@ PM 세션에서 결정한 뒤 작성한다. 선택 근거는 `InternalDocs/Spec/
 |---|---|---|
 | 언어 | Java | 21 |
 | 프레임워크 | Spring Boot (Spring Framework 7) | 4.0. 2026년 12월 말에 4.1로 올린다 |
-| 데이터베이스 | PostgreSQL | 프로젝트 생성 시 결정 |
+| 데이터베이스 | PostgreSQL | 17 |
 | 인증 | JWT, 카카오와 네이버 소셜 로그인 | - |
 | 프론트엔드 | React, Vite | 프로젝트 생성 시 결정 |
 | 파일 저장소 | Cloudflare R2 | - |
@@ -95,8 +95,10 @@ PM 세션에서 결정한 뒤 작성한다. 선택 근거는 `InternalDocs/Spec/
 
 ## 빌드와 테스트 명령어
 
-프로젝트를 생성한 뒤 작성한다.
+백엔드 명령어는 `backend/`에서 실행한다. 테스트와 로컬 실행은 Testcontainers로 PostgreSQL을 띄우므로 Docker가 켜져 있어야 한다.
 
 | 작업 | 명령어 |
 |---|---|
-| | |
+| 빌드 | `./gradlew build` |
+| 테스트 | `./gradlew test` |
+| 로컬 실행 | `./gradlew bootTestRun` |
