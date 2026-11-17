@@ -54,7 +54,7 @@ ODO는 공연을 준비하는 댄스 동아리 연습팀을 위한 서비스다.
 | 문서 | 경로 | 내용 |
 |---|---|---|
 | 스펙 인덱스 | `InternalDocs/SPEC.md` | 기능 목록과 상태, spec 작성 규칙과 템플릿 |
-| 기능별 spec | `InternalDocs/Spec/{Topic}_spec.md` | 기능별 상세 설계 |
+| 기능별 spec | `InternalDocs/Spec/{NN}_{Topic}_spec.md` | 기능별 상세 설계. `NN`은 두 자리 번호 (예: `10_Chat_spec.md`) |
 | 디자인 원칙 | `InternalDocs/DESIGN.md` | 디자인 방향과 원칙 |
 
 - `InternalDocs/Record/`, `InternalDocs/TroubleShooting/`, `InternalDocs/Adr/`는 사용자가 직접 작성하는 문서다. 읽기는 역할 지침에 따르고, 수정하지 않는다.
@@ -81,11 +81,17 @@ ODO는 공연을 준비하는 댄스 동아리 연습팀을 위한 서비스다.
 
 ## 기술 스택
 
-PM 세션에서 결정한 뒤 작성한다.
+PM 세션에서 결정한 뒤 작성한다. 선택 근거는 `InternalDocs/Spec/00_ServiceOverview_spec.md`의 설계에 있다.
 
 | 영역 | 기술 | 버전 |
 |---|---|---|
-| | | |
+| 언어 | Java | 21 |
+| 프레임워크 | Spring Boot (Spring Framework 7) | 4.0. 2026년 12월 말에 4.1로 올린다 |
+| 데이터베이스 | PostgreSQL | 프로젝트 생성 시 결정 |
+| 인증 | JWT, 카카오와 네이버 소셜 로그인 | - |
+| 프론트엔드 | React, Vite | 프로젝트 생성 시 결정 |
+| 파일 저장소 | Cloudflare R2 | - |
+| 배포 단위 | 컨테이너. 도구와 클라우드 서비스는 인프라 세션에서 정한다 | - |
 
 ## 빌드와 테스트 명령어
 
