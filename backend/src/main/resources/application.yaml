@@ -1,3 +1,32 @@
 spring:
   application:
     name: odo
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  security:
+    oauth2:
+      client:
+        registration:
+          kakao:
+            client-id: ${KAKAO_CLIENT_ID}
+            client-secret: ${KAKAO_CLIENT_SECRET}
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope: profile_nickname
+            client-name: Kakao
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
+
+odo:
+  frontend-base-url: ${ODO_FRONTEND_BASE_URL}
+  auth:
+    # 둘 다 32바이트 이상. 서로 다른 값을 쓴다.
+    jwt-secret: ${ODO_JWT_SECRET}
+    oauth-cookie-secret: ${ODO_OAUTH_COOKIE_SECRET}
