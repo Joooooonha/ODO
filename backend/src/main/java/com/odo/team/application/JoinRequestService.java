@@ -1,5 +1,6 @@
 package com.odo.team.application;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -10,24 +11,34 @@ import com.odo.team.application.dto.InviteStatus;
 import com.odo.team.application.dto.JoinRequestResult;
 import com.odo.team.application.dto.PendingJoinRequestResult;
 import com.odo.team.application.dto.TeamMemberResult;
+import com.odo.team.domain.AlreadyMemberException;
+import com.odo.team.domain.AlreadyRequestedException;
 import com.odo.team.domain.InviteNotFoundException;
 import com.odo.team.domain.JoinRequest;
 import com.odo.team.domain.JoinRequestRepository;
 import com.odo.team.domain.JoinRequestStatus;
+import com.odo.team.domain.RequestNotFoundException;
+import com.odo.team.domain.RequestNotPendingException;
 import com.odo.team.domain.Team;
+import com.odo.team.domain.TeamMember;
 import com.odo.team.domain.TeamMemberRepository;
 import com.odo.team.domain.TeamRepository;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 초대와 입장 요청. 02_TeamSpace_spec.md의 "초대와 입장", "입장 요청 상태".
- * 조회(초대 확인, 내 요청 목록, 대기 목록)는 Claude, 상태를 바꾸는 동작(요청 보내기, 승인, 거절, 취소)은 사용자 담당이다.
+ * 상태를 바꾸는 동작(승인, 거절, 취소)은 조건부 UPDATE로 해서 동시에 와도 하나만 반영된다.
  */
 @Service
 @RequiredArgsConstructor
 public class JoinRequestService {
+
+	/** 한 사람이 한 팀에 대기 중인 요청을 하나만 갖게 하는 부분 유니크 인덱스. V2 마이그레이션. */
+	private static final String PENDING_UNIQUE_INDEX = "uk_join_request_pending";
 
 	private final TeamRepository teamRepository;
 
@@ -38,6 +49,8 @@ public class JoinRequestService {
 	private final TeamAccess teamAccess;
 
 	private final NameLookup nameLookup;
+
+	private final Clock clock;
 
 	/** 초대 링크를 연 사람에게 보여 줄 팀 정보와 내 상태. 무효인 코드면 InviteNotFoundException. */
 	@Transactional(readOnly = true)
@@ -76,15 +89,34 @@ public class JoinRequestService {
 			.toList();
 	}
 
-	// ---- 아래는 사용자 담당. 시그니처는 spec의 "사용자 담당 시그니처"를 따르고 본문은 사용자가 쓴다 ----
-
 	/**
 	 * 입장 요청 보내기.
 	 * 무효인 코드 InviteNotFoundException, 기수 오류 InvalidGenerationException,
 	 * 이미 팀원 AlreadyMemberException, 대기 중인 요청이 있음 AlreadyRequestedException.
 	 */
+	@Transactional
 	public JoinRequestResult request(long accountId, String inviteCode, Integer generation) {
-		throw new UnsupportedOperationException("사용자 구현 예정");
+		Team team = teamRepository.findByInviteCode(inviteCode).orElseThrow(InviteNotFoundException::new);
+		JoinRequest request = JoinRequest.pending(team.getId(), accountId, generation, clock.instant());
+		if (teamMemberRepository.findByTeamIdAndAccountId(team.getId(), accountId).isPresent()) {
+			throw new AlreadyMemberException();
+		}
+		if (joinRequestRepository.findByTeamIdAndAccountIdAndStatus(team.getId(), accountId, JoinRequestStatus.PENDING)
+			.isPresent()) {
+			throw new AlreadyRequestedException();
+		}
+		// 위 확인은 흔한 경우를 먼저 걸러 낼 뿐이다. 동시에 들어온 요청은 둘 다 확인을 통과할 수 있고,
+		// 그때는 DB의 부분 유니크 인덱스가 하나만 남긴다. 그 위반을 같은 409로 바꾼다.
+		try {
+			joinRequestRepository.saveAndFlush(request);
+		}
+		catch (DataIntegrityViolationException ex) {
+			if (violates(ex, PENDING_UNIQUE_INDEX)) {
+				throw new AlreadyRequestedException();
+			}
+			throw ex;
+		}
+		return JoinRequestResult.of(request, team);
 	}
 
 	/**
@@ -92,18 +124,58 @@ public class JoinRequestService {
 	 * 팀원 아님 TeamNotFoundException, 팀장 아님 NotTeamLeaderException,
 	 * 이 팀의 요청이 아님 RequestNotFoundException, 이미 처리됨 RequestNotPendingException.
 	 */
+	@Transactional
 	public TeamMemberResult approve(long leaderId, long teamId, long requestId) {
-		throw new UnsupportedOperationException("사용자 구현 예정");
+		JoinRequest request = decide(leaderId, teamId, requestId, JoinRequestStatus.APPROVED);
+		// 조건부 UPDATE가 이 요청 행을 잠근 채로 팀원을 넣는다. 상태 변경과 팀원 추가는 같은 트랜잭션이라 함께 반영되거나 함께 취소된다.
+		TeamMember member = teamMemberRepository
+			.save(TeamMember.member(teamId, request.getAccountId(), request.getGeneration(), clock.instant()));
+		return TeamMemberResult.of(member, nameLookup.nameOf(member.getAccountId()));
 	}
 
 	/** 거절. 예외는 승인과 같다. */
+	@Transactional
 	public void reject(long leaderId, long teamId, long requestId) {
-		throw new UnsupportedOperationException("사용자 구현 예정");
+		decide(leaderId, teamId, requestId, JoinRequestStatus.REJECTED);
 	}
 
 	/** 내 요청 취소. 남의 요청이면 RequestNotFoundException, 이미 처리됨 RequestNotPendingException. */
+	@Transactional
 	public void cancel(long accountId, long requestId) {
-		throw new UnsupportedOperationException("사용자 구현 예정");
+		JoinRequest request = joinRequestRepository.findById(requestId)
+			.filter(found -> found.getAccountId() == accountId)
+			.orElseThrow(RequestNotFoundException::new);
+		changeStatus(request, JoinRequestStatus.CANCELED);
+	}
+
+	/** 팀장이 이 팀의 요청을 승인하거나 거절한다. 상태를 바꾼 요청을 돌려준다(엔티티의 status는 갱신 전 값이다). */
+	private JoinRequest decide(long leaderId, long teamId, long requestId, JoinRequestStatus status) {
+		teamAccess.requireLeader(teamId, leaderId);
+		JoinRequest request = joinRequestRepository.findById(requestId)
+			.filter(found -> found.getTeamId() == teamId)
+			.orElseThrow(RequestNotFoundException::new);
+		changeStatus(request, status);
+		return request;
+	}
+
+	/**
+	 * 대기 중일 때만 바꾼다. 0행이면 이미 처리된 요청이다.
+	 * 동시에 두 트랜잭션이 같은 행을 바꾸면 뒤의 것은 앞의 것이 끝날 때까지 기다린 뒤 조건을 다시 보고 0행이 된다.
+	 */
+	private void changeStatus(JoinRequest request, JoinRequestStatus status) {
+		if (joinRequestRepository.changeStatusIfPending(request.getId(), status, clock.instant()) == 0) {
+			throw new RequestNotPendingException();
+		}
+	}
+
+	/** 예외 원인을 따라가며 위반된 제약 이름을 찾는다. */
+	private static boolean violates(DataIntegrityViolationException ex, String constraintName) {
+		for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+			if (cause instanceof ConstraintViolationException violation) {
+				return constraintName.equalsIgnoreCase(violation.getConstraintName());
+			}
+		}
+		return false;
 	}
 
 	private static InvitePreviewResult preview(Team team, String leaderName, InviteStatus status, Long requestId) {
