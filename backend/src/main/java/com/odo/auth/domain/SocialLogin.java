@@ -8,11 +8,16 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
  * 계정의 로그인 수단. (provider, provider_user_id)가 유일하다.
  */
 @Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "social_login")
 public class SocialLogin {
 
@@ -34,18 +39,11 @@ public class SocialLogin {
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
 
-	protected SocialLogin() {
-	}
-
 	public SocialLogin(Long accountId, String provider, String providerUserId, Instant now) {
 		this.accountId = accountId;
 		this.provider = provider;
 		this.providerUserId = providerUserId;
 		this.createdAt = now;
-	}
-
-	public Long getAccountId() {
-		return accountId;
 	}
 
 }

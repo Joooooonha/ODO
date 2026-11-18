@@ -9,7 +9,7 @@ import java.util.UUID;
  */
 public interface RefreshTokenRepository {
 
-	void insert(long accountId, UUID familyId, String tokenHash, Instant expiresAt, Instant createdAt);
+	void saveNewToken(long accountId, UUID familyId, String tokenHash, Instant expiresAt, Instant createdAt);
 
 	/**
 	 * 아직 쓰지 않았고 만료되지 않은 토큰이면 사용 시각을 기록하고 true.
@@ -17,12 +17,12 @@ public interface RefreshTokenRepository {
 	 */
 	boolean markUsedIfUnused(String tokenHash, Instant now);
 
-	Optional<RefreshToken> findByHash(String tokenHash);
+	Optional<RefreshToken> findByTokenHash(String tokenHash);
 
 	/** 그 family의 행을 모두 지우고 지운 수를 돌려준다. */
-	int deleteFamily(UUID familyId);
+	int deleteAllInFamily(UUID familyId);
 
 	/** 만료 시각이 now 이전인 행을 지우고 지운 수를 돌려준다. */
-	int deleteExpired(Instant now);
+	int deleteAllExpiredBefore(Instant now);
 
 }

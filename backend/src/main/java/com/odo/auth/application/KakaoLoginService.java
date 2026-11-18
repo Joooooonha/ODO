@@ -7,6 +7,7 @@ import com.odo.account.domain.Account;
 import com.odo.account.domain.AccountRepository;
 import com.odo.auth.domain.SocialLogin;
 import com.odo.auth.domain.SocialLoginRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -18,6 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * social_login의 유니크 제약에서 나중 요청이 실패하므로, 그 트랜잭션을 되돌리고 먼저 만들어진 계정으로 로그인시킨다.
  */
 @Service
+@RequiredArgsConstructor
 public class KakaoLoginService {
 
 	private final SocialLoginRepository socialLoginRepository;
@@ -27,14 +29,6 @@ public class KakaoLoginService {
 	private final TransactionTemplate transactionTemplate;
 
 	private final Clock clock;
-
-	public KakaoLoginService(SocialLoginRepository socialLoginRepository, AccountRepository accountRepository,
-			TransactionTemplate transactionTemplate, Clock clock) {
-		this.socialLoginRepository = socialLoginRepository;
-		this.accountRepository = accountRepository;
-		this.transactionTemplate = transactionTemplate;
-		this.clock = clock;
-	}
 
 	public LoginResult login(String kakaoUserId, String nickname) {
 		var existing = findAccountId(kakaoUserId);

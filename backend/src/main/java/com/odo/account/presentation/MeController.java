@@ -5,6 +5,7 @@ import com.odo.account.domain.InvalidNameException;
 import com.odo.account.presentation.dto.ChangeNameRequest;
 import com.odo.account.presentation.dto.MeResponse;
 import com.odo.common.error.ErrorResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,13 +22,10 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/me")
+@RequiredArgsConstructor
 public class MeController {
 
 	private final AccountService accountService;
-
-	public MeController(AccountService accountService) {
-		this.accountService = accountService;
-	}
 
 	@GetMapping
 	public MeResponse me(@AuthenticationPrincipal Jwt jwt) {

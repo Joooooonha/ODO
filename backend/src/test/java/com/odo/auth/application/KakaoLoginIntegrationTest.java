@@ -70,11 +70,11 @@ class KakaoLoginIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("닉네임이 없으면 이름이 ODO사용자인 계정이 만들어진다")
+	@DisplayName("닉네임이 없으면 이름이 '사용자'인 계정이 만들어진다")
 	void firstLoginWithoutNickname() {
 		LoginResult result = kakaoLoginService.login("12345", null);
 
-		assertThat(accountName(result.accountId())).isEqualTo("ODO사용자");
+		assertThat(accountName(result.accountId())).isEqualTo("사용자");
 	}
 
 	@Test
@@ -166,7 +166,7 @@ class KakaoLoginIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("닉네임 제공에 동의하지 않은 카카오 사용자도 ODO사용자로 가입된다")
+	@DisplayName("닉네임 제공에 동의하지 않은 카카오 사용자도 이름이 '사용자'인 계정으로 가입된다")
 	void successHandlerWithoutNicknameConsent() throws Exception {
 		Map<String, Object> attributes = Map.of("id", 12345L, "kakao_account",
 				Map.of("profile_nickname_needs_agreement", true));
@@ -174,7 +174,7 @@ class KakaoLoginIntegrationTest {
 
 		loginSuccessHandler.onAuthenticationSuccess(callbackRequest("/"), response, authentication(attributes));
 
-		assertThat(jdbc.queryForObject("SELECT name FROM account", String.class)).isEqualTo("ODO사용자");
+		assertThat(jdbc.queryForObject("SELECT name FROM account", String.class)).isEqualTo("사용자");
 		assertRefreshTokenCookieIssued(response);
 	}
 

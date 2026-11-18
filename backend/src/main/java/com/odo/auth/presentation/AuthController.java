@@ -6,6 +6,7 @@ import com.odo.auth.application.RefreshTokenService.RefreshResult;
 import com.odo.auth.application.RefreshTokenService;
 import com.odo.auth.presentation.dto.RefreshResponse;
 import com.odo.common.error.ErrorResponse;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -21,15 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping(RefreshTokenCookies.PATH)
+@RequiredArgsConstructor
 public class AuthController {
 
 	private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
 	private final RefreshTokenService refreshTokenService;
-
-	public AuthController(RefreshTokenService refreshTokenService) {
-		this.refreshTokenService = refreshTokenService;
-	}
 
 	@PostMapping("/refresh")
 	public ResponseEntity<?> refresh(@CookieValue(name = RefreshTokenCookies.NAME, required = false) String token) {

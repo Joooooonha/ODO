@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
  */
 public final class NameRule {
 
-	public static final String DEFAULT_NAME = "ODO사용자";
+	public static final String DEFAULT_NAME = "사용자";
 
 	public static final int MAX_LENGTH = 20;
 
@@ -34,7 +34,7 @@ public final class NameRule {
 	}
 
 	/** 쓸 수 없는 글자를 빼고 20자로 자른다. 남는 게 없거나 null이면 DEFAULT_NAME. */
-	public static String sanitizeNickname(String nickname) {
+	public static String nameFromNickname(String nickname) {
 		if (nickname == null) {
 			return DEFAULT_NAME;
 		}

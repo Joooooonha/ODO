@@ -11,6 +11,7 @@ import com.odo.common.crypto.SignedCookieCodec;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +28,7 @@ import tools.jackson.databind.json.JsonMapper;
  * 쿠키 본문은 JSON이다. 사용자가 보낸 값을 Java 역직렬화하면 원격 코드 실행 취약점이 될 수 있어 쓰지 않는다.
  * 서명은 SignedCookieCodec이 먼저 확인하고, 맞을 때만 JSON을 읽는다.
  */
+@RequiredArgsConstructor
 public class CookieOAuth2AuthorizationRequestRepository
 		implements AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
 
@@ -45,10 +47,6 @@ public class CookieOAuth2AuthorizationRequestRepository
 	private static final JsonMapper JSON = JsonMapper.builder().build();
 
 	private final SignedCookieCodec codec;
-
-	public CookieOAuth2AuthorizationRequestRepository(SignedCookieCodec codec) {
-		this.codec = codec;
-	}
 
 	@Override
 	public OAuth2AuthorizationRequest loadAuthorizationRequest(HttpServletRequest request) {

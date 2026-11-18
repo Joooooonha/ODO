@@ -63,48 +63,48 @@ class NameRuleTest {
 		@Test
 		@DisplayName("규칙에 맞는 닉네임은 그대로 쓴다")
 		void validNickname() {
-			assertThat(NameRule.sanitizeNickname("박준하")).isEqualTo("박준하");
+			assertThat(NameRule.nameFromNickname("박준하")).isEqualTo("박준하");
 		}
 
 		@Test
 		@DisplayName("이모지, 공백, 숫자, 특수문자, 자음과 모음은 빠진다")
 		void removesInvalidCharacters() {
-			assertThat(NameRule.sanitizeNickname("🐥뽀짝 지수_99ㅋㅋ!")).isEqualTo("뽀짝지수");
+			assertThat(NameRule.nameFromNickname("🐥뽀짝 지수_99ㅋㅋ!")).isEqualTo("뽀짝지수");
 		}
 
 		@Test
 		@DisplayName("20자를 넘으면 앞에서부터 20자로 자른다")
 		void truncates() {
-			assertThat(NameRule.sanitizeNickname("가나다라마바사아자차카타파하가나다라마바사아자차카"))
+			assertThat(NameRule.nameFromNickname("가나다라마바사아자차카타파하가나다라마바사아자차카"))
 				.isEqualTo("가나다라마바사아자차카타파하가나다라마바");
 		}
 
 		@Test
 		@DisplayName("쓸 수 없는 글자를 뺀 뒤 20자를 센다")
 		void truncatesAfterRemoving() {
-			assertThat(NameRule.sanitizeNickname("🐥🐥🐥 가나다라마바사아자차카타파하가나다라마바사"))
+			assertThat(NameRule.nameFromNickname("🐥🐥🐥 가나다라마바사아자차카타파하가나다라마바사"))
 				.isEqualTo("가나다라마바사아자차카타파하가나다라마바");
 		}
 
 		@Test
 		@DisplayName("NFD로 분해된 닉네임은 정규화해서 정리한다")
 		void nfdNickname() {
-			assertThat(NameRule.sanitizeNickname(Normalizer.normalize("홍길동", Normalizer.Form.NFD))).isEqualTo("홍길동");
+			assertThat(NameRule.nameFromNickname(Normalizer.normalize("홍길동", Normalizer.Form.NFD))).isEqualTo("홍길동");
 		}
 
 		@ParameterizedTest
 		@NullAndEmptySource
 		@ValueSource(strings = { "🐥🐥", "1234", "ㅋㅋㅋ", "!!!", "   " })
-		@DisplayName("쓸 수 없는 글자만 있거나 닉네임이 없으면 ODO사용자가 된다")
+		@DisplayName("쓸 수 없는 글자만 있거나 닉네임이 없으면 '사용자'가 된다")
 		void fallback(String nickname) {
-			assertThat(NameRule.sanitizeNickname(nickname)).isEqualTo("ODO사용자");
+			assertThat(NameRule.nameFromNickname(nickname)).isEqualTo("사용자");
 		}
 
 		@Test
 		@DisplayName("정리한 닉네임은 항상 이름 규칙을 통과한다")
 		void resultIsAlwaysValid() {
 			for (String nickname : new String[] { "🐥뽀짝 지수", "ㅋㅋ", "Jiwoo Park!", "가나다라마바사아자차카타파하가나다라마바사아" }) {
-				assertThat(NameRule.isValid(NameRule.sanitizeNickname(nickname))).as(nickname).isTrue();
+				assertThat(NameRule.isValid(NameRule.nameFromNickname(nickname))).as(nickname).isTrue();
 			}
 		}
 

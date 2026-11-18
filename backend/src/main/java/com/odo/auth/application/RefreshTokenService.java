@@ -13,6 +13,7 @@ import java.util.UUID;
 
 import com.odo.auth.domain.RefreshToken;
 import com.odo.auth.domain.RefreshTokenRepository;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 갱신 토큰은 32바이트 난수이고 저장소에는 SHA-256 해시만 둔다. 로그인 한 번에서 이어지는 토큰은 같은 family를 가진다.
  */
 @Service
+@RequiredArgsConstructor
 public class RefreshTokenService {
 
 	public static final Duration TTL = Duration.ofDays(30);
@@ -43,17 +45,10 @@ public class RefreshTokenService {
 
 	private final Clock clock;
 
-	public RefreshTokenService(RefreshTokenRepository refreshTokenRepository, AccessTokenIssuer accessTokenIssuer,
-			Clock clock) {
-		this.refreshTokenRepository = refreshTokenRepository;
-		this.accessTokenIssuer = accessTokenIssuer;
-		this.clock = clock;
-	}
-
 	/** 새 로그인(새 family)의 갱신 토큰을 발급하고 원문을 돌려준다. */
 	@Transactional
 	public String issueForNewLogin(long accountId) {
-		return issue(accountId, UUID.randomUUID(), clock.instant());
+		return issueAndSave(accountId, UUID.randomUUID(), clock.instant());
 	}
 
 	/**
@@ -72,10 +67,10 @@ public class RefreshTokenService {
 
 		// 한 요청만 rotation하게 한다
 		boolean rotated = refreshTokenRepository.markUsedIfUnused(hash, now);
-		RefreshToken token = refreshTokenRepository.findByHash(hash)
+		RefreshToken token = refreshTokenRepository.findByTokenHash(hash)
 			.orElseThrow(() -> new RefreshFailedException("DB에 없는 갱신 토큰"));
 		if (rotated) {
-			String newToken = issue(token.accountId(), token.familyId(), now);
+			String newToken = issueAndSave(token.accountId(), token.familyId(), now);
 			return new RefreshResult(accessTokenIssuer.issue(token.accountId()), newToken);
 		}
 		if (!token.expiresAt().isAfter(now)) {
@@ -84,7 +79,7 @@ public class RefreshTokenService {
 		if (!now.isAfter(token.usedAt().plus(REUSE_GRACE))) {
 			return new RefreshResult(accessTokenIssuer.issue(token.accountId()), null);
 		}
-		int deleted = refreshTokenRepository.deleteFamily(token.familyId());
+		int deleted = refreshTokenRepository.deleteAllInFamily(token.familyId());
 		log.warn("이미 쓴 갱신 토큰이 다시 쓰였다. 도난으로 보고 family를 무효로 한다. account={}, family={}, deleted={}",
 				token.accountId(), token.familyId(), deleted);
 		throw new RefreshFailedException("이미 쓴 갱신 토큰의 재사용");
@@ -96,23 +91,23 @@ public class RefreshTokenService {
 		if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
 			return;
 		}
-		refreshTokenRepository.findByHash(hash(rawRefreshToken))
-			.ifPresent(token -> refreshTokenRepository.deleteFamily(token.familyId()));
+		refreshTokenRepository.findByTokenHash(hash(rawRefreshToken))
+			.ifPresent(token -> refreshTokenRepository.deleteAllInFamily(token.familyId()));
 	}
 
 	/** 만료된 행을 지우고 지운 수를 돌려준다. 여러 서버가 동시에 실행해도 결과가 같다. */
 	@Transactional
 	public int deleteExpired() {
-		return refreshTokenRepository.deleteExpired(clock.instant());
+		return refreshTokenRepository.deleteAllExpiredBefore(clock.instant());
 	}
 
-	private String issue(long accountId, UUID familyId, Instant now) {
-		String token = newRawToken();
-		refreshTokenRepository.insert(accountId, familyId, hash(token), now.plus(TTL), now);
+	private String issueAndSave(long accountId, UUID familyId, Instant now) {
+		String token = generateRawToken();
+		refreshTokenRepository.saveNewToken(accountId, familyId, hash(token), now.plus(TTL), now);
 		return token;
 	}
 
-	private String newRawToken() {
+	private String generateRawToken() {
 		byte[] bytes = new byte[TOKEN_BYTES];
 		random.nextBytes(bytes);
 		return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
