@@ -60,7 +60,7 @@ public class CookieOAuth2AuthorizationRequestRepository
 			deleteCookie(response);
 			return;
 		}
-		String redirect = RedirectPathValidator.sanitize(request.getParameter(REDIRECT_PARAMETER));
+		String redirect = RedirectPathValidator.safePathOrDefault(request.getParameter(REDIRECT_PARAMETER));
 		String json = JSON.writeValueAsString(StoredRequest.from(authorizationRequest, redirect));
 		ResponseCookie cookie = baseCookie(codec.encode(json, TTL)).maxAge(TTL).build();
 		response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());

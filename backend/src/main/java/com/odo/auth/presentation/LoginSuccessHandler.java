@@ -49,7 +49,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
 
 		// 쿠키 저장소가 검사해 넣은 값이지만, 여기서 한 번 더 검사한다
 		Object attribute = request.getAttribute(CookieOAuth2AuthorizationRequestRepository.REDIRECT_ATTRIBUTE);
-		String redirect = RedirectPathValidator.sanitize(attribute instanceof String value ? value : null);
+		String redirect = RedirectPathValidator.safePathOrDefault(attribute instanceof String value ? value : null);
 		if (result.newAccount()) {
 			response.sendRedirect(
 					frontendBaseUrl + "/welcome?next=" + URLEncoder.encode(redirect, StandardCharsets.UTF_8));

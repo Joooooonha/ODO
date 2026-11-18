@@ -19,7 +19,7 @@ public final class RedirectPathValidator {
 	}
 
 	/** 허용된 경로면 그대로, 아니면 DEFAULT_PATH. */
-	public static String sanitize(String redirect) {
+	public static String safePathOrDefault(String redirect) {
 		if (redirect == null || redirect.isEmpty() || redirect.length() > MAX_LENGTH) {
 			return DEFAULT_PATH;
 		}
