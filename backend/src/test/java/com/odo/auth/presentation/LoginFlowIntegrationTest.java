@@ -1,5 +1,6 @@
 package com.odo.auth.presentation;
 
+import com.odo.auth.infrastructure.security.NoOpOAuth2AuthorizedClientRepository;
 import com.odo.support.IntegrationTest;
 import com.odo.support.TestCookies;
 import jakarta.servlet.http.Cookie;
@@ -7,8 +8,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
+import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import static com.odo.auth.infrastructure.security.CookieOAuth2AuthorizationRequestRepository.COOKIE_NAME;
@@ -28,6 +32,24 @@ class LoginFlowIntegrationTest {
 
 	@Autowired
 	MockMvc mockMvc;
+
+	@Autowired
+	FilterChainProxy filterChainProxy;
+
+	@Test
+	@DisplayName("카카오 로그인 필터는 카카오 토큰을 저장하지 않는 저장소를 쓴다")
+	void loginFilterDoesNotKeepKakaoTokens() {
+		OAuth2LoginAuthenticationFilter loginFilter = filterChainProxy.getFilterChains()
+			.stream()
+			.flatMap(chain -> chain.getFilters().stream())
+			.filter(OAuth2LoginAuthenticationFilter.class::isInstance)
+			.map(OAuth2LoginAuthenticationFilter.class::cast)
+			.findFirst()
+			.orElseThrow();
+
+		assertThat(ReflectionTestUtils.getField(loginFilter, "authorizedClientRepository"))
+			.isInstanceOf(NoOpOAuth2AuthorizedClientRepository.class);
+	}
 
 	@Test
 	@DisplayName("로그인 시작은 카카오 인가 화면으로 보내고 OAuth 상태 쿠키를 발급하며 서버 세션을 만들지 않는다")

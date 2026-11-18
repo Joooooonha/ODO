@@ -18,12 +18,15 @@ import org.springframework.stereotype.Component;
 @Component
 public class LoginFailureHandler implements AuthenticationFailureHandler {
 
+	/** 로그인 실패 화면. 성공 처리 중 오류가 날 때도 이 주소로 보낸다. */
+	public static final String LOGIN_FAILED_PATH = "/login?error=login_failed";
+
 	private static final Logger log = LoggerFactory.getLogger(LoginFailureHandler.class);
 
 	private final String loginFailedUrl;
 
 	public LoginFailureHandler(OdoProperties properties) {
-		this.loginFailedUrl = properties.frontendBaseUrl() + "/login?error=login_failed";
+		this.loginFailedUrl = properties.frontendBaseUrl() + LOGIN_FAILED_PATH;
 	}
 
 	@Override

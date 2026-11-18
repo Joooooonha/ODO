@@ -52,6 +52,9 @@ class RefreshTokenIntegrationTest {
 	RefreshTokenService refreshTokenService;
 
 	@Autowired
+	AccessTokenIssuer accessTokenIssuer;
+
+	@Autowired
 	JdbcTemplate jdbc;
 
 	@Autowired
@@ -310,6 +313,59 @@ class RefreshTokenIntegrationTest {
 
 			mockMvc.perform(post("/api/auth/logout").cookie(new Cookie(COOKIE, token)))
 				.andExpect(status().isNoContent());
+		}
+
+	}
+
+	@Nested
+	@DisplayName("갱신과 로그아웃의 Authorization 헤더")
+	class IgnoresAuthorizationHeader {
+
+		@Test
+		@DisplayName("만료된 접근 토큰을 Authorization 헤더에 붙여 갱신해도 200과 새 접근 토큰을 받는다")
+		void refreshWithExpiredAccessToken() throws Exception {
+			String token = refreshTokenService.issueForNewLogin(accountId);
+			String expired = accessTokenIssuer.issue(accountId);
+			clock.advance(Duration.ofMinutes(31));
+
+			MvcResult result = mockMvc
+				.perform(post("/api/auth/refresh").cookie(new Cookie(COOKIE, token)).header("Authorization", "Bearer " + expired))
+				.andExpect(status().isOk())
+				.andReturn();
+
+			assertThat(accessTokenOf(result)).isNotBlank().isNotEqualTo(expired);
+		}
+
+		@Test
+		@DisplayName("서명이 틀린 접근 토큰을 Authorization 헤더에 붙여 갱신해도 200이다")
+		void refreshWithBadSignatureAccessToken() throws Exception {
+			String token = refreshTokenService.issueForNewLogin(accountId);
+			String forged = withBrokenSignature(accessTokenIssuer.issue(accountId));
+
+			mockMvc.perform(post("/api/auth/refresh").cookie(new Cookie(COOKIE, token)).header("Authorization", "Bearer " + forged))
+				.andExpect(status().isOk());
+		}
+
+		@Test
+		@DisplayName("만료된 접근 토큰을 Authorization 헤더에 붙여 로그아웃해도 204이고 갱신 토큰 쿠키가 지워진다")
+		void logoutWithExpiredAccessToken() throws Exception {
+			String token = refreshTokenService.issueForNewLogin(accountId);
+			String expired = accessTokenIssuer.issue(accountId);
+			clock.advance(Duration.ofMinutes(31));
+
+			MvcResult result = mockMvc
+				.perform(post("/api/auth/logout").cookie(new Cookie(COOKIE, token)).header("Authorization", "Bearer " + expired))
+				.andExpect(status().isNoContent())
+				.andReturn();
+
+			assertThat(TestCookies.requireSetCookieHeader(result.getResponse(), COOKIE)).contains("Max-Age=0");
+		}
+
+		/** 서명 부분의 첫 글자를 바꾼다. base64url의 첫 글자는 6비트가 모두 쓰이므로 서명이 반드시 달라진다. */
+		private static String withBrokenSignature(String jwt) {
+			int signatureStart = jwt.lastIndexOf('.') + 1;
+			char first = jwt.charAt(signatureStart);
+			return jwt.substring(0, signatureStart) + (first == 'A' ? 'B' : 'A') + jwt.substring(signatureStart + 1);
 		}
 
 	}

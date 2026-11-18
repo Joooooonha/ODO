@@ -83,6 +83,8 @@ public class SecurityConfig {
 				.authenticated())
 			.oauth2Login(login -> login
 				.authorizationEndpoint(endpoint -> endpoint.authorizationRequestRepository(authorizationRequestRepository))
+				// 카카오 토큰은 로그인 뒤 쓰지 않으므로 서버 메모리에 남기지 않는다
+				.authorizedClientRepository(new NoOpOAuth2AuthorizedClientRepository())
 				.successHandler(loginSuccessHandler)
 				.failureHandler(loginFailureHandler))
 			.oauth2ResourceServer(resource -> resource.jwt(jwt -> jwt.decoder(jwtDecoder))

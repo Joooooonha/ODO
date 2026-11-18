@@ -10,10 +10,11 @@ import com.odo.auth.application.KakaoLoginService;
 import com.odo.auth.application.RefreshTokenService;
 import com.odo.auth.domain.RedirectPathValidator;
 import com.odo.auth.infrastructure.security.CookieOAuth2AuthorizationRequestRepository;
-import com.odo.auth.presentation.RefreshTokenCookies;
 import com.odo.common.config.OdoProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -22,9 +23,14 @@ import org.springframework.stereotype.Component;
 /**
  * 카카오 로그인 성공 뒤 계정을 찾거나 만들고, 갱신 토큰 쿠키를 발급해 프론트로 보낸다.
  * 접근 토큰은 URL에 싣지 않는다. 프론트가 앱을 열 때처럼 갱신 API를 불러 받는다.
+ * <p>
+ * 이 처리 중 오류가 나도 콜백 응답은 302로, 로그인 실패 화면으로 보낸다. 오류가 필터 밖으로 나가면 사용자가 API 도메인의 오류 화면에 남는다.
+ * 계정은 만들어졌는데 갱신 토큰 발급만 실패했다면, 다시 로그인할 때 기존 회원으로 들어오므로 되돌리지 않는다.
  */
 @Component
 public class LoginSuccessHandler implements AuthenticationSuccessHandler {
+
+	private static final Logger log = LoggerFactory.getLogger(LoginSuccessHandler.class);
 
 	private final KakaoLoginService kakaoLoginService;
 
@@ -42,6 +48,17 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
 	@Override
 	public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
 			Authentication authentication) throws IOException {
+		try {
+			completeLogin(request, response, authentication);
+		}
+		catch (RuntimeException ex) {
+			log.warn("카카오 로그인 뒤 처리 실패. 로그인 실패 화면으로 보낸다", ex);
+			response.sendRedirect(frontendBaseUrl + LoginFailureHandler.LOGIN_FAILED_PATH);
+		}
+	}
+
+	private void completeLogin(HttpServletRequest request, HttpServletResponse response, Authentication authentication)
+			throws IOException {
 		OAuth2User user = (OAuth2User) authentication.getPrincipal();
 		LoginResult result = kakaoLoginService.login(kakaoUserId(user), nickname(user));
 
