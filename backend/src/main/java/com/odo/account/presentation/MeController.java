@@ -1,16 +1,10 @@
 package com.odo.account.presentation;
 
 import com.odo.account.application.AccountService;
-import com.odo.account.domain.InvalidNameException;
 import com.odo.account.presentation.dto.ChangeNameRequest;
 import com.odo.account.presentation.dto.MeResponse;
-import com.odo.common.error.ErrorResponse;
+import com.odo.auth.presentation.LoginAccountId;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,23 +22,13 @@ public class MeController {
 	private final AccountService accountService;
 
 	@GetMapping
-	public MeResponse me(@AuthenticationPrincipal Jwt jwt) {
-		return MeResponse.from(accountService.getProfile(accountId(jwt)));
+	public MeResponse me(@LoginAccountId long accountId) {
+		return MeResponse.from(accountService.getProfile(accountId));
 	}
 
 	@PatchMapping
-	public MeResponse changeName(@AuthenticationPrincipal Jwt jwt, @RequestBody ChangeNameRequest request) {
-		return MeResponse.from(accountService.changeName(accountId(jwt), request.name()));
-	}
-
-	@ExceptionHandler(InvalidNameException.class)
-	public ResponseEntity<ErrorResponse> invalidName(InvalidNameException ex) {
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse("INVALID_NAME", ex.getMessage()));
-	}
-
-	/** 접근 토큰의 sub가 계정 ID다. */
-	private static long accountId(Jwt jwt) {
-		return Long.parseLong(jwt.getSubject());
+	public MeResponse changeName(@LoginAccountId long accountId, @RequestBody ChangeNameRequest request) {
+		return MeResponse.from(accountService.changeName(accountId, request.name()));
 	}
 
 }
