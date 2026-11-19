@@ -1,4 +1,4 @@
-package com.odo.account.domain;
+package com.odo.account.domain.exception;
 
 public class InvalidNameException extends RuntimeException {
 

@@ -1,6 +1,8 @@
-package com.odo.auth.domain;
+package com.odo.auth.domain.repository;
 
 import java.util.Optional;
+
+import com.odo.auth.domain.entity.SocialLogin;
 
 /**
  * 로그인 수단 저장소. 구현은 infrastructure에 둔다.

@@ -4,8 +4,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.odo.account.domain.Account;
-import com.odo.account.domain.AccountRepository;
+import com.odo.account.domain.entity.Account;
+import com.odo.account.domain.repository.AccountRepository;
 import com.odo.team.domain.entity.TeamRole;
 import com.odo.team.domain.repository.TeamMemberRepository;
 import lombok.RequiredArgsConstructor;

@@ -3,10 +3,10 @@ package com.odo.auth.application;
 import java.time.Clock;
 import java.time.Instant;
 
-import com.odo.account.domain.Account;
-import com.odo.account.domain.AccountRepository;
-import com.odo.auth.domain.SocialLogin;
-import com.odo.auth.domain.SocialLoginRepository;
+import com.odo.account.domain.entity.Account;
+import com.odo.account.domain.repository.AccountRepository;
+import com.odo.auth.domain.entity.SocialLogin;
+import com.odo.auth.domain.repository.SocialLoginRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;

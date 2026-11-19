@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
-import com.odo.auth.domain.RedirectPathValidator;
+import com.odo.auth.domain.rule.RedirectPathValidator;
 import com.odo.team.domain.exception.InvalidTeamDescriptionException;
 import com.odo.team.domain.exception.InvalidTeamNameException;
 import org.junit.jupiter.api.DisplayName;

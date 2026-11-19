@@ -1,7 +1,9 @@
-package com.odo.account.domain;
+package com.odo.account.domain.repository;
 
 import java.util.List;
 import java.util.Optional;
+
+import com.odo.account.domain.entity.Account;
 
 /**
  * 계정 저장소. 도메인이 필요한 동작만 정의하고, 구현은 infrastructure에 둔다.

@@ -8,7 +8,7 @@ import java.util.Map;
 import com.odo.auth.application.KakaoLoginService.LoginResult;
 import com.odo.auth.application.KakaoLoginService;
 import com.odo.auth.application.RefreshTokenService;
-import com.odo.auth.domain.RedirectPathValidator;
+import com.odo.auth.domain.rule.RedirectPathValidator;
 import com.odo.auth.infrastructure.security.CookieOAuth2AuthorizationRequestRepository;
 import com.odo.common.config.OdoProperties;
 import jakarta.servlet.http.HttpServletRequest;

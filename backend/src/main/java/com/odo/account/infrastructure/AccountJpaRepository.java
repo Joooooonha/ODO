@@ -1,7 +1,7 @@
 package com.odo.account.infrastructure;
 
-import com.odo.account.domain.Account;
-import com.odo.account.domain.AccountRepository;
+import com.odo.account.domain.entity.Account;
+import com.odo.account.domain.repository.AccountRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**

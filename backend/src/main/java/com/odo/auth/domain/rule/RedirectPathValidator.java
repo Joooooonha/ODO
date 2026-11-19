@@ -1,4 +1,4 @@
-package com.odo.auth.domain;
+package com.odo.auth.domain.rule;
 
 import java.util.regex.Pattern;
 

@@ -1,7 +1,7 @@
 package com.odo.auth.infrastructure;
 
-import com.odo.auth.domain.SocialLogin;
-import com.odo.auth.domain.SocialLoginRepository;
+import com.odo.auth.domain.entity.SocialLogin;
+import com.odo.auth.domain.repository.SocialLoginRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**

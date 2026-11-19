@@ -1,7 +1,9 @@
-package com.odo.account.domain;
+package com.odo.account.domain.entity;
 
 import java.time.Instant;
 
+import com.odo.account.domain.exception.InvalidNameException;
+import com.odo.account.domain.rule.NameRule;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
