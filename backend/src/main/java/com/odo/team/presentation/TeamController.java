@@ -33,9 +33,9 @@ public class TeamController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public TeamDetailResponse create(@LoginAccountId long accountId, @RequestBody CreateTeamRequest request) {
+	public TeamDetailResponse createTeam(@LoginAccountId long accountId, @RequestBody CreateTeamRequest request) {
 		return TeamDetailResponse
-			.from(teamService.create(accountId, request.name(), request.description(), request.generation()));
+			.from(teamService.createTeam(accountId, request.name(), request.description(), request.generation()));
 	}
 
 	@GetMapping
@@ -60,8 +60,8 @@ public class TeamController {
 	}
 
 	@GetMapping("/{teamId}/invite-code")
-	public InviteCodeResponse inviteCode(@LoginAccountId long accountId, @PathVariable long teamId) {
-		return new InviteCodeResponse(teamService.inviteCode(accountId, teamId));
+	public InviteCodeResponse findInviteCode(@LoginAccountId long accountId, @PathVariable long teamId) {
+		return new InviteCodeResponse(teamService.findInviteCode(accountId, teamId));
 	}
 
 	@PostMapping("/{teamId}/invite-code")

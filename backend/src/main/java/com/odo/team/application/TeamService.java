@@ -49,7 +49,7 @@ public class TeamService {
 	 * 규칙에 맞지 않으면 InvalidTeamNameException, InvalidTeamDescriptionException, InvalidGenerationException.
 	 */
 	@Transactional
-	public TeamDetailResult create(long accountId, String name, String description, Integer generation) {
+	public TeamDetailResult createTeam(long accountId, String name, String description, Integer generation) {
 		Team team = Team.createTeam(name, description, clock.instant());
 		teamRepository.save(team);
 		teamMemberRepository.save(TeamMember.createLeader(team.getId(), accountId, generation, team.getCreatedAt()));
@@ -94,7 +94,7 @@ public class TeamService {
 	}
 
 	@Transactional(readOnly = true)
-	public String inviteCode(long leaderId, long teamId) {
+	public String findInviteCode(long leaderId, long teamId) {
 		teamAccess.requireLeader(teamId, leaderId);
 		return findTeam(teamId).getInviteCode();
 	}

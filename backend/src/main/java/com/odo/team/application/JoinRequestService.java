@@ -79,7 +79,7 @@ public class JoinRequestService {
 
 	/** 팀장의 대기 목록. 대기 중인 요청만, 오래된 것부터. */
 	@Transactional(readOnly = true)
-	public List<PendingJoinRequestResult> pendingRequests(long leaderId, long teamId) {
+	public List<PendingJoinRequestResult> findPendingJoinRequests(long leaderId, long teamId) {
 		teamAccess.requireLeader(teamId, leaderId);
 		List<JoinRequest> requests = joinRequestRepository.findAllByTeamIdAndStatusOrderByRequestedAtAscIdAsc(teamId,
 				JoinRequestStatus.PENDING);

@@ -37,9 +37,9 @@ public class JoinRequestController {
 	}
 
 	@GetMapping("/api/teams/{teamId}/join-requests")
-	public List<PendingJoinRequestResponse> pendingRequests(@LoginAccountId long accountId,
+	public List<PendingJoinRequestResponse> findPendingJoinRequests(@LoginAccountId long accountId,
 			@PathVariable long teamId) {
-		return joinRequestService.pendingRequests(accountId, teamId)
+		return joinRequestService.findPendingJoinRequests(accountId, teamId)
 			.stream()
 			.map(PendingJoinRequestResponse::from)
 			.toList();
