@@ -340,6 +340,19 @@ class JoinRequestIntegrationTest {
 			pendingList(leader).andExpect(jsonPath("$", hasSize(1)));
 		}
 
+		@Test
+		@DisplayName("이미 팀원인 사람의 대기 중인 요청을 승인하면 409 ALREADY_MEMBER이고, 요청은 대기 중으로 남는다")
+		void approveAlreadyMember() throws Exception {
+			// 경합으로만 생기는 상태(팀원이면서 대기 중인 요청이 있음)를 DB에 바로 만든다
+			long requestId = requestJoinId(applicant, null);
+			TestTeams.addMember(jdbc, teamId, applicant, null, clock.instant());
+
+			approve(leader, teamId, requestId).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("ALREADY_MEMBER"));
+			assertThat(countMembership(applicant)).isEqualTo(1);
+			assertThat(countPending(applicant)).isEqualTo(1);
+		}
+
 	}
 
 	@Nested

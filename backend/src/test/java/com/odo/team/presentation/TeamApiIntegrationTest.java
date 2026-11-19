@@ -167,6 +167,39 @@ class TeamApiIntegrationTest {
 	}
 
 	@Nested
+	@DisplayName("읽을 수 없는 요청")
+	class InvalidRequest {
+
+		@Test
+		@DisplayName("경로 변수의 팀 ID가 숫자가 아니면 400 INVALID_REQUEST다")
+		void pathVariableTypeMismatch() throws Exception {
+			mockMvc.perform(get("/api/teams/{teamId}", "abc").header("Authorization", bearer(leader)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+		}
+
+		@Test
+		@DisplayName("본문 없이 팀을 만들면 400 INVALID_REQUEST이고 팀이 만들어지지 않는다")
+		void missingBody() throws Exception {
+			mockMvc.perform(post("/api/teams").header("Authorization", bearer(leader)).contentType(MediaType.APPLICATION_JSON))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+			assertThat(countTeams()).isZero();
+		}
+
+		@Test
+		@DisplayName("기수에 숫자가 아닌 값을 넣으면 400 INVALID_REQUEST이고 팀이 만들어지지 않는다")
+		void generationTypeMismatch() throws Exception {
+			createTeam(leader, Map.of("name", "블랙홀", "generation", "abc")).andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+			assertThat(countTeams()).isZero();
+		}
+
+	}
+
+	@Nested
 	@DisplayName("내 팀 목록")
 	class MyTeams {
 

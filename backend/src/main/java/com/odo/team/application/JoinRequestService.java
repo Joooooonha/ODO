@@ -40,6 +40,9 @@ public class JoinRequestService {
 	/** 한 사람이 한 팀에 대기 중인 요청을 하나만 갖게 하는 부분 유니크 인덱스. V2 마이그레이션. */
 	private static final String PENDING_UNIQUE_INDEX = "uk_join_request_pending";
 
+	/** 한 사람이 한 팀에 한 번만 들어가게 하는 팀원 유니크 제약. V2 마이그레이션. */
+	private static final String MEMBER_UNIQUE_CONSTRAINT = "uk_team_member_team_account";
+
 	private final TeamRepository teamRepository;
 
 	private final TeamMemberRepository teamMemberRepository;
@@ -98,14 +101,17 @@ public class JoinRequestService {
 	public JoinRequestResult requestJoin(long accountId, String inviteCode, Integer generation) {
 		Team team = teamRepository.findByInviteCode(inviteCode).orElseThrow(InviteNotFoundException::new);
 		JoinRequest request = JoinRequest.createPending(team.getId(), accountId, generation, clock.instant());
-		if (teamMemberRepository.findByTeamIdAndAccountId(team.getId(), accountId).isPresent()) {
-			throw new AlreadyMemberException();
-		}
+		// 대기 중인 요청을 먼저, 팀원인지를 나중에 본다. 이 순서를 바꾸지 않는다.
+		// 반대 순서면 두 확인 사이에 이전 요청의 승인이 커밋될 때 둘 다 통과해서, 팀원이면서 대기 중인 요청이 있는 상태가 생긴다.
+		// 승인은 상태 변경과 팀원 추가를 함께 커밋하므로, 이 순서면 승인 전에는 첫 확인에, 승인 후에는 두 번째 확인에 걸린다.
 		if (joinRequestRepository.findByTeamIdAndAccountIdAndStatus(team.getId(), accountId, JoinRequestStatus.PENDING)
 			.isPresent()) {
 			throw new AlreadyRequestedException();
 		}
-		// 위 확인은 흔한 경우를 먼저 걸러 낼 뿐이다. 동시에 들어온 요청은 둘 다 확인을 통과할 수 있고,
+		if (teamMemberRepository.findByTeamIdAndAccountId(team.getId(), accountId).isPresent()) {
+			throw new AlreadyMemberException();
+		}
+		// 같은 사람의 요청이 동시에 들어오면 둘 다 위 확인을 통과할 수 있다.
 		// 그때는 DB의 부분 유니크 인덱스가 하나만 남긴다. 그 위반을 같은 409로 바꾼다.
 		try {
 			joinRequestRepository.saveAndFlush(request);
@@ -122,14 +128,26 @@ public class JoinRequestService {
 	/**
 	 * 승인하고 요청한 기수로 팀원으로 넣는다.
 	 * 팀원 아님 TeamNotFoundException, 팀장 아님 NotTeamLeaderException,
-	 * 이 팀의 요청이 아님 RequestNotFoundException, 이미 처리됨 RequestNotPendingException.
+	 * 이 팀의 요청이 아님 RequestNotFoundException, 이미 처리됨 RequestNotPendingException,
+	 * 요청한 사람이 이미 팀원 AlreadyMemberException(이때 요청은 대기 중으로 남는다).
 	 */
 	@Transactional
 	public TeamMemberResult approve(long leaderId, long teamId, long requestId) {
 		JoinRequest request = decide(leaderId, teamId, requestId, JoinRequestStatus.APPROVED);
 		// 조건부 UPDATE가 이 요청 행을 잠근 채로 팀원을 넣는다. 상태 변경과 팀원 추가는 같은 트랜잭션이라 함께 반영되거나 함께 취소된다.
-		TeamMember member = teamMemberRepository
-			.save(TeamMember.createMember(teamId, request.getAccountId(), request.getGeneration(), clock.instant()));
+		TeamMember member;
+		try {
+			member = teamMemberRepository
+				.save(TeamMember.createMember(teamId, request.getAccountId(), request.getGeneration(), clock.instant()));
+		}
+		catch (DataIntegrityViolationException ex) {
+			// 팀원이면서 대기 중인 요청이 있는 상태는 경합으로만 생긴다(requestJoin의 확인 순서 참고).
+			// 예외로 트랜잭션이 롤백되어 요청은 대기 중으로 남고, 팀장은 거절해서 정리한다.
+			if (violates(ex, MEMBER_UNIQUE_CONSTRAINT)) {
+				throw new AlreadyMemberException();
+			}
+			throw ex;
+		}
 		return TeamMemberResult.of(member, nameLookup.nameOf(member.getAccountId()));
 	}
 
