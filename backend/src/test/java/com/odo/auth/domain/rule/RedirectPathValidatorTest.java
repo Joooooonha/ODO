@@ -1,4 +1,4 @@
-package com.odo.auth.domain;
+package com.odo.auth.domain.rule;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

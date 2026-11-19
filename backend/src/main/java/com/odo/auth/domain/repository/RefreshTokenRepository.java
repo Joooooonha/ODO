@@ -1,8 +1,10 @@
-package com.odo.auth.domain;
+package com.odo.auth.domain.repository;
 
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+
+import com.odo.auth.domain.entity.RefreshToken;
 
 /**
  * 갱신 토큰 저장소. 토큰은 SHA-256 해시로만 찾는다. 구현은 infrastructure에 둔다.

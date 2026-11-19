@@ -11,8 +11,8 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.UUID;
 
-import com.odo.auth.domain.RefreshToken;
-import com.odo.auth.domain.RefreshTokenRepository;
+import com.odo.auth.domain.entity.RefreshToken;
+import com.odo.auth.domain.repository.RefreshTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

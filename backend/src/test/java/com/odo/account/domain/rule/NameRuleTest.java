@@ -1,4 +1,4 @@
-package com.odo.account.domain;
+package com.odo.account.domain.rule;
 
 import java.text.Normalizer;
 

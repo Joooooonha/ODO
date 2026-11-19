@@ -1,6 +1,6 @@
 package com.odo.common.error;
 
-import com.odo.account.domain.InvalidNameException;
+import com.odo.account.domain.exception.InvalidNameException;
 import com.odo.team.domain.exception.AlreadyMemberException;
 import com.odo.team.domain.exception.AlreadyRequestedException;
 import com.odo.team.domain.exception.InvalidGenerationException;

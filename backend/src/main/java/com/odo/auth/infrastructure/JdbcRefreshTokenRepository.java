@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.odo.auth.domain.RefreshToken;
-import com.odo.auth.domain.RefreshTokenRepository;
+import com.odo.auth.domain.entity.RefreshToken;
+import com.odo.auth.domain.repository.RefreshTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;

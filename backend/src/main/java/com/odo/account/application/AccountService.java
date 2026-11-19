@@ -3,8 +3,8 @@ package com.odo.account.application;
 import java.time.Clock;
 
 import com.odo.account.application.dto.AccountProfileResult;
-import com.odo.account.domain.Account;
-import com.odo.account.domain.AccountRepository;
+import com.odo.account.domain.entity.Account;
+import com.odo.account.domain.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

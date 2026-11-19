@@ -1,4 +1,4 @@
-package com.odo.auth.domain;
+package com.odo.auth.domain.entity;
 
 import java.time.Instant;
 

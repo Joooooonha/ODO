@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import com.odo.auth.domain.RedirectPathValidator;
+import com.odo.auth.domain.rule.RedirectPathValidator;
 import com.odo.common.crypto.SignedCookieCodec;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
