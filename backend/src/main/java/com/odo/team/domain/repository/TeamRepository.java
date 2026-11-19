@@ -1,7 +1,9 @@
-package com.odo.team.domain;
+package com.odo.team.domain.repository;
 
 import java.util.List;
 import java.util.Optional;
+
+import com.odo.team.domain.entity.Team;
 
 public interface TeamRepository {
 

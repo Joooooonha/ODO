@@ -1,7 +1,8 @@
-package com.odo.team.domain;
+package com.odo.team.domain.entity;
 
 import java.time.Instant;
 
+import com.odo.team.domain.rule.Generation;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

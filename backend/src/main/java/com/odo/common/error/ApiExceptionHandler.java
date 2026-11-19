@@ -1,16 +1,16 @@
 package com.odo.common.error;
 
 import com.odo.account.domain.InvalidNameException;
-import com.odo.team.domain.AlreadyMemberException;
-import com.odo.team.domain.AlreadyRequestedException;
-import com.odo.team.domain.InvalidGenerationException;
-import com.odo.team.domain.InvalidTeamDescriptionException;
-import com.odo.team.domain.InvalidTeamNameException;
-import com.odo.team.domain.InviteNotFoundException;
-import com.odo.team.domain.NotTeamLeaderException;
-import com.odo.team.domain.RequestNotFoundException;
-import com.odo.team.domain.RequestNotPendingException;
-import com.odo.team.domain.TeamNotFoundException;
+import com.odo.team.domain.exception.AlreadyMemberException;
+import com.odo.team.domain.exception.AlreadyRequestedException;
+import com.odo.team.domain.exception.InvalidGenerationException;
+import com.odo.team.domain.exception.InvalidTeamDescriptionException;
+import com.odo.team.domain.exception.InvalidTeamNameException;
+import com.odo.team.domain.exception.InviteNotFoundException;
+import com.odo.team.domain.exception.NotTeamLeaderException;
+import com.odo.team.domain.exception.RequestNotFoundException;
+import com.odo.team.domain.exception.RequestNotPendingException;
+import com.odo.team.domain.exception.TeamNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;

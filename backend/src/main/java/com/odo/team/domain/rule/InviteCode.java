@@ -1,4 +1,4 @@
-package com.odo.team.domain;
+package com.odo.team.domain.rule;
 
 import java.security.SecureRandom;
 import java.util.Base64;

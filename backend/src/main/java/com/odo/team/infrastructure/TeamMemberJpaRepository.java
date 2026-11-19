@@ -1,7 +1,7 @@
 package com.odo.team.infrastructure;
 
-import com.odo.team.domain.TeamMember;
-import com.odo.team.domain.TeamMemberRepository;
+import com.odo.team.domain.entity.TeamMember;
+import com.odo.team.domain.repository.TeamMemberRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**

@@ -1,7 +1,7 @@
 package com.odo.team.presentation.dto;
 
 import com.odo.team.application.dto.MyTeamResult;
-import com.odo.team.domain.TeamRole;
+import com.odo.team.domain.entity.TeamRole;
 
 public record MyTeamResponse(long id, String name, TeamRole myRole) {
 

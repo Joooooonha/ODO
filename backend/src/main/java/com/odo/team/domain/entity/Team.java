@@ -1,7 +1,12 @@
-package com.odo.team.domain;
+package com.odo.team.domain.entity;
 
 import java.time.Instant;
 
+import com.odo.team.domain.exception.InvalidTeamDescriptionException;
+import com.odo.team.domain.exception.InvalidTeamNameException;
+import com.odo.team.domain.rule.InviteCode;
+import com.odo.team.domain.rule.TeamDescriptionRule;
+import com.odo.team.domain.rule.TeamNameRule;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

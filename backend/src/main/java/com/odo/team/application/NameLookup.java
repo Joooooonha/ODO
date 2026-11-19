@@ -6,8 +6,8 @@ import java.util.stream.Collectors;
 
 import com.odo.account.domain.Account;
 import com.odo.account.domain.AccountRepository;
-import com.odo.team.domain.TeamMemberRepository;
-import com.odo.team.domain.TeamRole;
+import com.odo.team.domain.entity.TeamRole;
+import com.odo.team.domain.repository.TeamMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

@@ -1,4 +1,6 @@
-package com.odo.team.domain;
+package com.odo.team.domain.rule;
+
+import com.odo.team.domain.exception.InvalidGenerationException;
 
 /**
  * 기수 규칙. 비어 있거나 1~999.

@@ -1,9 +1,9 @@
 package com.odo.team.application;
 
-import com.odo.team.domain.NotTeamLeaderException;
-import com.odo.team.domain.TeamMember;
-import com.odo.team.domain.TeamMemberRepository;
-import com.odo.team.domain.TeamNotFoundException;
+import com.odo.team.domain.entity.TeamMember;
+import com.odo.team.domain.exception.NotTeamLeaderException;
+import com.odo.team.domain.exception.TeamNotFoundException;
+import com.odo.team.domain.repository.TeamMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

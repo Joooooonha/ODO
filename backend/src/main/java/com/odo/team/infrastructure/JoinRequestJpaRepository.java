@@ -2,9 +2,9 @@ package com.odo.team.infrastructure;
 
 import java.time.Instant;
 
-import com.odo.team.domain.JoinRequest;
-import com.odo.team.domain.JoinRequestRepository;
-import com.odo.team.domain.JoinRequestStatus;
+import com.odo.team.domain.entity.JoinRequest;
+import com.odo.team.domain.entity.JoinRequestStatus;
+import com.odo.team.domain.repository.JoinRequestRepository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -24,7 +24,7 @@ interface JoinRequestJpaRepository extends JpaRepository<JoinRequest, Long>, Joi
 	@Query("""
 			update JoinRequest r
 			set r.status = :status, r.decidedAt = :decidedAt
-			where r.id = :id and r.status = com.odo.team.domain.JoinRequestStatus.PENDING
+			where r.id = :id and r.status = com.odo.team.domain.entity.JoinRequestStatus.PENDING
 			""")
 	int changeStatusIfPending(@Param("id") Long id, @Param("status") JoinRequestStatus status,
 			@Param("decidedAt") Instant decidedAt);

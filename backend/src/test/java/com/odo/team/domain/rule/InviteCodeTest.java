@@ -1,4 +1,4 @@
-package com.odo.team.domain;
+package com.odo.team.domain.rule;
 
 import java.util.HashSet;
 import java.util.Set;

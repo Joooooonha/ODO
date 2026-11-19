@@ -1,7 +1,7 @@
 package com.odo.team.application.dto;
 
-import com.odo.team.domain.Team;
-import com.odo.team.domain.TeamRole;
+import com.odo.team.domain.entity.Team;
+import com.odo.team.domain.entity.TeamRole;
 
 /** 팀 상세. myRole은 보는 사람의 역할이다. */
 public record TeamDetailResult(long id, String name, String description, String leaderName, TeamRole myRole) {

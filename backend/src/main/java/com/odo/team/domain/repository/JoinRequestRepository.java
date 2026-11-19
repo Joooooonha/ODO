@@ -1,8 +1,11 @@
-package com.odo.team.domain;
+package com.odo.team.domain.repository;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+
+import com.odo.team.domain.entity.JoinRequest;
+import com.odo.team.domain.entity.JoinRequestStatus;
 
 public interface JoinRequestRepository {
 

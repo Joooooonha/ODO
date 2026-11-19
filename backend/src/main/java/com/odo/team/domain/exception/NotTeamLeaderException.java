@@ -1,4 +1,4 @@
-package com.odo.team.domain;
+package com.odo.team.domain.exception;
 
 public class NotTeamLeaderException extends RuntimeException {
 

@@ -1,7 +1,10 @@
-package com.odo.team.domain;
+package com.odo.team.domain.repository;
 
 import java.util.List;
 import java.util.Optional;
+
+import com.odo.team.domain.entity.TeamMember;
+import com.odo.team.domain.entity.TeamRole;
 
 public interface TeamMemberRepository {
 
