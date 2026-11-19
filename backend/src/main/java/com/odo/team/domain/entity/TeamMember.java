@@ -2,7 +2,7 @@ package com.odo.team.domain.entity;
 
 import java.time.Instant;
 
-import com.odo.team.domain.rule.Generation;
+import com.odo.team.domain.rule.GenerationRule;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -51,7 +51,6 @@ public class TeamMember {
 	private Instant updatedAt;
 
 	private TeamMember(long teamId, long accountId, TeamRole role, Integer generation, Instant now) {
-		Generation.validate(generation);
 		this.teamId = teamId;
 		this.accountId = accountId;
 		this.role = role;
@@ -61,12 +60,14 @@ public class TeamMember {
 	}
 
 	/** 팀을 만든 사람. 기수가 규칙에 맞지 않으면 InvalidGenerationException. */
-	public static TeamMember leader(long teamId, long accountId, Integer generation, Instant now) {
+	public static TeamMember createLeader(long teamId, long accountId, Integer generation, Instant now) {
+		GenerationRule.validateGeneration(generation);
 		return new TeamMember(teamId, accountId, TeamRole.LEADER, generation, now);
 	}
 
 	/** 입장 요청이 승인된 사람. 기수가 규칙에 맞지 않으면 InvalidGenerationException. */
-	public static TeamMember member(long teamId, long accountId, Integer generation, Instant now) {
+	public static TeamMember createMember(long teamId, long accountId, Integer generation, Instant now) {
+		GenerationRule.validateGeneration(generation);
 		return new TeamMember(teamId, accountId, TeamRole.MEMBER, generation, now);
 	}
 
@@ -76,7 +77,7 @@ public class TeamMember {
 
 	/** null이면 기수를 비운다. 규칙에 맞지 않으면 InvalidGenerationException. */
 	public void changeGeneration(Integer generation, Instant now) {
-		Generation.validate(generation);
+		GenerationRule.validateGeneration(generation);
 		this.generation = generation;
 		this.updatedAt = now;
 	}

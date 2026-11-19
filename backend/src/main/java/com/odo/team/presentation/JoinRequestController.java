@@ -26,8 +26,8 @@ public class JoinRequestController {
 	private final JoinRequestService joinRequestService;
 
 	@GetMapping("/api/join-requests/me")
-	public List<JoinRequestResponse> myRequests(@LoginAccountId long accountId) {
-		return joinRequestService.myRequests(accountId).stream().map(JoinRequestResponse::from).toList();
+	public List<JoinRequestResponse> findMyJoinRequests(@LoginAccountId long accountId) {
+		return joinRequestService.findMyJoinRequests(accountId).stream().map(JoinRequestResponse::from).toList();
 	}
 
 	@DeleteMapping("/api/join-requests/{requestId}")

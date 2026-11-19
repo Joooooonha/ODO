@@ -39,18 +39,18 @@ public class TeamController {
 	}
 
 	@GetMapping
-	public List<MyTeamResponse> myTeams(@LoginAccountId long accountId) {
-		return teamService.myTeams(accountId).stream().map(MyTeamResponse::from).toList();
+	public List<MyTeamResponse> findMyTeams(@LoginAccountId long accountId) {
+		return teamService.findMyTeams(accountId).stream().map(MyTeamResponse::from).toList();
 	}
 
 	@GetMapping("/{teamId}")
-	public TeamDetailResponse detail(@LoginAccountId long accountId, @PathVariable long teamId) {
-		return TeamDetailResponse.from(teamService.detail(accountId, teamId));
+	public TeamDetailResponse findTeamDetail(@LoginAccountId long accountId, @PathVariable long teamId) {
+		return TeamDetailResponse.from(teamService.findTeamDetail(accountId, teamId));
 	}
 
 	@GetMapping("/{teamId}/members")
-	public List<TeamMemberResponse> members(@LoginAccountId long accountId, @PathVariable long teamId) {
-		return teamService.members(accountId, teamId).stream().map(TeamMemberResponse::from).toList();
+	public List<TeamMemberResponse> findTeamMembers(@LoginAccountId long accountId, @PathVariable long teamId) {
+		return teamService.findTeamMembers(accountId, teamId).stream().map(TeamMemberResponse::from).toList();
 	}
 
 	@PatchMapping("/{teamId}/members/me")

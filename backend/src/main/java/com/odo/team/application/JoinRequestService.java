@@ -54,21 +54,21 @@ public class JoinRequestService {
 
 	/** 초대 링크를 연 사람에게 보여 줄 팀 정보와 내 상태. 무효인 코드면 InviteNotFoundException. */
 	@Transactional(readOnly = true)
-	public InvitePreviewResult preview(long accountId, String inviteCode) {
+	public InvitePreviewResult previewInvite(long accountId, String inviteCode) {
 		Team team = teamRepository.findByInviteCode(inviteCode).orElseThrow(InviteNotFoundException::new);
 		String leaderName = nameLookup.leaderNameOf(team.getId());
 		if (teamMemberRepository.findByTeamIdAndAccountId(team.getId(), accountId).isPresent()) {
-			return preview(team, leaderName, InviteStatus.MEMBER, null);
+			return toPreviewResult(team, leaderName, InviteStatus.MEMBER, null);
 		}
 		return joinRequestRepository
 			.findByTeamIdAndAccountIdAndStatus(team.getId(), accountId, JoinRequestStatus.PENDING)
-			.map(pending -> preview(team, leaderName, InviteStatus.PENDING, pending.getId()))
-			.orElseGet(() -> preview(team, leaderName, InviteStatus.NONE, null));
+			.map(pending -> toPreviewResult(team, leaderName, InviteStatus.PENDING, pending.getId()))
+			.orElseGet(() -> toPreviewResult(team, leaderName, InviteStatus.NONE, null));
 	}
 
 	/** 내 대기 중인 요청만, 오래된 것부터. */
 	@Transactional(readOnly = true)
-	public List<JoinRequestResult> myRequests(long accountId) {
+	public List<JoinRequestResult> findMyJoinRequests(long accountId) {
 		List<JoinRequest> requests = joinRequestRepository
 			.findAllByAccountIdAndStatusOrderByRequestedAtAscIdAsc(accountId, JoinRequestStatus.PENDING);
 		Map<Long, Team> teams = teamRepository.findAllById(requests.stream().map(JoinRequest::getTeamId).toList())
@@ -95,9 +95,9 @@ public class JoinRequestService {
 	 * 이미 팀원 AlreadyMemberException, 대기 중인 요청이 있음 AlreadyRequestedException.
 	 */
 	@Transactional
-	public JoinRequestResult request(long accountId, String inviteCode, Integer generation) {
+	public JoinRequestResult requestJoin(long accountId, String inviteCode, Integer generation) {
 		Team team = teamRepository.findByInviteCode(inviteCode).orElseThrow(InviteNotFoundException::new);
-		JoinRequest request = JoinRequest.pending(team.getId(), accountId, generation, clock.instant());
+		JoinRequest request = JoinRequest.createPending(team.getId(), accountId, generation, clock.instant());
 		if (teamMemberRepository.findByTeamIdAndAccountId(team.getId(), accountId).isPresent()) {
 			throw new AlreadyMemberException();
 		}
@@ -129,7 +129,7 @@ public class JoinRequestService {
 		JoinRequest request = decide(leaderId, teamId, requestId, JoinRequestStatus.APPROVED);
 		// 조건부 UPDATE가 이 요청 행을 잠근 채로 팀원을 넣는다. 상태 변경과 팀원 추가는 같은 트랜잭션이라 함께 반영되거나 함께 취소된다.
 		TeamMember member = teamMemberRepository
-			.save(TeamMember.member(teamId, request.getAccountId(), request.getGeneration(), clock.instant()));
+			.save(TeamMember.createMember(teamId, request.getAccountId(), request.getGeneration(), clock.instant()));
 		return TeamMemberResult.of(member, nameLookup.nameOf(member.getAccountId()));
 	}
 
@@ -178,7 +178,7 @@ public class JoinRequestService {
 		return false;
 	}
 
-	private static InvitePreviewResult preview(Team team, String leaderName, InviteStatus status, Long requestId) {
+	private static InvitePreviewResult toPreviewResult(Team team, String leaderName, InviteStatus status, Long requestId) {
 		return new InvitePreviewResult(team.getId(), team.getName(), leaderName, team.getDescription(), status,
 				requestId);
 	}

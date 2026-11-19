@@ -16,7 +16,6 @@ import com.odo.team.domain.entity.TeamRole;
 import com.odo.team.domain.exception.TeamNotFoundException;
 import com.odo.team.domain.repository.TeamMemberRepository;
 import com.odo.team.domain.repository.TeamRepository;
-import com.odo.team.domain.rule.Generation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,39 +45,37 @@ public class TeamService {
 	private final Clock clock;
 
 	/**
-	 * 만든 사람을 그 기수로 팀장으로 넣는다.
+	 * 만든 사람을 그 기수로 팀장으로 넣는다. 기수가 틀리면 예외로 트랜잭션이 롤백되어 팀 행도 남지 않는다.
 	 * 규칙에 맞지 않으면 InvalidTeamNameException, InvalidTeamDescriptionException, InvalidGenerationException.
 	 */
 	@Transactional
 	public TeamDetailResult create(long accountId, String name, String description, Integer generation) {
-		Team team = Team.create(name, description, clock.instant());
-		// 팀 행을 넣기 전에 모든 입력을 확인한다
-		Generation.validate(generation);
+		Team team = Team.createTeam(name, description, clock.instant());
 		teamRepository.save(team);
-		teamMemberRepository.save(TeamMember.leader(team.getId(), accountId, generation, team.getCreatedAt()));
+		teamMemberRepository.save(TeamMember.createLeader(team.getId(), accountId, generation, team.getCreatedAt()));
 		return TeamDetailResult.of(team, nameLookup.nameOf(accountId), TeamRole.LEADER);
 	}
 
 	@Transactional(readOnly = true)
-	public List<MyTeamResult> myTeams(long accountId) {
-		List<TeamMember> memberships = teamMemberRepository.findAllByAccountIdOrderByJoinedAtAscIdAsc(accountId);
-		Map<Long, Team> teams = teamRepository.findAllById(memberships.stream().map(TeamMember::getTeamId).toList())
+	public List<MyTeamResult> findMyTeams(long accountId) {
+		List<TeamMember> myTeamMembers = teamMemberRepository.findAllByAccountIdOrderByJoinedAtAscIdAsc(accountId);
+		Map<Long, Team> teams = teamRepository.findAllById(myTeamMembers.stream().map(TeamMember::getTeamId).toList())
 			.stream()
 			.collect(Collectors.toMap(Team::getId, Function.identity()));
-		return memberships.stream().map(membership -> {
-			Team team = teams.get(membership.getTeamId());
-			return new MyTeamResult(team.getId(), team.getName(), membership.getRole());
+		return myTeamMembers.stream().map(myTeamMember -> {
+			Team team = teams.get(myTeamMember.getTeamId());
+			return new MyTeamResult(team.getId(), team.getName(), myTeamMember.getRole());
 		}).toList();
 	}
 
 	@Transactional(readOnly = true)
-	public TeamDetailResult detail(long accountId, long teamId) {
+	public TeamDetailResult findTeamDetail(long accountId, long teamId) {
 		TeamMember me = teamAccess.requireMember(teamId, accountId);
 		return TeamDetailResult.of(findTeam(teamId), nameLookup.leaderNameOf(teamId), me.getRole());
 	}
 
 	@Transactional(readOnly = true)
-	public List<TeamMemberResult> members(long accountId, long teamId) {
+	public List<TeamMemberResult> findTeamMembers(long accountId, long teamId) {
 		teamAccess.requireMember(teamId, accountId);
 		List<TeamMember> members = teamMemberRepository.findAllByTeamId(teamId);
 		Map<Long, String> names = nameLookup.namesOf(members.stream().map(TeamMember::getAccountId).toList());

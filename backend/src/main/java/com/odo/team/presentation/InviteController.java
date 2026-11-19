@@ -26,15 +26,15 @@ public class InviteController {
 	private final JoinRequestService joinRequestService;
 
 	@GetMapping
-	public InvitePreviewResponse preview(@LoginAccountId long accountId, @PathVariable String inviteCode) {
-		return InvitePreviewResponse.from(joinRequestService.preview(accountId, inviteCode));
+	public InvitePreviewResponse previewInvite(@LoginAccountId long accountId, @PathVariable String inviteCode) {
+		return InvitePreviewResponse.from(joinRequestService.previewInvite(accountId, inviteCode));
 	}
 
 	@PostMapping("/join-requests")
 	@ResponseStatus(HttpStatus.CREATED)
-	public JoinRequestResponse request(@LoginAccountId long accountId, @PathVariable String inviteCode,
+	public JoinRequestResponse requestJoin(@LoginAccountId long accountId, @PathVariable String inviteCode,
 			@RequestBody CreateJoinRequestRequest request) {
-		return JoinRequestResponse.from(joinRequestService.request(accountId, inviteCode, request.generation()));
+		return JoinRequestResponse.from(joinRequestService.requestJoin(accountId, inviteCode, request.generation()));
 	}
 
 }

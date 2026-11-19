@@ -2,7 +2,7 @@ package com.odo.team.domain.entity;
 
 import java.time.Instant;
 
-import com.odo.team.domain.rule.Generation;
+import com.odo.team.domain.rule.GenerationRule;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -62,8 +62,8 @@ public class JoinRequest {
 	}
 
 	/** 대기 중인 새 요청. 기수가 규칙에 맞지 않으면 InvalidGenerationException. */
-	public static JoinRequest pending(long teamId, long accountId, Integer generation, Instant now) {
-		Generation.validate(generation);
+	public static JoinRequest createPending(long teamId, long accountId, Integer generation, Instant now) {
+		GenerationRule.validateGeneration(generation);
 		return new JoinRequest(teamId, accountId, generation, now);
 	}
 
