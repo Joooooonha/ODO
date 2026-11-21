@@ -1,0 +1,109 @@
+package com.odo.performance.application;
+
+import java.time.Clock;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import com.odo.performance.application.dto.MemberAssignment;
+import com.odo.performance.application.dto.PerformanceMemberResult;
+import com.odo.performance.domain.entity.PerformanceMember;
+import com.odo.performance.domain.entity.PerformanceRole;
+import com.odo.performance.domain.exception.EmptyMembersException;
+import com.odo.performance.domain.exception.InvalidRoleException;
+import com.odo.performance.domain.exception.PerformanceMemberNotFoundException;
+import com.odo.performance.domain.repository.PerformanceMemberRepository;
+import com.odo.team.domain.entity.TeamMember;
+import com.odo.team.domain.repository.TeamMemberRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * 명단 조회, 명단에 추가, 디렉터 지정. 06_Performance_spec.md의 "API 명세".
+ */
+@Service
+@RequiredArgsConstructor
+public class PerformanceMemberService {
+
+	/** 디렉터를 먼저, 같은 역할 안에서는 명단에 들어온 순서. 한 요청으로 같이 들어온 사람은 요청 순서(id). */
+	private static final Comparator<PerformanceMember> ROSTER_ORDER = Comparator
+		.comparing((PerformanceMember member) -> !member.isDirector())
+		.thenComparing(PerformanceMember::getJoinedAt)
+		.thenComparing(PerformanceMember::getId);
+
+	private final PerformanceMemberRepository performanceMemberRepository;
+
+	private final TeamMemberRepository teamMemberRepository;
+
+	private final PerformanceRoster performanceRoster;
+
+	private final PerformanceAccess performanceAccess;
+
+	private final AccountNames accountNames;
+
+	private final Clock clock;
+
+	/** 명단에 없음 PerformanceNotFoundException. */
+	@Transactional(readOnly = true)
+	public List<PerformanceMemberResult> findPerformanceMembers(long accountId, long performanceId) {
+		PerformanceMember me = performanceAccess.requireParticipant(performanceId, accountId);
+		List<PerformanceMember> members = performanceMemberRepository.findAllByPerformanceId(performanceId)
+			.stream()
+			.sorted(ROSTER_ORDER)
+			.toList();
+		Map<Long, Integer> generations = generationsOf(me.getTeamId());
+		Map<Long, String> names = accountNames.namesOf(members.stream().map(PerformanceMember::getAccountId).toList());
+		return members.stream()
+			.map(member -> PerformanceMemberResult.of(member, names.get(member.getAccountId()),
+					generations.get(member.getAccountId())))
+			.toList();
+	}
+
+	/**
+	 * 여러 명을 한 번에 넣는다. 하나라도 오류가 있으면 아무도 넣지 않는다.
+	 * 명단에 없음 PerformanceNotFoundException, 팀장 아님 NotTeamLeaderException, 빈 목록 EmptyMembersException,
+	 * 그 밖의 명단 오류는 PerformanceRoster.enrollMembers와 같다.
+	 */
+	@Transactional
+	public List<PerformanceMemberResult> addPerformanceMembers(long leaderId, long performanceId,
+			List<MemberAssignment> members) {
+		PerformanceMember leader = performanceAccess.requireLeader(performanceId, leaderId);
+		if (members.isEmpty()) {
+			throw new EmptyMembersException();
+		}
+		return performanceRoster.enrollMembers(performanceId, leader.getTeamId(), members, clock.instant());
+	}
+
+	/**
+	 * 명단에 있는 사람을 디렉터로 지정한다. 이미 디렉터면 그대로 둔다.
+	 * 명단에 없음 PerformanceNotFoundException, 팀장 아님 NotTeamLeaderException,
+	 * role이 DIRECTOR가 아님 InvalidRoleException(1차에는 해제가 없다), 그 사람이 명단에 없음 PerformanceMemberNotFoundException.
+	 */
+	@Transactional
+	public PerformanceMemberResult designateDirector(long leaderId, long performanceId, long targetAccountId,
+			PerformanceRole role) {
+		PerformanceMember leader = performanceAccess.requireLeader(performanceId, leaderId);
+		if (role != PerformanceRole.DIRECTOR) {
+			throw new InvalidRoleException();
+		}
+		PerformanceMember target = performanceMemberRepository
+			.findByPerformanceIdAndAccountId(performanceId, targetAccountId)
+			.orElseThrow(PerformanceMemberNotFoundException::new);
+		target.designateDirector(clock.instant());
+		Integer generation = teamMemberRepository.findByTeamIdAndAccountId(leader.getTeamId(), targetAccountId)
+			.map(TeamMember::getGeneration)
+			.orElse(null);
+		return PerformanceMemberResult.of(target, accountNames.nameOf(targetAccountId), generation);
+	}
+
+	/** 그 팀 팀원들의 지금 기수. 기수가 없는 팀원도 있다. Collectors.toMap은 null 값을 받지 않아 직접 모은다. */
+	private Map<Long, Integer> generationsOf(long teamId) {
+		Map<Long, Integer> generations = new HashMap<>();
+		teamMemberRepository.findAllByTeamId(teamId)
+			.forEach(member -> generations.put(member.getAccountId(), member.getGeneration()));
+		return generations;
+	}
+
+}

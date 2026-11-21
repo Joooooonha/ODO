@@ -1,6 +1,20 @@
 package com.odo.common.error;
 
 import com.odo.account.domain.exception.InvalidNameException;
+import com.odo.performance.domain.exception.AlreadyInPerformanceException;
+import com.odo.performance.domain.exception.DuplicateMemberException;
+import com.odo.performance.domain.exception.EmptyMembersException;
+import com.odo.performance.domain.exception.InvalidPerformanceDescriptionException;
+import com.odo.performance.domain.exception.InvalidPerformanceNameException;
+import com.odo.performance.domain.exception.InvalidRoleException;
+import com.odo.performance.domain.exception.InvalidSongNameException;
+import com.odo.performance.domain.exception.LeaderNotInMembersException;
+import com.odo.performance.domain.exception.NotDirectorException;
+import com.odo.performance.domain.exception.NotSongDirectorException;
+import com.odo.performance.domain.exception.NotTeamMemberException;
+import com.odo.performance.domain.exception.PerformanceMemberNotFoundException;
+import com.odo.performance.domain.exception.PerformanceNotFoundException;
+import com.odo.performance.domain.exception.SongNotFoundException;
 import com.odo.team.domain.exception.AlreadyMemberException;
 import com.odo.team.domain.exception.AlreadyRequestedException;
 import com.odo.team.domain.exception.InvalidGenerationException;
@@ -25,10 +39,11 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
-	// 400 요청을 읽을 수 없음(본문 없음, JSON 형식 오류, 값이나 경로 변수의 타입이 틀림)
+	// 400 요청을 읽을 수 없음(본문 없음, JSON 형식 오류, 값이나 경로 변수의 타입이 틀림, 꼭 있어야 할 값이 없음)
 	// message는 고정 문구다. 예외 메시지에는 파싱이 실패한 위치나 내부 클래스 이름이 들어간다.
 
-	@ExceptionHandler({ HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class })
+	@ExceptionHandler({ HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class,
+			InvalidRequestException.class })
 	ResponseEntity<ErrorResponse> invalidRequest(Exception ex) {
 		return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "요청을 읽을 수 없다");
 	}
@@ -55,6 +70,46 @@ public class ApiExceptionHandler {
 		return error(HttpStatus.BAD_REQUEST, "INVALID_GENERATION", ex);
 	}
 
+	@ExceptionHandler(InvalidPerformanceNameException.class)
+	ResponseEntity<ErrorResponse> invalidPerformanceName(InvalidPerformanceNameException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_PERFORMANCE_NAME", ex);
+	}
+
+	@ExceptionHandler(InvalidPerformanceDescriptionException.class)
+	ResponseEntity<ErrorResponse> invalidPerformanceDescription(InvalidPerformanceDescriptionException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_PERFORMANCE_DESCRIPTION", ex);
+	}
+
+	@ExceptionHandler(InvalidSongNameException.class)
+	ResponseEntity<ErrorResponse> invalidSongName(InvalidSongNameException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_SONG_NAME", ex);
+	}
+
+	@ExceptionHandler(LeaderNotInMembersException.class)
+	ResponseEntity<ErrorResponse> leaderNotInMembers(LeaderNotInMembersException ex) {
+		return error(HttpStatus.BAD_REQUEST, "LEADER_NOT_IN_MEMBERS", ex);
+	}
+
+	@ExceptionHandler(DuplicateMemberException.class)
+	ResponseEntity<ErrorResponse> duplicateMember(DuplicateMemberException ex) {
+		return error(HttpStatus.BAD_REQUEST, "DUPLICATE_MEMBER", ex);
+	}
+
+	@ExceptionHandler(NotTeamMemberException.class)
+	ResponseEntity<ErrorResponse> notTeamMember(NotTeamMemberException ex) {
+		return error(HttpStatus.BAD_REQUEST, "NOT_TEAM_MEMBER", ex);
+	}
+
+	@ExceptionHandler(EmptyMembersException.class)
+	ResponseEntity<ErrorResponse> emptyMembers(EmptyMembersException ex) {
+		return error(HttpStatus.BAD_REQUEST, "EMPTY_MEMBERS", ex);
+	}
+
+	@ExceptionHandler(InvalidRoleException.class)
+	ResponseEntity<ErrorResponse> invalidRole(InvalidRoleException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_ROLE", ex);
+	}
+
 	// 403 권한
 
 	@ExceptionHandler(NotTeamLeaderException.class)
@@ -62,7 +117,17 @@ public class ApiExceptionHandler {
 		return error(HttpStatus.FORBIDDEN, "NOT_TEAM_LEADER", ex);
 	}
 
-	// 404 없음(팀원이 아닌 팀도 없는 것으로 본다)
+	@ExceptionHandler(NotDirectorException.class)
+	ResponseEntity<ErrorResponse> notDirector(NotDirectorException ex) {
+		return error(HttpStatus.FORBIDDEN, "NOT_DIRECTOR", ex);
+	}
+
+	@ExceptionHandler(NotSongDirectorException.class)
+	ResponseEntity<ErrorResponse> notSongDirector(NotSongDirectorException ex) {
+		return error(HttpStatus.FORBIDDEN, "NOT_SONG_DIRECTOR", ex);
+	}
+
+	// 404 없음(팀원이 아닌 팀, 명단에 없는 공연과 곡도 없는 것으로 본다)
 
 	@ExceptionHandler(TeamNotFoundException.class)
 	ResponseEntity<ErrorResponse> teamNotFound(TeamNotFoundException ex) {
@@ -77,6 +142,21 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(RequestNotFoundException.class)
 	ResponseEntity<ErrorResponse> requestNotFound(RequestNotFoundException ex) {
 		return error(HttpStatus.NOT_FOUND, "REQUEST_NOT_FOUND", ex);
+	}
+
+	@ExceptionHandler(PerformanceNotFoundException.class)
+	ResponseEntity<ErrorResponse> performanceNotFound(PerformanceNotFoundException ex) {
+		return error(HttpStatus.NOT_FOUND, "PERFORMANCE_NOT_FOUND", ex);
+	}
+
+	@ExceptionHandler(PerformanceMemberNotFoundException.class)
+	ResponseEntity<ErrorResponse> performanceMemberNotFound(PerformanceMemberNotFoundException ex) {
+		return error(HttpStatus.NOT_FOUND, "PERFORMANCE_MEMBER_NOT_FOUND", ex);
+	}
+
+	@ExceptionHandler(SongNotFoundException.class)
+	ResponseEntity<ErrorResponse> songNotFound(SongNotFoundException ex) {
+		return error(HttpStatus.NOT_FOUND, "SONG_NOT_FOUND", ex);
 	}
 
 	// 409 현재 상태와 맞지 않음
@@ -94,6 +174,11 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(RequestNotPendingException.class)
 	ResponseEntity<ErrorResponse> requestNotPending(RequestNotPendingException ex) {
 		return error(HttpStatus.CONFLICT, "REQUEST_NOT_PENDING", ex);
+	}
+
+	@ExceptionHandler(AlreadyInPerformanceException.class)
+	ResponseEntity<ErrorResponse> alreadyInPerformance(AlreadyInPerformanceException ex) {
+		return error(HttpStatus.CONFLICT, "ALREADY_IN_PERFORMANCE", ex);
 	}
 
 	private static ResponseEntity<ErrorResponse> error(HttpStatus status, String code, RuntimeException ex) {
