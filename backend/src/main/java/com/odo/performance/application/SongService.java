@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 
+import com.odo.account.application.AccountReader;
 import com.odo.performance.application.dto.SongResult;
 import com.odo.performance.domain.entity.Song;
 import com.odo.performance.domain.exception.SongNotFoundException;
@@ -26,7 +27,7 @@ public class SongService {
 
 	private final SongAccess songAccess;
 
-	private final AccountNames accountNames;
+	private final AccountReader accountReader;
 
 	private final Clock clock;
 
@@ -35,7 +36,7 @@ public class SongService {
 	public List<SongResult> findSongs(long accountId, long performanceId) {
 		performanceAccess.requireParticipant(performanceId, accountId);
 		List<Song> songs = songRepository.findAllByPerformanceIdAndDeletedAtIsNullOrderByIdAsc(performanceId);
-		Map<Long, String> names = accountNames.namesOf(songs.stream().map(Song::getDirectorAccountId).toList());
+		Map<Long, String> names = accountReader.namesOf(songs.stream().map(Song::getDirectorAccountId).toList());
 		return songs.stream().map(song -> SongResult.of(song, names.get(song.getDirectorAccountId()), accountId)).toList();
 	}
 
@@ -47,14 +48,14 @@ public class SongService {
 	public SongResult createSong(long accountId, long performanceId, String name) {
 		performanceAccess.requireDirector(performanceId, accountId);
 		Song song = songRepository.save(Song.createSong(performanceId, accountId, name, clock.instant()));
-		return SongResult.of(song, accountNames.nameOf(accountId), accountId);
+		return SongResult.of(song, accountReader.nameOf(accountId), accountId);
 	}
 
 	/** 곡이 없음, 삭제됨, 명단에 없음은 SongNotFoundException. */
 	@Transactional(readOnly = true)
 	public SongResult findSong(long accountId, long songId) {
 		Song song = songAccess.requireVisibleSong(songId, accountId);
-		return SongResult.of(song, accountNames.nameOf(song.getDirectorAccountId()), accountId);
+		return SongResult.of(song, accountReader.nameOf(song.getDirectorAccountId()), accountId);
 	}
 
 	/**
@@ -69,7 +70,7 @@ public class SongService {
 		if (songRepository.renameIfNotDeleted(songId, newName, clock.instant()) == 0) {
 			throw new SongNotFoundException();
 		}
-		return SongResult.of(song, newName, accountNames.nameOf(accountId), accountId);
+		return SongResult.of(song, newName, accountReader.nameOf(accountId), accountId);
 	}
 
 	/** 삭제 표시를 한다. 동시에 두 번 오면 하나만 성공한다. 예외는 renameSong과 같다(이름 규칙 제외). */

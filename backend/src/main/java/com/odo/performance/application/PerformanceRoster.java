@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.odo.account.application.AccountReader;
 import com.odo.performance.application.dto.MemberAssignment;
 import com.odo.performance.application.dto.PerformanceMemberResult;
 import com.odo.performance.domain.entity.PerformanceMember;
@@ -37,7 +38,7 @@ class PerformanceRoster {
 
 	private final TeamMemberRepository teamMemberRepository;
 
-	private final AccountNames accountNames;
+	private final AccountReader accountReader;
 
 	/**
 	 * 요청 순서대로 넣고, 넣은 항목을 같은 순서로 돌려준다.
@@ -75,7 +76,7 @@ class PerformanceRoster {
 			}
 			throw ex;
 		}
-		Map<Long, String> names = accountNames.namesOf(distinct);
+		Map<Long, String> names = accountReader.namesOf(distinct);
 		return members.stream()
 			.map(member -> PerformanceMemberResult.of(member, names.get(member.getAccountId()),
 					teamMembers.get(member.getAccountId()).getGeneration()))
