@@ -4,6 +4,7 @@ import java.text.Normalizer;
 import java.time.Instant;
 
 import com.odo.performance.domain.exception.InvalidSongNameException;
+import com.odo.performance.domain.exception.NotSongDirectorException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -99,6 +100,21 @@ class SongTest {
 		assertThat(song.getPerformanceId()).isEqualTo(PERFORMANCE_ID);
 		assertThat(song.getDirectorAccountId()).isEqualTo(DIRECTOR_ACCOUNT_ID);
 		assertThat(song.getDeletedAt()).isNull();
+	}
+
+	@Test
+	@DisplayName("만든 담당 디렉터면 requireDirectedBy가 통과한다")
+	void directedBy() {
+		Song song = createWithName("Ditto");
+		assertThatCode(() -> song.requireDirectedBy(DIRECTOR_ACCOUNT_ID)).doesNotThrowAnyException();
+	}
+
+	@Test
+	@DisplayName("담당 디렉터가 아니면 requireDirectedBy가 NotSongDirectorException을 던진다")
+	void notDirectedBy() {
+		Song song = createWithName("Ditto");
+		assertThatThrownBy(() -> song.requireDirectedBy(DIRECTOR_ACCOUNT_ID + 1))
+			.isInstanceOf(NotSongDirectorException.class);
 	}
 
 }

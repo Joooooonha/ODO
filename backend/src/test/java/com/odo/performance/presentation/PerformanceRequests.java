@@ -105,7 +105,7 @@ class PerformanceRequests {
 		return addMembersBody(accountId, performanceId, Map.of("members", List.of(members)));
 	}
 
-	ResultActions designate(long accountId, long performanceId, long target, Map<String, ?> body) throws Exception {
+	ResultActions changeRole(long accountId, long performanceId, long target, Map<String, ?> body) throws Exception {
 		return send(patch("/api/performances/{performanceId}/members/{accountId}", performanceId, target), accountId,
 				body);
 	}

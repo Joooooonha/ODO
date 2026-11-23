@@ -123,7 +123,7 @@ class PerformanceMemberIntegrationTest {
 		@DisplayName("나중에 들어와 디렉터로 지정된 사람은 먼저 있던 디렉터 뒤, 팀원 앞에 보인다")
 		void orderAfterDesignation() throws Exception {
 			api.addMembers(leader, performanceId, member(bystander)).andExpect(status().isCreated());
-			api.designate(leader, performanceId, bystander, Map.of("role", "DIRECTOR")).andExpect(status().isOk());
+			api.changeRole(leader, performanceId, bystander, Map.of("role", "DIRECTOR")).andExpect(status().isOk());
 
 			api.listMembers(leader, performanceId)
 				.andExpect(jsonPath("$", hasSize(4)))
@@ -271,15 +271,15 @@ class PerformanceMemberIntegrationTest {
 	}
 
 	@Nested
-	@DisplayName("디렉터 지정")
-	class Designate {
+	@DisplayName("명단 역할 변경 (디렉터 지정)")
+	class ChangeRole {
 
 		@Test
 		@DisplayName("팀장은 명단의 팀원을 디렉터로 지정하고 200과 바뀐 명단 항목을 받으며, 지정된 사람은 곡을 만들 수 있다")
-		void designate() throws Exception {
+		void designateDirector() throws Exception {
 			api.createSong(dancer, performanceId, "Ditto").andExpect(status().isForbidden());
 
-			api.designate(leader, performanceId, dancer, Map.of("role", "DIRECTOR"))
+			api.changeRole(leader, performanceId, dancer, Map.of("role", "DIRECTOR"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.accountId").value(dancer))
 				.andExpect(jsonPath("$.name").value("김지수"))
@@ -293,10 +293,10 @@ class PerformanceMemberIntegrationTest {
 		@Test
 		@DisplayName("이미 디렉터인 사람을 다시 지정해도 그대로 200이다")
 		void alreadyDirector() throws Exception {
-			api.designate(leader, performanceId, choreographer, Map.of("role", "DIRECTOR"))
+			api.changeRole(leader, performanceId, choreographer, Map.of("role", "DIRECTOR"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.role").value("DIRECTOR"));
-			api.designate(leader, performanceId, choreographer, Map.of("role", "DIRECTOR"))
+			api.changeRole(leader, performanceId, choreographer, Map.of("role", "DIRECTOR"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.role").value("DIRECTOR"));
 		}
@@ -304,10 +304,10 @@ class PerformanceMemberIntegrationTest {
 		@Test
 		@DisplayName("role이 MEMBER이거나 없으면 400 INVALID_ROLE이고 역할은 그대로다")
 		void invalidRole() throws Exception {
-			api.designate(leader, performanceId, choreographer, Map.of("role", "MEMBER"))
+			api.changeRole(leader, performanceId, choreographer, Map.of("role", "MEMBER"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("INVALID_ROLE"));
-			api.designate(leader, performanceId, choreographer, Map.of())
+			api.changeRole(leader, performanceId, choreographer, Map.of())
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("INVALID_ROLE"));
 
@@ -318,7 +318,7 @@ class PerformanceMemberIntegrationTest {
 		@DisplayName("명단에 없는 accountId면 404 PERFORMANCE_MEMBER_NOT_FOUND다")
 		void notOnRoster() throws Exception {
 			for (long target : List.of(bystander, outsider, 999_999L)) {
-				api.designate(leader, performanceId, target, Map.of("role", "DIRECTOR"))
+				api.changeRole(leader, performanceId, target, Map.of("role", "DIRECTOR"))
 					.andExpect(status().isNotFound())
 					.andExpect(jsonPath("$.code").value("PERFORMANCE_MEMBER_NOT_FOUND"));
 			}
@@ -327,10 +327,10 @@ class PerformanceMemberIntegrationTest {
 		@Test
 		@DisplayName("팀장이 아닌 명단의 사람은 디렉터라도 403 NOT_TEAM_LEADER이고, 명단에 없는 사람은 404 PERFORMANCE_NOT_FOUND다")
 		void notLeader() throws Exception {
-			api.designate(choreographer, performanceId, dancer, Map.of("role", "DIRECTOR"))
+			api.changeRole(choreographer, performanceId, dancer, Map.of("role", "DIRECTOR"))
 				.andExpect(status().isForbidden())
 				.andExpect(jsonPath("$.code").value("NOT_TEAM_LEADER"));
-			api.designate(bystander, performanceId, dancer, Map.of("role", "DIRECTOR"))
+			api.changeRole(bystander, performanceId, dancer, Map.of("role", "DIRECTOR"))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.code").value("PERFORMANCE_NOT_FOUND"));
 

@@ -5,7 +5,7 @@ import java.util.List;
 import com.odo.auth.presentation.LoginAccountId;
 import com.odo.performance.application.PerformanceMemberService;
 import com.odo.performance.presentation.dto.AddPerformanceMembersRequest;
-import com.odo.performance.presentation.dto.DesignateDirectorRequest;
+import com.odo.performance.presentation.dto.ChangePerformanceMemberRoleRequest;
 import com.odo.performance.presentation.dto.MemberEntryRequest;
 import com.odo.performance.presentation.dto.PerformanceMemberResponse;
 import lombok.RequiredArgsConstructor;
@@ -52,10 +52,10 @@ public class PerformanceMemberController {
 	}
 
 	@PatchMapping("/{targetAccountId}")
-	public PerformanceMemberResponse designateDirector(@LoginAccountId long accountId, @PathVariable long performanceId,
-			@PathVariable long targetAccountId, @RequestBody DesignateDirectorRequest request) {
+	public PerformanceMemberResponse changePerformanceMemberRole(@LoginAccountId long accountId, @PathVariable long performanceId,
+			@PathVariable long targetAccountId, @RequestBody ChangePerformanceMemberRoleRequest request) {
 		return PerformanceMemberResponse.from(
-				performanceMemberService.designateDirector(accountId, performanceId, targetAccountId, request.role()));
+				performanceMemberService.changePerformanceMemberRole(accountId, performanceId, targetAccountId, request.role()));
 	}
 
 }

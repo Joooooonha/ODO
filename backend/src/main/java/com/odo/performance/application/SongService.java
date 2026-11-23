@@ -6,9 +6,7 @@ import java.util.Map;
 
 import com.odo.performance.application.dto.SongResult;
 import com.odo.performance.domain.entity.Song;
-import com.odo.performance.domain.exception.NotSongDirectorException;
 import com.odo.performance.domain.exception.SongNotFoundException;
-import com.odo.performance.domain.repository.PerformanceMemberRepository;
 import com.odo.performance.domain.repository.SongRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,8 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 곡 목록, 곡 만들기, 곡 조회, 이름 수정, 삭제. 06_Performance_spec.md의 "API 명세"와 "곡 삭제".
- * 곡 URL(/api/songs/{songId})의 확인 순서: 곡이 있는지 → 그 공연의 명단에 있는지 → 담당 디렉터인지.
- * 앞의 둘은 모두 SongNotFoundException(404)이다. URL이 가리키는 자원이 곡이기 때문이다.
+ * 곡 URL(/api/songs/{songId})의 확인은 SongAccess가 한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -25,9 +22,9 @@ public class SongService {
 
 	private final SongRepository songRepository;
 
-	private final PerformanceMemberRepository performanceMemberRepository;
-
 	private final PerformanceAccess performanceAccess;
+
+	private final SongAccess songAccess;
 
 	private final AccountNames accountNames;
 
@@ -56,7 +53,7 @@ public class SongService {
 	/** 곡이 없음, 삭제됨, 명단에 없음은 SongNotFoundException. */
 	@Transactional(readOnly = true)
 	public SongResult findSong(long accountId, long songId) {
-		Song song = requireVisibleSong(songId, accountId);
+		Song song = songAccess.requireVisibleSong(songId, accountId);
 		return SongResult.of(song, accountNames.nameOf(song.getDirectorAccountId()), accountId);
 	}
 
@@ -66,7 +63,7 @@ public class SongService {
 	 */
 	@Transactional
 	public SongResult renameSong(long accountId, long songId, String name) {
-		Song song = requireOwnSong(songId, accountId);
+		Song song = songAccess.requireOwnSong(songId, accountId);
 		String newName = Song.requireValidName(name);
 		// 삭제와 동시에 와도 삭제된 곡의 이름이 바뀌지 않도록 삭제하지 않았을 때만 바꾼다
 		if (songRepository.renameIfNotDeleted(songId, newName, clock.instant()) == 0) {
@@ -78,28 +75,10 @@ public class SongService {
 	/** 삭제 표시를 한다. 동시에 두 번 오면 하나만 성공한다. 예외는 renameSong과 같다(이름 규칙 제외). */
 	@Transactional
 	public void deleteSong(long accountId, long songId) {
-		requireOwnSong(songId, accountId);
+		songAccess.requireOwnSong(songId, accountId);
 		if (songRepository.deleteIfNotDeleted(songId, clock.instant()) == 0) {
 			throw new SongNotFoundException();
 		}
-	}
-
-	/** 삭제하지 않은 곡이고 그 공연의 명단에 있으면 곡을 돌려준다. 아니면 SongNotFoundException. */
-	private Song requireVisibleSong(long songId, long accountId) {
-		Song song = songRepository.findByIdAndDeletedAtIsNull(songId).orElseThrow(SongNotFoundException::new);
-		if (performanceMemberRepository.findByPerformanceIdAndAccountId(song.getPerformanceId(), accountId).isEmpty()) {
-			throw new SongNotFoundException();
-		}
-		return song;
-	}
-
-	/** requireVisibleSong에 더해 담당 디렉터인지 본다. 아니면 NotSongDirectorException. */
-	private Song requireOwnSong(long songId, long accountId) {
-		Song song = requireVisibleSong(songId, accountId);
-		if (!song.isDirectedBy(accountId)) {
-			throw new NotSongDirectorException();
-		}
-		return song;
 	}
 
 }

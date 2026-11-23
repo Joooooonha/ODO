@@ -77,12 +77,13 @@ public class PerformanceMemberService {
 	}
 
 	/**
-	 * 명단에 있는 사람을 디렉터로 지정한다. 이미 디렉터면 그대로 둔다.
+	 * 명단에 있는 사람의 역할을 바꾼다. role에 따라 엔티티 동작을 고른다. 1차에는 DIRECTOR(디렉터 지정)만 있다.
+	 * 이미 디렉터면 그대로 둔다.
 	 * 명단에 없음 PerformanceNotFoundException, 팀장 아님 NotTeamLeaderException,
 	 * role이 DIRECTOR가 아님 InvalidRoleException(1차에는 해제가 없다), 그 사람이 명단에 없음 PerformanceMemberNotFoundException.
 	 */
 	@Transactional
-	public PerformanceMemberResult designateDirector(long leaderId, long performanceId, long targetAccountId,
+	public PerformanceMemberResult changePerformanceMemberRole(long leaderId, long performanceId, long targetAccountId,
 			PerformanceRole role) {
 		PerformanceMember leader = performanceAccess.requireLeader(performanceId, leaderId);
 		if (role != PerformanceRole.DIRECTOR) {

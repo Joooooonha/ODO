@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.regex.Pattern;
 
 import com.odo.performance.domain.exception.InvalidSongNameException;
+import com.odo.performance.domain.exception.NotSongDirectorException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -86,6 +87,16 @@ public class Song {
 
 	public boolean isDirectedBy(long accountId) {
 		return directorAccountId == accountId;
+	}
+
+	/**
+	 * 담당 디렉터가 아니면 NotSongDirectorException. 지금 역할이 디렉터인지는 보지 않는다.
+	 * 이름 수정과 삭제는 조건부 UPDATE라 이 검사를 담을 수정 메서드가 없어 따로 둔다.
+	 */
+	public void requireDirectedBy(long accountId) {
+		if (!isDirectedBy(accountId)) {
+			throw new NotSongDirectorException();
+		}
 	}
 
 	/** NFC로 합치고 앞뒤 공백을 뺀 값. null은 null. */
