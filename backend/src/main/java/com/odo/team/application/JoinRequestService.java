@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.odo.account.application.AccountReader;
 import com.odo.team.application.dto.InvitePreviewResult;
 import com.odo.team.application.dto.InviteStatus;
 import com.odo.team.application.dto.JoinRequestResult;
@@ -51,7 +52,9 @@ public class JoinRequestService {
 
 	private final TeamAccess teamAccess;
 
-	private final NameLookup nameLookup;
+	private final TeamMemberReader teamMemberReader;
+
+	private final AccountReader accountReader;
 
 	private final Clock clock;
 
@@ -59,7 +62,7 @@ public class JoinRequestService {
 	@Transactional(readOnly = true)
 	public InvitePreviewResult previewInvite(long accountId, String inviteCode) {
 		Team team = teamRepository.findByInviteCode(inviteCode).orElseThrow(InviteNotFoundException::new);
-		String leaderName = nameLookup.leaderNameOf(team.getId());
+		String leaderName = accountReader.nameOf(teamMemberReader.leaderIdOf(team.getId()));
 		if (teamMemberRepository.findByTeamIdAndAccountId(team.getId(), accountId).isPresent()) {
 			return toPreviewResult(team, leaderName, InviteStatus.MEMBER, null);
 		}
@@ -86,7 +89,7 @@ public class JoinRequestService {
 		teamAccess.requireLeader(teamId, leaderId);
 		List<JoinRequest> requests = joinRequestRepository.findAllByTeamIdAndStatusOrderByRequestedAtAscIdAsc(teamId,
 				JoinRequestStatus.PENDING);
-		Map<Long, String> names = nameLookup.namesOf(requests.stream().map(JoinRequest::getAccountId).toList());
+		Map<Long, String> names = accountReader.namesOf(requests.stream().map(JoinRequest::getAccountId).toList());
 		return requests.stream()
 			.map(request -> PendingJoinRequestResult.of(request, names.get(request.getAccountId())))
 			.toList();
@@ -148,7 +151,7 @@ public class JoinRequestService {
 			}
 			throw ex;
 		}
-		return TeamMemberResult.of(member, nameLookup.nameOf(member.getAccountId()));
+		return TeamMemberResult.of(member, accountReader.nameOf(member.getAccountId()));
 	}
 
 	/** 거절. 예외는 승인과 같다. */

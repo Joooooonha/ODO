@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.odo.account.application.AccountReader;
 import com.odo.team.application.dto.MyTeamResult;
 import com.odo.team.application.dto.TeamDetailResult;
 import com.odo.team.application.dto.TeamMemberResult;
@@ -40,7 +41,9 @@ public class TeamService {
 
 	private final TeamAccess teamAccess;
 
-	private final NameLookup nameLookup;
+	private final TeamMemberReader teamMemberReader;
+
+	private final AccountReader accountReader;
 
 	private final Clock clock;
 
@@ -53,7 +56,7 @@ public class TeamService {
 		Team team = Team.createTeam(name, description, clock.instant());
 		teamRepository.save(team);
 		teamMemberRepository.save(TeamMember.createLeader(team.getId(), accountId, generation, team.getCreatedAt()));
-		return TeamDetailResult.of(team, nameLookup.nameOf(accountId), TeamRole.LEADER);
+		return TeamDetailResult.of(team, accountReader.nameOf(accountId), TeamRole.LEADER);
 	}
 
 	@Transactional(readOnly = true)
@@ -71,14 +74,14 @@ public class TeamService {
 	@Transactional(readOnly = true)
 	public TeamDetailResult findTeamDetail(long accountId, long teamId) {
 		TeamMember me = teamAccess.requireMember(teamId, accountId);
-		return TeamDetailResult.of(findTeam(teamId), nameLookup.leaderNameOf(teamId), me.getRole());
+		return TeamDetailResult.of(findTeam(teamId), accountReader.nameOf(teamMemberReader.leaderIdOf(teamId)), me.getRole());
 	}
 
 	@Transactional(readOnly = true)
 	public List<TeamMemberResult> findTeamMembers(long accountId, long teamId) {
 		teamAccess.requireMember(teamId, accountId);
 		List<TeamMember> members = teamMemberRepository.findAllByTeamId(teamId);
-		Map<Long, String> names = nameLookup.namesOf(members.stream().map(TeamMember::getAccountId).toList());
+		Map<Long, String> names = accountReader.namesOf(members.stream().map(TeamMember::getAccountId).toList());
 		return members.stream()
 			.sorted(MEMBER_ORDER)
 			.map(member -> TeamMemberResult.of(member, names.get(member.getAccountId())))
@@ -90,7 +93,7 @@ public class TeamService {
 	public TeamMemberResult changeMyGeneration(long accountId, long teamId, Integer generation) {
 		TeamMember me = teamAccess.requireMember(teamId, accountId);
 		me.changeGeneration(generation, clock.instant());
-		return TeamMemberResult.of(me, nameLookup.nameOf(accountId));
+		return TeamMemberResult.of(me, accountReader.nameOf(accountId));
 	}
 
 	@Transactional(readOnly = true)

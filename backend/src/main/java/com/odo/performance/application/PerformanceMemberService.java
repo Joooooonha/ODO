@@ -2,10 +2,10 @@ package com.odo.performance.application;
 
 import java.time.Clock;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.odo.account.application.AccountReader;
 import com.odo.performance.application.dto.MemberAssignment;
 import com.odo.performance.application.dto.PerformanceMemberResult;
 import com.odo.performance.domain.entity.PerformanceMember;
@@ -14,8 +14,7 @@ import com.odo.performance.domain.exception.EmptyMembersException;
 import com.odo.performance.domain.exception.InvalidRoleException;
 import com.odo.performance.domain.exception.PerformanceMemberNotFoundException;
 import com.odo.performance.domain.repository.PerformanceMemberRepository;
-import com.odo.team.domain.entity.TeamMember;
-import com.odo.team.domain.repository.TeamMemberRepository;
+import com.odo.team.application.TeamMemberReader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,13 +34,13 @@ public class PerformanceMemberService {
 
 	private final PerformanceMemberRepository performanceMemberRepository;
 
-	private final TeamMemberRepository teamMemberRepository;
+	private final TeamMemberReader teamMemberReader;
 
 	private final PerformanceRoster performanceRoster;
 
 	private final PerformanceAccess performanceAccess;
 
-	private final AccountNames accountNames;
+	private final AccountReader accountReader;
 
 	private final Clock clock;
 
@@ -53,8 +52,8 @@ public class PerformanceMemberService {
 			.stream()
 			.sorted(ROSTER_ORDER)
 			.toList();
-		Map<Long, Integer> generations = generationsOf(me.getTeamId());
-		Map<Long, String> names = accountNames.namesOf(members.stream().map(PerformanceMember::getAccountId).toList());
+		Map<Long, Integer> generations = teamMemberReader.generationsOf(me.getTeamId());
+		Map<Long, String> names = accountReader.namesOf(members.stream().map(PerformanceMember::getAccountId).toList());
 		return members.stream()
 			.map(member -> PerformanceMemberResult.of(member, names.get(member.getAccountId()),
 					generations.get(member.getAccountId())))
@@ -93,18 +92,8 @@ public class PerformanceMemberService {
 			.findByPerformanceIdAndAccountId(performanceId, targetAccountId)
 			.orElseThrow(PerformanceMemberNotFoundException::new);
 		target.designateDirector(clock.instant());
-		Integer generation = teamMemberRepository.findByTeamIdAndAccountId(leader.getTeamId(), targetAccountId)
-			.map(TeamMember::getGeneration)
-			.orElse(null);
-		return PerformanceMemberResult.of(target, accountNames.nameOf(targetAccountId), generation);
-	}
-
-	/** 그 팀 팀원들의 지금 기수. 기수가 없는 팀원도 있다. Collectors.toMap은 null 값을 받지 않아 직접 모은다. */
-	private Map<Long, Integer> generationsOf(long teamId) {
-		Map<Long, Integer> generations = new HashMap<>();
-		teamMemberRepository.findAllByTeamId(teamId)
-			.forEach(member -> generations.put(member.getAccountId(), member.getGeneration()));
-		return generations;
+		Integer generation = teamMemberReader.generationOf(leader.getTeamId(), targetAccountId);
+		return PerformanceMemberResult.of(target, accountReader.nameOf(targetAccountId), generation);
 	}
 
 }
