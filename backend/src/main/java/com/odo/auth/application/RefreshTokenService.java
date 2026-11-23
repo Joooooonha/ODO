@@ -123,7 +123,9 @@ public class RefreshTokenService {
 		}
 	}
 
-	public record RefreshResult(String accessToken, String newRefreshToken) {
+	public record RefreshResult(
+			String accessToken,
+			String newRefreshToken) {
 	}
 
 	public static class RefreshFailedException extends RuntimeException {

@@ -8,7 +8,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * odo.* 설정. 운영에서는 환경 변수로 넣는다.
  */
 @ConfigurationProperties("odo")
-public record OdoProperties(String frontendBaseUrl, Auth auth) {
+public record OdoProperties(
+		String frontendBaseUrl,
+		Auth auth) {
 
 	private static final int MIN_SECRET_BYTES = 32;
 
@@ -23,7 +25,9 @@ public record OdoProperties(String frontendBaseUrl, Auth auth) {
 				: frontendBaseUrl;
 	}
 
-	public record Auth(String jwtSecret, String oauthCookieSecret) {
+	public record Auth(
+			String jwtSecret,
+			String oauthCookieSecret) {
 
 		public Auth {
 			requireSecret("odo.auth.jwt-secret", jwtSecret);

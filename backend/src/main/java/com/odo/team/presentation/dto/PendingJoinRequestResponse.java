@@ -4,7 +4,11 @@ import java.time.Instant;
 
 import com.odo.team.application.dto.PendingJoinRequestResult;
 
-public record PendingJoinRequestResponse(long requestId, long accountId, String name, Integer generation,
+public record PendingJoinRequestResponse(
+		long requestId,
+		long accountId,
+		String name,
+		Integer generation,
 		Instant requestedAt) {
 
 	public static PendingJoinRequestResponse from(PendingJoinRequestResult result) {

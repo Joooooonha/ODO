@@ -10,7 +10,9 @@ import com.odo.performance.domain.entity.PerformanceRole;
  * 명단에 넣을 한 사람. role이 DIRECTOR, MEMBER가 아니면 JSON을 읽을 때 실패해 INVALID_REQUEST가 된다.
  * accountId나 role이 없어도 INVALID_REQUEST다.
  */
-public record MemberEntryRequest(Long accountId, PerformanceRole role) {
+public record MemberEntryRequest(
+		Long accountId,
+		PerformanceRole role) {
 
 	/** 명단이 없으면 빈 목록으로 본다. 빈 명단을 어떤 오류로 볼지는 서비스가 정한다(공연 만들기와 명단 추가가 다르다). */
 	public static List<MemberAssignment> toAssignments(List<MemberEntryRequest> entries) {

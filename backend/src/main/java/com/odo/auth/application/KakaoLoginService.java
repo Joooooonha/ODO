@@ -61,7 +61,9 @@ public class KakaoLoginService {
 			.orElse(null);
 	}
 
-	public record LoginResult(long accountId, boolean newAccount) {
+	public record LoginResult(
+			long accountId,
+			boolean newAccount) {
 	}
 
 }

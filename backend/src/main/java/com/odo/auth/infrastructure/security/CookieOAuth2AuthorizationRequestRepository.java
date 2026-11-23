@@ -111,9 +111,16 @@ public class CookieOAuth2AuthorizationRequestRepository
 	}
 
 	/** 쿠키에 담는 인가 요청. Spring Security가 콜백에서 다시 만들 수 있도록 필요한 값을 모두 둔다. */
-	record StoredRequest(String authorizationUri, String clientId, String redirectUri, Set<String> scopes,
-			String state, Map<String, Object> additionalParameters, Map<String, Object> attributes,
-			String authorizationRequestUri, String redirect) {
+	record StoredRequest(
+			String authorizationUri,
+			String clientId,
+			String redirectUri,
+			Set<String> scopes,
+			String state,
+			Map<String, Object> additionalParameters,
+			Map<String, Object> attributes,
+			String authorizationRequestUri,
+			String redirect) {
 
 		static StoredRequest from(OAuth2AuthorizationRequest request, String redirect) {
 			return new StoredRequest(request.getAuthorizationUri(), request.getClientId(), request.getRedirectUri(),
