@@ -2,7 +2,12 @@ package com.odo.performance.presentation.dto;
 
 import com.odo.performance.application.dto.SongResult;
 
-public record SongResponse(long id, long performanceId, String name, long directorAccountId, String directorName,
+public record SongResponse(
+		long id,
+		long performanceId,
+		String name,
+		long directorAccountId,
+		String directorName,
 		boolean mine) {
 
 	public static SongResponse from(SongResult result) {

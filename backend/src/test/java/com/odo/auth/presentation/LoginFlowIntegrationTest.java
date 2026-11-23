@@ -131,7 +131,9 @@ class LoginFlowIntegrationTest {
 	}
 
 	/** 로그인을 시작해 발급된 OAuth 상태 쿠키와, 카카오로 보낸 state */
-	private record LoginStart(Cookie cookie, String state) {
+	private record LoginStart(
+			Cookie cookie,
+			String state) {
 	}
 
 	private LoginStart startLogin() throws Exception {

@@ -8,7 +8,12 @@ import com.odo.team.domain.entity.TeamRole;
  * 팀 상세 조회(GET /api/teams/{teamId})와 팀 생성(POST /api/teams) 직후의 응답에 쓴다.
  * 내 팀 목록의 한 항목인 MyTeamResult와 구분하려고 Detail을 붙였다. myRole은 보는 사람의 역할이다.
  */
-public record TeamDetailResult(long id, String name, String description, String leaderName, TeamRole myRole) {
+public record TeamDetailResult(
+		long id,
+		String name,
+		String description,
+		String leaderName,
+		TeamRole myRole) {
 
 	public static TeamDetailResult of(Team team, String leaderName, TeamRole myRole) {
 		return new TeamDetailResult(team.getId(), team.getName(), team.getDescription(), leaderName, myRole);
