@@ -16,6 +16,7 @@ import com.odo.team.domain.entity.JoinRequest;
 import com.odo.team.domain.entity.JoinRequestStatus;
 import com.odo.team.domain.entity.Team;
 import com.odo.team.domain.entity.TeamMember;
+import com.odo.team.domain.event.TeamMemberJoinedEvent;
 import com.odo.team.domain.exception.AlreadyMemberException;
 import com.odo.team.domain.exception.AlreadyRequestedException;
 import com.odo.team.domain.exception.InviteNotFoundException;
@@ -26,6 +27,7 @@ import com.odo.team.domain.repository.TeamMemberRepository;
 import com.odo.team.domain.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +57,8 @@ public class JoinRequestService {
 	private final TeamMemberReader teamMemberReader;
 
 	private final AccountReader accountReader;
+
+	private final ApplicationEventPublisher eventPublisher;
 
 	private final Clock clock;
 
@@ -133,9 +137,13 @@ public class JoinRequestService {
 	 * 팀원 아님 TeamNotFoundException, 팀장 아님 NotTeamLeaderException,
 	 * 이 팀의 요청이 아님 RequestNotFoundException, 이미 처리됨 RequestNotPendingException,
 	 * 요청한 사람이 이미 팀원 AlreadyMemberException(이때 요청은 대기 중으로 남는다).
+	 * 팀원을 넣은 뒤 같은 트랜잭션에서 TeamMemberJoinedEvent를 발행한다. 받는 쪽(일정)이 실패하면 승인도 롤백된다.
 	 */
 	@Transactional
 	public TeamMemberResult approve(long leaderId, long teamId, long requestId) {
+		// 맨 먼저 팀 행을 잠근다. 일정 만들기도 팀원 목록을 읽기 전에 같은 행을 잠그므로 둘이 한 번에 하나씩 돈다.
+		// 그래서 일정 만들기는 이 승인이 넣은 팀원을 보거나, 승인 쪽 리스너가 그 일정을 본다(03_Schedule_spec.md의 "참여자 행과 새 팀원").
+		teamRepository.lockById(teamId);
 		JoinRequest request = decide(leaderId, teamId, requestId, JoinRequestStatus.APPROVED);
 		// 조건부 UPDATE가 이 요청 행을 잠근 채로 팀원을 넣는다. 상태 변경과 팀원 추가는 같은 트랜잭션이라 함께 반영되거나 함께 취소된다.
 		TeamMember member;
@@ -151,6 +159,7 @@ public class JoinRequestService {
 			}
 			throw ex;
 		}
+		eventPublisher.publishEvent(new TeamMemberJoinedEvent(teamId, member.getAccountId()));
 		return TeamMemberResult.of(member, accountReader.nameOf(member.getAccountId()));
 	}
 
