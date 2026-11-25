@@ -5,7 +5,7 @@ import org.springframework.boot.SpringApplication;
 public class TestOdoApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.from(OdoApplication::main).with(TestcontainersConfiguration.class).run(args);
+		SpringApplication.from(OdoApplication::main).with(TestcontainersConfiguration.class, LocalStorageConfiguration.class).run(args);
 	}
 
 }

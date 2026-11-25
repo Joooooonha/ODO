@@ -15,6 +15,15 @@ odo:
   clock:
     # 테스트는 기준 시간 서버에 붙지 않는다(감시를 끈다).
     reference-host: ""
+  storage:
+    # 테스트는 메모리 저장소(InMemoryObjectStorage)를 쓴다. R2 구현은 만들어지지만 닿지 않는다.
+    endpoint: http://localhost:9
+    bucket: test-bucket
+    access-key-id: test-access-key
+    secret-access-key: test-secret-key
+  practice-video:
+    # 테스트는 청소 작업을 끄고 removeExpired()를 직접 부른다.
+    cleanup-enabled: false
 
 spring:
   security:

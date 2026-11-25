@@ -4,9 +4,9 @@ spring:
   task:
     scheduling:
       pool:
-        # 스케줄 작업(투표 작업자, 시계 감시, 토큰 정리)마다 스레드를 하나씩 둔다. 기본값(1개)이면 시계 감시가
+        # 스케줄 작업(투표 작업자, 시계 감시, 토큰 정리, 연습 영상 청소)마다 스레드를 하나씩 둔다. 기본값(1개)이면 시계 감시가
         # 기준 서버의 응답을 기다리는 동안 투표 작업자도 멈춘다. 스케줄 작업을 더하면 이 값도 올린다.
-        size: 3
+        size: 4
   jpa:
     open-in-view: false
     hibernate:
@@ -53,3 +53,19 @@ odo:
     # 시계 차이를 잴 기준 시간 서버(SNTP). 비어 있으면 감시를 끈다.
     reference-host: ${ODO_CLOCK_REFERENCE_HOST:}
     check-interval: 30s
+  storage:
+    # 파일 저장소(Cloudflare R2)의 S3 API 주소, 버킷, 접근 키. 비어 있으면 서버가 뜨지 않는다(08_PracticeVideo_spec.md의 "저장소").
+    endpoint: ${ODO_STORAGE_ENDPOINT}
+    bucket: ${ODO_STORAGE_BUCKET}
+    access-key-id: ${ODO_STORAGE_ACCESS_KEY_ID}
+    secret-access-key: ${ODO_STORAGE_SECRET_ACCESS_KEY}
+  practice-video:
+    # 업로드 주소의 만료. 이 안에 전송을 시작해야 한다.
+    upload-url-ttl: 30m
+    # 업로드 시작부터 완료까지의 기한. 지나면 실패로 보고 청소 작업이 지운다.
+    upload-deadline: 6h
+    # 재생 주소의 만료. 한 번 연습하는 시간(2~3시간)을 덮는다.
+    playback-url-ttl: 3h
+    page-size: 20
+    cleanup-interval: 10m
+    cleanup-enabled: true
