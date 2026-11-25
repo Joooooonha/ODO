@@ -188,6 +188,52 @@ class ScheduleRequests {
 		return send(patch("/api/schedules/{id}/participants/{accountId}", scheduleId, target), accountId, body);
 	}
 
+	// 투표
+
+	/** 투표를 보낸다. choice가 null이면 본문에 choice를 넣지 않는다. */
+	ResultActions vote(long accountId, long scheduleId, String choice) throws Exception {
+		Map<String, Object> body = new HashMap<>();
+		if (choice != null) {
+			body.put("choice", choice);
+		}
+		return send(post("/api/schedules/{id}/votes", scheduleId), accountId, body);
+	}
+
+	/** 투표를 보내고 202를 확인한 뒤 요청 ID를 돌려준다. */
+	long voteRequestId(long accountId, long scheduleId, String choice) throws Exception {
+		String response = body(vote(accountId, scheduleId, choice).andExpect(status().isAccepted()));
+		return ((Number) JsonPath.read(response, "$.requestId")).longValue();
+	}
+
+	ResultActions voteResult(long accountId, long requestId) throws Exception {
+		return mockMvc
+			.perform(get("/api/vote-requests/{requestId}", requestId).header("Authorization", bearer(accountId)));
+	}
+
+	/** 요청 테이블의 처리 상태(PENDING, CONFIRMED, FULL, INVALID). */
+	String requestStatusOf(long requestId) {
+		return jdbc.queryForObject("SELECT status FROM vote_request WHERE id = ?", String.class, requestId);
+	}
+
+	String requestReasonOf(long requestId) {
+		return jdbc.queryForObject("SELECT reason FROM vote_request WHERE id = ?", String.class, requestId);
+	}
+
+	boolean reorderedOf(long requestId) {
+		return jdbc.queryForObject("SELECT reordered FROM vote_request WHERE id = ?", Boolean.class, requestId);
+	}
+
+	int countVoteRequests() {
+		return jdbc.queryForObject("SELECT count(*) FROM vote_request", Integer.class);
+	}
+
+	/** 그 일정에서 참여로 투표한 선택 참여자 수. */
+	int countYes(long scheduleId) {
+		return jdbc.queryForObject(
+				"SELECT count(*) FROM schedule_participant WHERE schedule_id = ? AND status = 'OPTIONAL' AND vote = 'YES'",
+				Integer.class, scheduleId);
+	}
+
 	// DB 확인과 준비
 
 	/** 투표 기능 없이 참여자의 투표 값을 넣는다. 선택 참여자에게만 쓴다(DB check). */

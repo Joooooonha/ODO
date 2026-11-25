@@ -11,7 +11,7 @@ public final class DatabaseCleaner {
 	}
 
 	public static void clean(JdbcTemplate jdbc) {
-		jdbc.execute("TRUNCATE TABLE notification_event, schedule_participant, schedule, practice_room, song, performance_member, performance, join_request, team_member, team, refresh_token, social_login, account RESTART IDENTITY CASCADE");
+		jdbc.execute("TRUNCATE TABLE vote_request, notification_event, schedule_participant, schedule, practice_room, song, performance_member, performance, join_request, team_member, team, refresh_token, social_login, account RESTART IDENTITY CASCADE");
 	}
 
 }

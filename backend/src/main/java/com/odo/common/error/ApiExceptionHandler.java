@@ -36,6 +36,7 @@ import com.odo.schedule.domain.exception.ParticipantNotFoundException;
 import com.odo.schedule.domain.exception.PracticeRoomNotFoundException;
 import com.odo.schedule.domain.exception.ScheduleEndedException;
 import com.odo.schedule.domain.exception.ScheduleNotFoundException;
+import com.odo.schedule.domain.exception.VoteRequestNotFoundException;
 import com.odo.schedule.domain.exception.VotingClosedException;
 import com.odo.team.domain.exception.AlreadyMemberException;
 import com.odo.team.domain.exception.AlreadyRequestedException;
@@ -304,6 +305,11 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(ParticipantNotFoundException.class)
 	ResponseEntity<ErrorResponse> participantNotFound(ParticipantNotFoundException ex) {
 		return error(HttpStatus.NOT_FOUND, "PARTICIPANT_NOT_FOUND", ex);
+	}
+
+	@ExceptionHandler(VoteRequestNotFoundException.class)
+	ResponseEntity<ErrorResponse> voteRequestNotFound(VoteRequestNotFoundException ex) {
+		return error(HttpStatus.NOT_FOUND, "VOTE_REQUEST_NOT_FOUND", ex);
 	}
 
 	// 일정. 409 자원의 지금 상태와 충돌

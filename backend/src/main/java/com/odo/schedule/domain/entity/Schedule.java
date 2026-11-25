@@ -204,6 +204,29 @@ public class Schedule {
 		return votingEnabled && !now.isBefore(voteDeadline);
 	}
 
+	/** 정원이 없거나, 참여한 선택 참여자 수가 정원보다 적으면 자리가 있다. */
+	public boolean hasSeat(long confirmedCount) {
+		return capacity == null || confirmedCount < capacity;
+	}
+
+	/**
+	 * 이 도착 시각의 요청을 지금 처리하면 역전인지. 이미 처리한 요청 중 가장 늦은 도착 시각보다 이르면 역전이다.
+	 * 03_Schedule_spec.md의 "역전 기록".
+	 */
+	public boolean isReordered(Instant arrivedAt) {
+		return lastConfirmedArrivedAt != null && arrivedAt.isBefore(lastConfirmedArrivedAt);
+	}
+
+	/**
+	 * 처리한 투표 요청의 도착 시각을 남긴다. 늦게 처리한 이른 요청이 기준을 앞으로 당기지 않도록 가장 늦은 값만 둔다.
+	 * 당겨지면 그다음에 늦게 온 요청이 역전으로 잡히지 않는다. 결과(확정, 정원 마감, 무효)와 관계없이 남긴다.
+	 */
+	public void recordProcessedArrival(Instant arrivedAt) {
+		if (lastConfirmedArrivedAt == null || arrivedAt.isAfter(lastConfirmedArrivedAt)) {
+			this.lastConfirmedArrivedAt = arrivedAt;
+		}
+	}
+
 	/** 일정을 만들거나 팀원이 들어올 때의 상태. 투표를 받으면 선택, 받지 않으면 제외다. */
 	public ParticipantStatus defaultParticipantStatus() {
 		return votingEnabled ? ParticipantStatus.OPTIONAL : ParticipantStatus.EXCLUDED;

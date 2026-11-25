@@ -84,6 +84,23 @@ public class ScheduleParticipant implements Persistable<ScheduleParticipantId> {
 		return true;
 	}
 
+	/**
+	 * 본인의 투표를 반영한다(작업자). 같은 투표면 아무것도 바꾸지 않고 false를 돌려준다.
+	 * 선택 참여자만 투표를 가진다. 확인은 작업자가 판정 표의 순서대로 먼저 한다.
+	 */
+	public boolean castVote(Vote newVote, Instant now) {
+		if (!isOptional()) {
+			throw new IllegalStateException("선택 참여자만 투표할 수 있다");
+		}
+		if (newVote == vote) {
+			return false;
+		}
+		this.vote = newVote;
+		this.votedAt = now;
+		this.updatedAt = now;
+		return true;
+	}
+
 	public boolean isOptional() {
 		return status == ParticipantStatus.OPTIONAL;
 	}

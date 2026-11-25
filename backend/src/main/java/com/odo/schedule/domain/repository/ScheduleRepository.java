@@ -23,6 +23,14 @@ public interface ScheduleRepository {
 	Optional<Schedule> lockById(long id);
 
 	/**
+	 * 일정 행을 FOR UPDATE SKIP LOCKED로 잠그고 읽는다. 투표 작업자가 쓴다.
+	 * 다른 트랜잭션(다른 작업자, 팀장의 조작)이 잠그고 있으면 기다리지 않고 빈 값을 돌려준다. 행이 없어도 빈 값이다.
+	 */
+	Optional<Schedule> lockByIdSkipLocked(long id);
+
+	boolean existsById(Long id);
+
+	/**
 	 * 팀의 완료되지 않은 일정을 FOR SHARE로 잠그고 읽는다. 새 팀원의 참여자 행을 넣을 때 쓴다.
 	 * 그사이 일정이 지워지면 삭제가 이 잠금을 기다리므로, 지워진 일정에 행을 넣다가 FK 오류가 나지 않는다.
 	 */

@@ -20,6 +20,10 @@ interface ScheduleJpaRepository extends JpaRepository<Schedule, Long>, ScheduleR
 	Optional<Schedule> lockById(@Param("id") long id);
 
 	@Override
+	@Query(value = "SELECT * FROM schedule WHERE id = :id FOR UPDATE SKIP LOCKED", nativeQuery = true)
+	Optional<Schedule> lockByIdSkipLocked(@Param("id") long id);
+
+	@Override
 	@Query(value = "SELECT * FROM schedule WHERE team_id = :teamId AND end_at > :now ORDER BY id FOR SHARE",
 			nativeQuery = true)
 	List<Schedule> lockIncompleteForShare(@Param("teamId") long teamId, @Param("now") Instant now);
