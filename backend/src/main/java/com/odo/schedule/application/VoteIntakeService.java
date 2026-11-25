@@ -28,7 +28,7 @@ public class VoteIntakeService {
 	@Transactional
 	public VoteRequestResult accept(long scheduleId, long accountId, Vote choice, Instant arrivedAt,
 			String receivedBy) {
-		VoteRequest request = VoteRequest.accept(scheduleId, accountId, choice, arrivedAt, receivedBy,
+		VoteRequest request = VoteRequest.createPending(scheduleId, accountId, choice, arrivedAt, receivedBy,
 				clock.instant());
 		return VoteRequestResult.from(voteRequestRepository.save(request));
 	}

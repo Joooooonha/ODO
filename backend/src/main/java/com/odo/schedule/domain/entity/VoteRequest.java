@@ -66,7 +66,11 @@ public class VoteRequest {
 	@Column(name = "processed_at")
 	private Instant processedAt;
 
-	public static VoteRequest accept(long scheduleId, long accountId, Vote choice, Instant arrivedAt,
+	/**
+	 * 접수한 투표를 대기(PENDING) 상태의 요청으로 만든다. 팀원인지, 마감, 정원은 여기서 확인하지 않는다.
+	 * 작업자가 도착 시각 + W가 지난 뒤 꺼내서 판단한다.
+	 */
+	public static VoteRequest createPending(long scheduleId, long accountId, Vote choice, Instant arrivedAt,
 			String receivedBy, Instant now) {
 		VoteRequest request = new VoteRequest();
 		request.scheduleId = scheduleId;
@@ -79,15 +83,18 @@ public class VoteRequest {
 		return request;
 	}
 
-	public void confirm(boolean reordered, Instant now) {
+	/** 처리를 끝낸다. 투표를 참여자 행에 반영했다(같은 투표라 바뀐 것이 없는 경우도 포함). 대기 상태에서만 부를 수 있다. */
+	public void completeAsConfirmed(boolean reordered, Instant now) {
 		complete(VoteRequestStatus.CONFIRMED, null, reordered, now);
 	}
 
-	public void full(boolean reordered, Instant now) {
+	/** 처리를 끝낸다. 정원이 차서 참여를 반영하지 못했다. 대기 상태에서만 부를 수 있다. */
+	public void completeAsFull(boolean reordered, Instant now) {
 		complete(VoteRequestStatus.FULL, null, reordered, now);
 	}
 
-	public void invalidate(VoteInvalidReason reason, boolean reordered, Instant now) {
+	/** 처리를 끝낸다. 투표가 무효이고, 그 이유를 남긴다. 대기 상태에서만 부를 수 있다. */
+	public void completeAsInvalid(VoteInvalidReason reason, boolean reordered, Instant now) {
 		complete(VoteRequestStatus.INVALID, reason, reordered, now);
 	}
 

@@ -123,25 +123,25 @@ public class VoteProcessor {
 			boolean reordered, Instant now) {
 		VoteInvalidReason invalid = invalidReason(schedule, participant, request);
 		if (invalid != null) {
-			request.invalidate(invalid, reordered, now);
+			request.completeAsInvalid(invalid, reordered, now);
 			return 0;
 		}
 		Vote before = participant.getVote();
 		if (request.getChoice() == Vote.NO) {
 			participant.castVote(Vote.NO, now);
-			request.confirm(reordered, now);
+			request.completeAsConfirmed(reordered, now);
 			return before == Vote.YES ? -1 : 0;
 		}
 		if (before == Vote.YES) {
-			request.confirm(reordered, now);
+			request.completeAsConfirmed(reordered, now);
 			return 0;
 		}
 		if (schedule.hasSeat(confirmed)) {
 			participant.castVote(Vote.YES, now);
-			request.confirm(reordered, now);
+			request.completeAsConfirmed(reordered, now);
 			return 1;
 		}
-		request.full(reordered, now);
+		request.completeAsFull(reordered, now);
 		return 0;
 	}
 
@@ -169,7 +169,7 @@ public class VoteProcessor {
 	 */
 	private int invalidateDeleted(long scheduleId, Instant cutoff, Instant now) {
 		List<VoteRequest> due = voteRequestRepository.lockDueSkipLocked(scheduleId, cutoff);
-		due.forEach(request -> request.invalidate(VoteInvalidReason.SCHEDULE_NOT_FOUND, false, now));
+		due.forEach(request -> request.completeAsInvalid(VoteInvalidReason.SCHEDULE_NOT_FOUND, false, now));
 		return due.size();
 	}
 
