@@ -6,6 +6,16 @@ package com.odo.schedule.domain.entity;
  */
 public enum ParticipantStatus {
 
-	REQUIRED, OPTIONAL, EXCLUDED
+	/** 필수. 투표 없이 참여 인원에 들어간다. 투표 일정과 투표 없는 일정 모두 쓴다. */
+	REQUIRED,
+
+	/**
+	 * 선택. 투표 일정에서만 쓴다. 마감 전에 참여로 투표해야 참여 인원에 들어가고, 미투표와 불참은 들어가지 않는다.
+	 * 투표를 가질 수 있는 유일한 상태다.
+	 */
+	OPTIONAL,
+
+	/** 제외. 투표 없는 일정에서만 쓴다. 참여하지 않고, 그 일정의 알림도 받지 않는다. */
+	EXCLUDED
 
 }
