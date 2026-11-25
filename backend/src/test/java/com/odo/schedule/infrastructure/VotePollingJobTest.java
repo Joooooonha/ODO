@@ -55,12 +55,13 @@ class VotePollingJobTest {
 	void passesCutoffOfLastRun() {
 		Instant cutoff = Instant.parse("2026-11-25T09:59:56Z");
 		when(processor.currentCutoff()).thenReturn(cutoff);
-		when(processor.nextRunDelay(cutoff)).thenReturn(Duration.ZERO);
+		// Mockito가 정하지 않은 Duration 반환값으로 돌려주는 Duration.ZERO와 다른 값이어야, 어느 메서드를 불렀는지 구별된다.
+		when(processor.nextRunDelay(cutoff)).thenReturn(Duration.ofMillis(7));
 
 		job.run();
 
 		verify(processor).processDue(cutoff);
-		assertThat(job.nextExecution(context)).isEqualTo(SCHEDULER_NOW);
+		assertThat(job.nextExecution(context)).isEqualTo(SCHEDULER_NOW.plusMillis(7));
 	}
 
 }
