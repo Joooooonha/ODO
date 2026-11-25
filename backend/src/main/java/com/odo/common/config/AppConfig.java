@@ -3,6 +3,7 @@ package com.odo.common.config;
 import java.time.Clock;
 
 import com.odo.common.crypto.CryptoProperties;
+import com.odo.common.time.ClockProperties;
 import com.odo.schedule.application.VoteProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -10,7 +11,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties({ OdoProperties.class, CryptoProperties.class, VoteProperties.class })
+@EnableConfigurationProperties({ OdoProperties.class, CryptoProperties.class, ClockProperties.class,
+		VoteProperties.class })
 @EnableScheduling
 public class AppConfig {
 

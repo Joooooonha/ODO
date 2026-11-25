@@ -42,3 +42,7 @@ odo:
     # 작업자가 처리할 요청을 확인하는 주기. 결과가 최대 그만큼 늦어진다.
     poll-interval: 200ms
     worker-enabled: true
+  clock:
+    # 시계 차이를 잴 기준 시간 서버(SNTP). 비어 있으면 감시를 끈다.
+    reference-host: ${ODO_CLOCK_REFERENCE_HOST:}
+    check-interval: 30s
