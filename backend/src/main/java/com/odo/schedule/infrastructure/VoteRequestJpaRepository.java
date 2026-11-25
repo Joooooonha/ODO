@@ -2,6 +2,7 @@ package com.odo.schedule.infrastructure;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import com.odo.schedule.domain.entity.VoteRequest;
 import com.odo.schedule.domain.repository.VoteRequestRepository;
@@ -42,5 +43,13 @@ interface VoteRequestJpaRepository extends JpaRepository<VoteRequest, Long>, Vot
 			FOR UPDATE SKIP LOCKED
 			""", nativeQuery = true)
 	List<VoteRequest> lockDueSkipLocked(@Param("scheduleId") long scheduleId, @Param("cutoff") Instant cutoff);
+
+	@Override
+	@Query("""
+			select min(r.arrivedAt) from VoteRequest r
+			where r.status = com.odo.schedule.domain.entity.VoteRequestStatus.PENDING
+				and r.arrivedAt > :cutoff
+			""")
+	Optional<Instant> findEarliestUpcomingArrival(@Param("cutoff") Instant cutoff);
 
 }

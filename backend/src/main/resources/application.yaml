@@ -45,7 +45,8 @@ odo:
   vote:
     # 도착 시각을 찍은 뒤 처리하기까지 기다리는 시간(W). 1차는 고정이다(03_Schedule_spec.md의 "W = 4초와 오차 예산").
     wait: 4s
-    # 작업자가 처리할 요청을 확인하는 주기. 결과가 최대 그만큼 늦어진다.
+    # 작업자가 다시 돌기까지 기다리는 가장 긴 시간. 작업자는 가장 이른 처리 시각(도착 + W)에 깨어나고,
+    # 늦어도 이 주기마다 확인한다(03_Schedule_spec.md의 "작업자 운영").
     poll-interval: 200ms
     worker-enabled: true
   clock:

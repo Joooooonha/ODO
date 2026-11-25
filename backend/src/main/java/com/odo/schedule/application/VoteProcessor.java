@@ -1,6 +1,7 @@
 package com.odo.schedule.application;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +83,21 @@ public class VoteProcessor {
 			}
 		}
 		return processed;
+	}
+
+	/**
+	 * 지금부터 다음 processDue()까지 기다릴 시간. 아직 처리할 때가 되지 않은 대기 요청 중 가장 이른 처리 시각(도착 시각 + W)까지이고,
+	 * 그 시각이 poll-interval보다 멀거나 그런 요청이 없으면 poll-interval이다. 처리할 때가 지났는데 남은 요청(다른 서버가 처리 중,
+	 * 오류로 롤백)은 poll-interval마다 다시 확인한다. 0 이하가 되지 않으므로 작업자가 쉬지 않고 돌지 않는다.
+	 */
+	public Duration nextRunDelay() {
+		Instant now = clock.instant();
+		Instant cutoff = now.minus(properties.waitTime());
+		Duration pollInterval = properties.pollInterval();
+		return voteRequestRepository.findEarliestUpcomingArrival(cutoff)
+			.map(arrivedAt -> Duration.between(now, arrivedAt.plus(properties.waitTime())))
+			.filter(untilDue -> untilDue.compareTo(pollInterval) < 0)
+			.orElse(pollInterval);
 	}
 
 	private int processSchedule(long scheduleId, Instant cutoff, Instant now) {

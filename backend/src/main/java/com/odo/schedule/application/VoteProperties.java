@@ -10,7 +10,8 @@ import org.springframework.boot.context.properties.bind.Name;
  *
  * @param waitTime 도착 시각을 찍은 뒤 처리하기까지 기다리는 시간(W, 설정 키는 wait). 1차는 4초로 고정한다.
  *     record 항목 이름을 wait로 하면 Object.wait()와 겹쳐 쓸 수 없다
- * @param pollInterval 작업자가 처리할 요청이 있는지 확인하는 주기. 정확성과 관계없고, 결과가 최대 그만큼 늦어진다
+ * @param pollInterval 작업자가 다시 돌기까지 기다리는 가장 긴 시간. 작업자는 가장 이른 처리 시각에 깨어나고, 늦어도 이 주기마다
+ *     확인한다. 확인한 뒤에 저장된 요청이나 다른 서버가 잠가서 건너뛴 일정은 결과가 최대 그만큼 늦어진다
  * @param workerEnabled 작업자를 돌릴지. 테스트는 끄고 VoteProcessor.processDue()를 직접 부른다
  */
 @ConfigurationProperties("odo.vote")
