@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 일정 기능을 위한 승인 변경. 승인은 맨 처음 팀 행을 FOR UPDATE로 잠그고, 팀원을 넣은 뒤 같은 트랜잭션에서
+ * 일정 기능을 위한 승인 변경. 승인은 맨 처음 팀 행을 FOR NO KEY UPDATE로 잠그고, 팀원을 넣은 뒤 같은 트랜잭션에서
  * TeamMemberJoinedEvent를 발행한다. 02_TeamSpace_spec.md의 입장 요청 상태, 03_Schedule_spec.md의 "참여자 행과 새 팀원".
  * 승인과 거절의 다른 동작은 JoinRequestIntegrationTest가 확인한다.
  */
@@ -123,7 +123,7 @@ class JoinApprovalIntegrationTest {
 
 	/**
 	 * 다른 트랜잭션이 팀 행을 FOR NO KEY UPDATE로 잡고 있으면 승인이 기다리는지 본다.
-	 * 팀원 INSERT의 FK 확인(FOR KEY SHARE)은 이 잠금과 충돌하지 않으므로, 승인이 기다리는 것은 승인이 팀 행을 FOR UPDATE로 잠글 때뿐이다.
+	 * 팀원 INSERT의 FK 확인(FOR KEY SHARE)은 이 잠금과 충돌하지 않으므로, 승인이 기다리는 것은 승인이 팀 행을 FOR NO KEY UPDATE로 잠글 때뿐이다.
 	 */
 	@Test
 	@DisplayName("다른 트랜잭션이 팀 행을 잠그고 있으면 승인은 잠금이 풀릴 때까지 기다린다")

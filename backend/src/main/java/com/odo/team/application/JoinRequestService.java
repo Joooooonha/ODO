@@ -141,7 +141,8 @@ public class JoinRequestService {
 	 */
 	@Transactional
 	public TeamMemberResult approve(long leaderId, long teamId, long requestId) {
-		// 맨 먼저 팀 행을 잠근다. 일정 만들기도 팀원 목록을 읽기 전에 같은 행을 잠그므로 둘이 한 번에 하나씩 돈다.
+		// 맨 먼저 팀 행을 FOR NO KEY UPDATE로 잠근다. 일정 만들기도 팀원 목록을 읽기 전에 같은 행을 잠그므로 둘이 한 번에 하나씩 돈다.
+		// FK 확인(FOR KEY SHARE)과는 충돌하지 않는 잠금이라 알림 기록 같은 INSERT를 막지 않는다(TeamRepository.lockById).
 		// 그래서 일정 만들기는 이 승인이 넣은 팀원을 보거나, 승인 쪽 리스너가 그 일정을 본다(03_Schedule_spec.md의 "참여자 행과 새 팀원").
 		teamRepository.lockById(teamId);
 		JoinRequest request = decide(leaderId, teamId, requestId, JoinRequestStatus.APPROVED);
