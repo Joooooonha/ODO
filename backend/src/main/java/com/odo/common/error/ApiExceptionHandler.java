@@ -17,6 +17,26 @@ import com.odo.performance.domain.exception.NotTeamMemberException;
 import com.odo.performance.domain.exception.PerformanceMemberNotFoundException;
 import com.odo.performance.domain.exception.PerformanceNotFoundException;
 import com.odo.performance.domain.exception.SongNotFoundException;
+import com.odo.schedule.domain.exception.CapacityBelowConfirmedException;
+import com.odo.schedule.domain.exception.InvalidCapacityException;
+import com.odo.schedule.domain.exception.InvalidDurationException;
+import com.odo.schedule.domain.exception.InvalidPracticeRoomAddressException;
+import com.odo.schedule.domain.exception.InvalidPracticeRoomException;
+import com.odo.schedule.domain.exception.InvalidPracticeRoomMemoException;
+import com.odo.schedule.domain.exception.InvalidPracticeRoomNameException;
+import com.odo.schedule.domain.exception.InvalidPracticeRoomPasswordException;
+import com.odo.schedule.domain.exception.InvalidRentalFeeException;
+import com.odo.schedule.domain.exception.InvalidScheduleMemoException;
+import com.odo.schedule.domain.exception.InvalidScheduleTitleException;
+import com.odo.schedule.domain.exception.InvalidStartAtException;
+import com.odo.schedule.domain.exception.InvalidStatusException;
+import com.odo.schedule.domain.exception.InvalidVoteDeadlineException;
+import com.odo.schedule.domain.exception.NotVotingScheduleException;
+import com.odo.schedule.domain.exception.ParticipantNotFoundException;
+import com.odo.schedule.domain.exception.PracticeRoomNotFoundException;
+import com.odo.schedule.domain.exception.ScheduleEndedException;
+import com.odo.schedule.domain.exception.ScheduleNotFoundException;
+import com.odo.schedule.domain.exception.VotingClosedException;
 import com.odo.team.domain.exception.AlreadyMemberException;
 import com.odo.team.domain.exception.AlreadyRequestedException;
 import com.odo.team.domain.exception.InvalidGenerationException;
@@ -183,6 +203,124 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(AlreadyInPerformanceException.class)
 	ResponseEntity<ErrorResponse> alreadyInPerformance(AlreadyInPerformanceException ex) {
 		return error(HttpStatus.CONFLICT, "ALREADY_IN_PERFORMANCE", ex);
+	}
+
+	// 일정과 연습실(03_Schedule_spec.md). 400 입력 규칙 위반과 본문 값 오류
+
+	@ExceptionHandler(InvalidScheduleTitleException.class)
+	ResponseEntity<ErrorResponse> invalidScheduleTitle(InvalidScheduleTitleException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_SCHEDULE_TITLE", ex);
+	}
+
+	@ExceptionHandler(InvalidScheduleMemoException.class)
+	ResponseEntity<ErrorResponse> invalidScheduleMemo(InvalidScheduleMemoException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_SCHEDULE_MEMO", ex);
+	}
+
+	@ExceptionHandler(InvalidStartAtException.class)
+	ResponseEntity<ErrorResponse> invalidStartAt(InvalidStartAtException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_START_AT", ex);
+	}
+
+	@ExceptionHandler(InvalidDurationException.class)
+	ResponseEntity<ErrorResponse> invalidDuration(InvalidDurationException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_DURATION", ex);
+	}
+
+	@ExceptionHandler(InvalidVoteDeadlineException.class)
+	ResponseEntity<ErrorResponse> invalidVoteDeadline(InvalidVoteDeadlineException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_VOTE_DEADLINE", ex);
+	}
+
+	@ExceptionHandler(InvalidCapacityException.class)
+	ResponseEntity<ErrorResponse> invalidCapacity(InvalidCapacityException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_CAPACITY", ex);
+	}
+
+	@ExceptionHandler(InvalidStatusException.class)
+	ResponseEntity<ErrorResponse> invalidStatus(InvalidStatusException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_STATUS", ex);
+	}
+
+	@ExceptionHandler(NotVotingScheduleException.class)
+	ResponseEntity<ErrorResponse> notVotingSchedule(NotVotingScheduleException ex) {
+		return error(HttpStatus.BAD_REQUEST, "NOT_VOTING_SCHEDULE", ex);
+	}
+
+	@ExceptionHandler(InvalidPracticeRoomException.class)
+	ResponseEntity<ErrorResponse> invalidPracticeRoom(InvalidPracticeRoomException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_PRACTICE_ROOM", ex);
+	}
+
+	@ExceptionHandler(InvalidPracticeRoomNameException.class)
+	ResponseEntity<ErrorResponse> invalidPracticeRoomName(InvalidPracticeRoomNameException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_PRACTICE_ROOM_NAME", ex);
+	}
+
+	@ExceptionHandler(InvalidPracticeRoomAddressException.class)
+	ResponseEntity<ErrorResponse> invalidPracticeRoomAddress(InvalidPracticeRoomAddressException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_PRACTICE_ROOM_ADDRESS", ex);
+	}
+
+	@ExceptionHandler(InvalidPracticeRoomPasswordException.class)
+	ResponseEntity<ErrorResponse> invalidPracticeRoomPassword(InvalidPracticeRoomPasswordException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_PRACTICE_ROOM_PASSWORD", ex);
+	}
+
+	@ExceptionHandler(InvalidPracticeRoomMemoException.class)
+	ResponseEntity<ErrorResponse> invalidPracticeRoomMemo(InvalidPracticeRoomMemoException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_PRACTICE_ROOM_MEMO", ex);
+	}
+
+	@ExceptionHandler(InvalidRentalFeeException.class)
+	ResponseEntity<ErrorResponse> invalidRentalFee(InvalidRentalFeeException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_RENTAL_FEE", ex);
+	}
+
+	/** 공연과 같은 코드지만 일정이 공연 패키지에 의존하지 않도록 일정 패키지에 따로 둔 예외다. */
+	@ExceptionHandler(com.odo.schedule.domain.exception.DuplicateMemberException.class)
+	ResponseEntity<ErrorResponse> duplicateRequiredMember(RuntimeException ex) {
+		return error(HttpStatus.BAD_REQUEST, "DUPLICATE_MEMBER", ex);
+	}
+
+	/** 공연과 같은 코드지만 일정이 공연 패키지에 의존하지 않도록 일정 패키지에 따로 둔 예외다. */
+	@ExceptionHandler(com.odo.schedule.domain.exception.NotTeamMemberException.class)
+	ResponseEntity<ErrorResponse> requiredNotTeamMember(RuntimeException ex) {
+		return error(HttpStatus.BAD_REQUEST, "NOT_TEAM_MEMBER", ex);
+	}
+
+	// 일정과 연습실. 404 없거나 볼 수 없음
+
+	@ExceptionHandler(ScheduleNotFoundException.class)
+	ResponseEntity<ErrorResponse> scheduleNotFound(ScheduleNotFoundException ex) {
+		return error(HttpStatus.NOT_FOUND, "SCHEDULE_NOT_FOUND", ex);
+	}
+
+	@ExceptionHandler(PracticeRoomNotFoundException.class)
+	ResponseEntity<ErrorResponse> practiceRoomNotFound(PracticeRoomNotFoundException ex) {
+		return error(HttpStatus.NOT_FOUND, "PRACTICE_ROOM_NOT_FOUND", ex);
+	}
+
+	@ExceptionHandler(ParticipantNotFoundException.class)
+	ResponseEntity<ErrorResponse> participantNotFound(ParticipantNotFoundException ex) {
+		return error(HttpStatus.NOT_FOUND, "PARTICIPANT_NOT_FOUND", ex);
+	}
+
+	// 일정. 409 자원의 지금 상태와 충돌
+
+	@ExceptionHandler(ScheduleEndedException.class)
+	ResponseEntity<ErrorResponse> scheduleEnded(ScheduleEndedException ex) {
+		return error(HttpStatus.CONFLICT, "SCHEDULE_ENDED", ex);
+	}
+
+	@ExceptionHandler(VotingClosedException.class)
+	ResponseEntity<ErrorResponse> votingClosed(VotingClosedException ex) {
+		return error(HttpStatus.CONFLICT, "VOTING_CLOSED", ex);
+	}
+
+	@ExceptionHandler(CapacityBelowConfirmedException.class)
+	ResponseEntity<ErrorResponse> capacityBelowConfirmed(CapacityBelowConfirmedException ex) {
+		return error(HttpStatus.CONFLICT, "CAPACITY_BELOW_CONFIRMED", ex);
 	}
 
 	// 503 서버가 바쁨. DB 연결을 대기 시간(HikariCP connection-timeout) 안에 받지 못했다. 잠시 뒤 다시 보내면 된다.
