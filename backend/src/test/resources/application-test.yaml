@@ -9,6 +9,9 @@ odo:
     current-key-version: v1
     data-keys:
       v1: dGVzdC1kYXRhLWtleS0wMTIzNDU2Nzg5YWJjZGVmMDE=
+  vote:
+    # 테스트는 작업자를 끄고 processDue()를 직접 불러 결과가 매번 같게 한다.
+    worker-enabled: false
 
 spring:
   security:

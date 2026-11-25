@@ -36,3 +36,9 @@ odo:
     current-key-version: ${ODO_DATA_KEY_CURRENT}
     data-keys:
       v1: ${ODO_DATA_KEY_V1}
+  vote:
+    # 도착 시각을 찍은 뒤 처리하기까지 기다리는 시간(W). 1차는 고정이다(03_Schedule_spec.md의 "W = 4초와 오차 예산").
+    wait: 4s
+    # 작업자가 처리할 요청을 확인하는 주기. 결과가 최대 그만큼 늦어진다.
+    poll-interval: 200ms
+    worker-enabled: true
