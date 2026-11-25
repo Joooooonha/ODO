@@ -13,6 +13,7 @@ import org.springframework.scheduling.support.SimpleTriggerContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -47,6 +48,19 @@ class VotePollingJobTest {
 		when(processor.nextRunDelay()).thenThrow(new IllegalStateException("DB 오류"));
 
 		assertThat(job.nextExecution(context)).isEqualTo(SCHEDULER_NOW.plus(POLL_INTERVAL));
+	}
+
+	@Test
+	@DisplayName("한 번 돌면 currentCutoff()의 기준으로 처리하고, 다음 실행 시각은 같은 기준의 nextRunDelay(cutoff)로 정한다")
+	void passesCutoffOfLastRun() {
+		Instant cutoff = Instant.parse("2026-11-25T09:59:56Z");
+		when(processor.currentCutoff()).thenReturn(cutoff);
+		when(processor.nextRunDelay(cutoff)).thenReturn(Duration.ZERO);
+
+		job.run();
+
+		verify(processor).processDue(cutoff);
+		assertThat(job.nextExecution(context)).isEqualTo(SCHEDULER_NOW);
 	}
 
 }

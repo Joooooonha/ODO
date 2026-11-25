@@ -1,6 +1,7 @@
 package com.odo.common.config;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -18,6 +19,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.timeout;
@@ -47,7 +49,7 @@ class ScheduledJobIsolationIntegrationTest {
 		try {
 			clearInvocations(voteProcessor);
 			// 폴링 주기는 200ms다. 측정이 멈춘 동안 3초 안에 세 번 넘게 불려야 한다.
-			verify(voteProcessor, timeout(3_000).atLeast(3)).processDue();
+			verify(voteProcessor, timeout(3_000).atLeast(3)).processDue(any(Instant.class));
 		}
 		finally {
 			timeSource.release.countDown();

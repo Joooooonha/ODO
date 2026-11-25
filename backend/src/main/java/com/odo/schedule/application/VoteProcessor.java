@@ -65,13 +65,22 @@ public class VoteProcessor {
 		this.transactionTemplate = new TransactionTemplate(transactionManager);
 	}
 
+	/** 지금 처리할 때가 된 요청의 기준(지금 − W). 도착 시각이 이 값 이하인 요청을 처리한다. "지금"은 이 서버의 시계다. */
+	public Instant currentCutoff() {
+		return clock.instant().minus(properties.waitTime());
+	}
+
+	/** 기준을 지금 − W로 두고 처리한다. processDue(Instant)를 보라. */
+	public int processDue() {
+		return processDue(currentCutoff());
+	}
+
 	/**
-	 * 처리할 때가 된 요청을 처리하고, 처리한 요청 수를 돌려준다. "지금"은 이 서버의 시계다.
+	 * 도착 시각이 cutoff 이하인 대기 요청을 처리하고, 처리한 요청 수를 돌려준다.
 	 * 한 일정에서 오류가 나도 그 일정만 롤백하고 다른 일정은 계속 처리한다. 롤백된 요청은 다음 폴링에서 다시 처리된다.
 	 */
-	public int processDue() {
+	public int processDue(Instant cutoff) {
 		Instant now = clock.instant();
-		Instant cutoff = now.minus(properties.waitTime());
 		int processed = 0;
 		for (Long scheduleId : voteRequestRepository.findDueScheduleIds(cutoff, MAX_SCHEDULES_PER_POLL)) {
 			try {
@@ -85,17 +94,24 @@ public class VoteProcessor {
 		return processed;
 	}
 
-	/**
-	 * 지금부터 다음 processDue()까지 기다릴 시간. 아직 처리할 때가 되지 않은 대기 요청 중 가장 이른 처리 시각(도착 시각 + W)까지이고,
-	 * 그 시각이 poll-interval보다 멀거나 그런 요청이 없으면 poll-interval이다. 처리할 때가 지났는데 남은 요청(다른 서버가 처리 중,
-	 * 오류로 롤백)은 poll-interval마다 다시 확인한다. 0 이하가 되지 않으므로 작업자가 쉬지 않고 돌지 않는다.
-	 */
+	/** 기준을 지금 − W로 두고 기다릴 시간을 구한다. 작업자가 아직 한 번도 돌지 않았을 때 쓴다. nextRunDelay(Instant)를 보라. */
 	public Duration nextRunDelay() {
+		return nextRunDelay(currentCutoff());
+	}
+
+	/**
+	 * 지금부터 다음 processDue까지 기다릴 시간. cutoff는 방금 돈 처리가 쓴 기준이다.
+	 * 그 기준보다 늦게 도착한 대기 요청 중 가장 이른 처리 시각(도착 시각 + W)까지이고, 그 시각이 이미 지났으면(앞의 요청을 처리하는
+	 * 사이에 때가 되었으면) 0이다. 그 시각이 poll-interval보다 멀거나 그런 요청이 없으면 poll-interval이다.
+	 * 기준보다 먼저 도착했는데 남은 요청(다른 서버가 처리 중, 오류로 롤백)은 대상이 아니므로 작업자가 쉬지 않고 돌지 않는다.
+	 * 그런 요청은 poll-interval마다 다시 확인한다.
+	 */
+	public Duration nextRunDelay(Instant cutoff) {
 		Instant now = clock.instant();
-		Instant cutoff = now.minus(properties.waitTime());
 		Duration pollInterval = properties.pollInterval();
 		return voteRequestRepository.findEarliestUpcomingArrival(cutoff)
 			.map(arrivedAt -> Duration.between(now, arrivedAt.plus(properties.waitTime())))
+			.map(untilDue -> untilDue.isNegative() ? Duration.ZERO : untilDue)
 			.filter(untilDue -> untilDue.compareTo(pollInterval) < 0)
 			.orElse(pollInterval);
 	}

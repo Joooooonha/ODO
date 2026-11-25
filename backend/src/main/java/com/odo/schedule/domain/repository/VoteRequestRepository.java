@@ -30,8 +30,8 @@ public interface VoteRequestRepository {
 	List<VoteRequest> lockDueSkipLocked(long scheduleId, Instant cutoff);
 
 	/**
-	 * 아직 처리할 때가 되지 않은(도착 시각이 cutoff보다 늦은) 대기 요청 중 가장 이른 도착 시각. 모든 일정에서 찾는다.
-	 * 작업자가 다음에 언제 돌지 정할 때 쓴다.
+	 * 도착 시각이 cutoff보다 늦은 대기 요청 중 가장 이른 도착 시각. 모든 일정에서 찾는다.
+	 * 작업자가 방금 쓴 기준을 넘겨 다음에 언제 돌지 정할 때 쓴다.
 	 */
 	Optional<Instant> findEarliestUpcomingArrival(Instant cutoff);
 

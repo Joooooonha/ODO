@@ -131,4 +131,36 @@ class VoteNextRunIntegrationTest {
 		assertThat(voteProcessor.nextRunDelay()).isEqualTo(POLL_INTERVAL);
 	}
 
+	@Test
+	@DisplayName("앞의 요청을 처리하는 사이에 뒤의 요청이 때가 되면, 그 처리의 기준으로 구한 기다릴 시간이 0이고 바로 다시 돌면 처리된다")
+	void dueDuringProcessing() throws Exception {
+		long first = voteAt(T0, memberA);
+		long second = voteAt(T0.plusMillis(3), memberB);
+
+		clock.set(T0.plus(W));
+		Instant cutoff = voteProcessor.currentCutoff();
+		assertThat(voteProcessor.processDue(cutoff)).isEqualTo(1);
+		assertThat(api.requestStatusOf(first)).isEqualTo("CONFIRMED");
+
+		// 앞의 처리에 5ms가 걸렸다. 그사이 뒤의 요청(도착 + W = 3ms 뒤)이 처리할 때가 되었다.
+		clock.advance(Duration.ofMillis(5));
+		assertThat(voteProcessor.nextRunDelay(cutoff)).isEqualTo(Duration.ZERO);
+
+		assertThat(voteProcessor.processDue()).isEqualTo(1);
+		assertThat(api.requestStatusOf(second)).isEqualTo("CONFIRMED");
+	}
+
+	@Test
+	@DisplayName("이전 기준보다 먼저 도착했는데 처리하지 못한 요청(다른 서버가 잠가 둔 경우)만 있으면 그 기준으로 구한 기다릴 시간이 poll-interval이다")
+	void leftoverWithinPreviousCutoff() throws Exception {
+		voteAt(T0, memberA);
+
+		clock.set(T0.plus(W));
+		Instant cutoff = voteProcessor.currentCutoff();
+		// 이 요청은 처리할 때가 되었지만 다른 서버가 잠가 두어 처리하지 못했다고 본다(processDue를 부르지 않는다).
+		clock.advance(Duration.ofMillis(5));
+
+		assertThat(voteProcessor.nextRunDelay(cutoff)).isEqualTo(POLL_INTERVAL);
+	}
+
 }
