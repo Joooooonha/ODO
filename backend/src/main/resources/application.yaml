@@ -30,3 +30,9 @@ odo:
     # 둘 다 32바이트 이상. 서로 다른 값을 쓴다.
     jwt-secret: ${ODO_JWT_SECRET}
     oauth-cookie-secret: ${ODO_OAUTH_COOKIE_SECRET}
+  crypto:
+    # 키는 32바이트를 base64로 넣는다(openssl rand -base64 32). 키를 바꿀 때는 새 버전을 추가하고 current-key-version을 바꾼다.
+    # 옛 버전의 키는 그 버전의 암호문이 남지 않을 때까지 지우지 않는다.
+    current-key-version: ${ODO_DATA_KEY_CURRENT}
+    data-keys:
+      v1: ${ODO_DATA_KEY_V1}

@@ -1,5 +1,7 @@
 package com.odo.common.error;
 
+import java.sql.SQLTransientConnectionException;
+
 import com.odo.account.domain.exception.InvalidNameException;
 import com.odo.performance.domain.exception.AlreadyInPerformanceException;
 import com.odo.performance.domain.exception.DuplicateMemberException;
@@ -26,8 +28,10 @@ import com.odo.team.domain.exception.RequestNotFoundException;
 import com.odo.team.domain.exception.RequestNotPendingException;
 import com.odo.team.domain.exception.TeamNotFoundException;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -179,6 +183,26 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(AlreadyInPerformanceException.class)
 	ResponseEntity<ErrorResponse> alreadyInPerformance(AlreadyInPerformanceException ex) {
 		return error(HttpStatus.CONFLICT, "ALREADY_IN_PERFORMANCE", ex);
+	}
+
+	// 503 서버가 바쁨. DB 연결을 대기 시간(HikariCP connection-timeout) 안에 받지 못했다. 잠시 뒤 다시 보내면 된다.
+	// 원인이 연결 대기 초과(SQLTransientConnectionException)일 때만 바꾸고, 다른 원인은 다시 던져 지금처럼 500이 되게 한다.
+
+	@ExceptionHandler({ CannotCreateTransactionException.class, CannotGetJdbcConnectionException.class })
+	ResponseEntity<ErrorResponse> serverBusy(RuntimeException ex) {
+		if (!causedBy(ex, SQLTransientConnectionException.class)) {
+			throw ex;
+		}
+		return error(HttpStatus.SERVICE_UNAVAILABLE, "SERVER_BUSY", "서버가 바쁘다. 잠시 뒤 다시 보낸다");
+	}
+
+	private static boolean causedBy(Throwable ex, Class<? extends Throwable> type) {
+		for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+			if (type.isInstance(cause)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static ResponseEntity<ErrorResponse> error(HttpStatus status, String code, RuntimeException ex) {

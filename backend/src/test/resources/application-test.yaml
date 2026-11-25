@@ -4,6 +4,11 @@ odo:
     # 테스트 전용 값. 운영에서는 환경 변수로 넣는다.
     jwt-secret: test-jwt-secret-0123456789abcdef0123456789abcdef
     oauth-cookie-secret: test-oauth-cookie-secret-0123456789abcdef01234567
+  crypto:
+    # 테스트 전용 키(32바이트). 운영에서는 환경 변수로 넣는다.
+    current-key-version: v1
+    data-keys:
+      v1: dGVzdC1kYXRhLWtleS0wMTIzNDU2Nzg5YWJjZGVmMDE=
 
 spring:
   security:
