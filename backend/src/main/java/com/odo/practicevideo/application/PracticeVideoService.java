@@ -103,6 +103,7 @@ public class PracticeVideoService {
 
 	/**
 	 * 올린 디렉터만 지운다. 업로드 중인 영상도 지울 수 있다. DELETING으로 바꾸고, 커밋 뒤 R2 객체와 행을 지운다.
+	 * 업로드 중에 지운 영상의 행은 완료 기한까지 남는다(PracticeVideoObjectRemover.removeDeleted).
 	 * 볼 수 없음(이미 삭제함 포함) PracticeVideoNotFoundException, 올린 사람 아님 NotPracticeVideoUploaderException.
 	 */
 	@Transactional

@@ -48,6 +48,8 @@ public class PracticeVideoObjectRemover {
 	/**
 	 * 삭제한 영상(DELETING)의 객체와 행을 지운다. 삭제 요청의 커밋 뒤에 부른다. 실패하면 로그만 남긴다.
 	 * 응답은 이미 정해진 204이고, 남은 DELETING 행은 청소 작업이 다시 지운다.
+	 * 업로드 중에 지운 영상(한 번도 READY가 아니었음)은 객체만 지우고 행은 남긴다. 브라우저의 PUT은 서버와 따로 R2로 가서
+	 * 지운 뒤에 끝날 수 있으므로, 완료 기한 뒤 청소 작업이 객체를 한 번 더 지우고 행을 지운다.
 	 */
 	public void removeDeleted(long videoId, String objectKey) {
 		try {
@@ -60,7 +62,7 @@ public class PracticeVideoObjectRemover {
 	}
 
 	/**
-	 * 청소 대상(DELETING, 완료 기한이 지난 UPLOADING)의 객체와 행을 지우고, 지운 영상 수를 돌려준다.
+	 * 청소 대상(PracticeVideoRepository.findCleanupTargetIds)의 객체와 행을 지우고, 지운 영상 수를 돌려준다.
 	 * 영상마다 트랜잭션이 따로다. 행을 SKIP LOCKED로 잠가 한 영상은 한 곳만 처리한다. 한 영상에서 오류가 나면 그 영상만
 	 * 롤백하고 다음 영상으로 넘어간다. 실패한 영상은 다음 주기에 다시 처리된다.
 	 */

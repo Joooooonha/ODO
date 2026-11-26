@@ -22,7 +22,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
+import static com.odo.practicevideo.presentation.PracticeVideoRequests.uploadBody;
+import static com.odo.practicevideo.presentation.PracticeVideoRequests.uploadUrlOf;
+import static com.odo.practicevideo.presentation.PracticeVideoRequests.videoIdOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -94,6 +98,38 @@ class PracticeVideoCleanupIntegrationTest {
 		assertThat(api.statusOf(ready)).isEqualTo("READY");
 		assertThat(api.statusOf(uploading)).isEqualTo("UPLOADING");
 		assertThat(remover.removeExpired()).isZero();
+	}
+
+	@Test
+	@DisplayName("업로드 중에 지운 영상은 완료 기한 전에는 대상이 아니라 행이 남는다")
+	void deletedWhileUploadingWaitsForDeadline() throws Exception {
+		long id = api.startUploadId(f.choreographer(), f.performanceId(), f.choreoSong(), "올리는 중에 지움");
+		api.delete(f.choreographer(), id).andExpect(status().isNoContent());
+		clock.advance(Duration.ofHours(6).minusSeconds(1));
+
+		assertThat(remover.removeExpired()).isZero();
+		assertThat(api.statusOf(id)).isEqualTo("DELETING");
+	}
+
+	/** 브라우저의 PUT은 서버와 따로 R2로 가서, 지운 뒤에 끝날 수 있다(PR A 리뷰). */
+	@Test
+	@DisplayName("업로드 중에 지운 뒤 진행 중이던 PUT이 끝나 객체가 생겨도, 완료 기한 뒤 청소 작업이 객체와 행을 지운다")
+	void lateUploadAfterDeleteIsRemoved() throws Exception {
+		ResultActions started = api
+			.startUpload(f.choreographer(), f.performanceId(), uploadBody(f.choreoSong(), "올리는 중에 지움"))
+			.andExpect(status().isCreated());
+		long id = videoIdOf(started);
+		String uploadUrl = uploadUrlOf(started);
+		api.delete(f.choreographer(), id).andExpect(status().isNoContent());
+		clock.advance(Duration.ofMinutes(20));
+		String key = storage.uploadAsBrowser(uploadUrl);
+		assertThat(storage.contains(key)).isTrue();
+
+		clock.advance(Duration.ofHours(6));
+		assertThat(remover.removeExpired()).isEqualTo(1);
+
+		assertThat(api.statusOf(id)).isNull();
+		assertThat(storage.contains(key)).isFalse();
 	}
 
 	@Test

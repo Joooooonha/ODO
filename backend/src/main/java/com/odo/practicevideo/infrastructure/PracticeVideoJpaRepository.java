@@ -70,13 +70,18 @@ interface PracticeVideoJpaRepository extends JpaRepository<PracticeVideo, Long>,
 
 	@Override
 	@Modifying
-	@Query("delete from PracticeVideo v where v.id = :id and v.status = com.odo.practicevideo.domain.entity.PracticeVideoStatus.DELETING")
+	@Query("""
+			delete from PracticeVideo v
+			where v.id = :id and v.status = com.odo.practicevideo.domain.entity.PracticeVideoStatus.DELETING
+			  and v.readyAt is not null
+			""")
 	int deleteDeleting(@Param("id") long id);
 
 	@Override
 	@Query(value = """
 			SELECT id FROM practice_video
-			WHERE status = 'DELETING' OR (status = 'UPLOADING' AND upload_deadline <= :now)
+			WHERE (status = 'DELETING' AND (ready_at IS NOT NULL OR upload_deadline <= :now))
+			   OR (status = 'UPLOADING' AND upload_deadline <= :now)
 			ORDER BY id LIMIT :limit
 			""", nativeQuery = true)
 	List<Long> findCleanupTargetIds(@Param("now") Instant now, @Param("limit") int limit);
@@ -84,7 +89,9 @@ interface PracticeVideoJpaRepository extends JpaRepository<PracticeVideo, Long>,
 	@Override
 	@Query(value = """
 			SELECT * FROM practice_video
-			WHERE id = :id AND (status = 'DELETING' OR (status = 'UPLOADING' AND upload_deadline <= :now))
+			WHERE id = :id
+			  AND ((status = 'DELETING' AND (ready_at IS NOT NULL OR upload_deadline <= :now))
+			       OR (status = 'UPLOADING' AND upload_deadline <= :now))
 			FOR UPDATE SKIP LOCKED
 			""", nativeQuery = true)
 	Optional<PracticeVideo> lockCleanupTargetSkipLocked(@Param("id") long id, @Param("now") Instant now);

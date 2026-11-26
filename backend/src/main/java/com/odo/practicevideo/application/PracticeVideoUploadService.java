@@ -25,12 +25,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 업로드 시작과 완료. 08_PracticeVideo_spec.md의 "업로드", "업로드 시작과 완료", API 명세의 "업로드 시작", "업로드 완료".
- * 완료는 R2를 부르는 동안 DB 연결과 행 잠금을 잡지 않으려고 트랜잭션을 나눈다. 상태는 조건부 UPDATE로 바꿔, 동시에 두 번
- * 부르거나 삭제, 청소와 겹쳐도 하나로 정해진다.
+ * 완료는 R2를 부르는 동안 DB 연결과 행 잠금을 잡지 않으려고 TransactionTemplate으로 트랜잭션을 나눈다. 같은 클래스 안의
+ * 호출에는 @Transactional이 걸리지 않기 때문이다. 상태는 조건부 UPDATE로 바꿔, 동시에 두 번 부르거나 삭제, 청소와 겹쳐도
+ * 하나로 정해진다. 시작은 R2를 부르지 않으므로(서명은 서버에서 계산만 한다) 나누지 않고 @Transactional이다.
  */
 @Service
 public class PracticeVideoUploadService {
@@ -75,27 +77,26 @@ public class PracticeVideoUploadService {
 	 * 명단에 없음 PerformanceNotFoundException, 디렉터 아님 NotDirectorException, 곡이 틀림 InvalidSongException,
 	 * 곡 담당 아님 NotSongDirectorException, 그다음 제목, 설명, 크기, 형식의 예외.
 	 */
+	@Transactional
 	public UploadStartResult start(long accountId, long performanceId, StartUploadCommand command) {
-		return transactionTemplate.execute(status -> {
-			performanceAccess.requireDirector(performanceId, accountId);
-			if (command.songId() == null) {
-				throw new InvalidRequestException();
-			}
-			Song song = songRepository.findByIdAndDeletedAtIsNull(command.songId())
-				.filter(found -> found.getPerformanceId() == performanceId)
-				.orElseThrow(InvalidSongException::new);
-			song.requireDirectedBy(accountId);
-			if (command.fileSize() == null || command.contentType() == null) {
-				throw new InvalidRequestException();
-			}
-			PracticeVideo video = PracticeVideo.startUpload(practiceVideoRepository.nextId(), performanceId,
-					song.getId(), accountId, command.title(), command.description(), command.fileSize(),
-					command.contentType(), clock.instant(), properties.uploadDeadline());
-			practiceVideoRepository.save(video);
-			PresignedUpload upload = objectStorage.presignUpload(video.getObjectKey(), video.getContentType(),
-					video.getFileSize(), properties.uploadUrlTtl());
-			return new UploadStartResult(results.item(video, accountId), upload);
-		});
+		performanceAccess.requireDirector(performanceId, accountId);
+		if (command.songId() == null) {
+			throw new InvalidRequestException();
+		}
+		Song song = songRepository.findByIdAndDeletedAtIsNull(command.songId())
+			.filter(found -> found.getPerformanceId() == performanceId)
+			.orElseThrow(InvalidSongException::new);
+		song.requireDirectedBy(accountId);
+		if (command.fileSize() == null || command.contentType() == null) {
+			throw new InvalidRequestException();
+		}
+		PracticeVideo video = PracticeVideo.startUpload(practiceVideoRepository.nextId(), performanceId,
+				song.getId(), accountId, command.title(), command.description(), command.fileSize(),
+				command.contentType(), clock.instant(), properties.uploadDeadline());
+		practiceVideoRepository.save(video);
+		PresignedUpload upload = objectStorage.presignUpload(video.getObjectKey(), video.getContentType(),
+				video.getFileSize(), properties.uploadUrlTtl());
+		return new UploadStartResult(results.item(video, accountId), upload);
 	}
 
 	/**

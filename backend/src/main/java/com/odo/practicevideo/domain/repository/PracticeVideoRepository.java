@@ -35,10 +35,16 @@ public interface PracticeVideoRepository {
 	/** UPLOADING인 행을 지운다(올라온 파일이 달라 업로드를 버릴 때). */
 	int deleteUploading(long id);
 
-	/** DELETING인 행을 지운다(R2 객체를 지운 뒤). */
+	/**
+	 * DELETING이고 한 번이라도 READY였던(ready_at이 있는) 행을 지운다(R2 객체를 지운 뒤).
+	 * 업로드 중에 지운 행은 지우지 않는다. 진행 중이던 PUT이 나중에 끝날 수 있어 완료 기한까지 남겨 두고 청소 작업이 지운다.
+	 */
 	int deleteDeleting(long id);
 
-	/** 청소 대상(DELETING, 완료 기한이 지난 UPLOADING)의 ID. 오래된 것부터 limit개. */
+	/**
+	 * 청소 대상의 ID. 오래된 것부터 limit개. 대상은 READY였다가 지운 DELETING, 업로드 중에 지웠고 완료 기한이 지난 DELETING,
+	 * 완료 기한이 지난 UPLOADING이다.
+	 */
 	List<Long> findCleanupTargetIds(Instant now, int limit);
 
 	/** 아직 청소 대상이면 FOR UPDATE SKIP LOCKED로 잠근다. 다른 서버가 잠갔거나 이미 지워졌으면 비어 있다. */
