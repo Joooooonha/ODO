@@ -65,6 +65,11 @@ interface PracticeVideoJpaRepository extends JpaRepository<PracticeVideo, Long>,
 
 	@Override
 	@Modifying
+	@Query("update PracticeVideo v set v.playCount = v.playCount + 1 where v.id = :id and v.status = com.odo.practicevideo.domain.entity.PracticeVideoStatus.READY")
+	int incrementPlayCount(@Param("id") long id);
+
+	@Override
+	@Modifying
 	@Query("delete from PracticeVideo v where v.id = :id and v.status = com.odo.practicevideo.domain.entity.PracticeVideoStatus.UPLOADING")
 	int deleteUploading(@Param("id") long id);
 

@@ -99,4 +99,54 @@ class UserTextRuleTest {
 
 	}
 
+	/** 08_PracticeVideo_spec.md의 "입력 검증과 글자 규칙"의 코멘트, "코멘트 (단위와 통합)". */
+	@Nested
+	@DisplayName("보이는 글자 수")
+	class Graphemes {
+
+		@ParameterizedTest
+		@ValueSource(strings = { "👨‍👩‍👧", "🇰🇷", "👍🏽", "❤️", "1️⃣", "가", "a" })
+		@DisplayName("ZWJ로 이은 이모지, 국기, 피부색 이모지, 표시 선택자가 붙은 기호, 키캡, 한글, 영문은 각각 1자다")
+		void oneEach(String text) {
+			assertThat(UserTextRule.countGraphemes(text)).isEqualTo(1);
+		}
+
+		@Test
+		@DisplayName("NFC로 합친 한글은 한 글자가 1자다")
+		void hangul() {
+			String decomposed = Normalizer.normalize("연습해요", Normalizer.Form.NFD);
+
+			assertThat(UserTextRule.countGraphemes(UserTextRule.normalize(decomposed))).isEqualTo(4);
+		}
+
+		@Test
+		@DisplayName("글자, 공백, 줄바꿈을 모두 센다")
+		void mixed() {
+			assertThat(UserTextRule.countGraphemes("45도 🙆\n좋아요")).isEqualTo(9);
+			assertThat(UserTextRule.countGraphemes("")).isZero();
+		}
+
+	}
+
+	/** 코멘트처럼 글자 종류를 막지 않는 글자. 줄바꿈을 뺀 제어 문자만 막는다. */
+	@Nested
+	@DisplayName("줄바꿈을 뺀 제어 문자")
+	class ControlChar {
+
+		@ParameterizedTest
+		@ValueSource(strings = { "여기 팔 각도", "첫 줄\n둘째 줄", "첫 줄\r\n둘째 줄", "👨‍👩‍👧 가족", "Love ♥️", "Korea 🇰🇷" })
+		@DisplayName("줄바꿈, \\r\\n, ZWJ와 표시 선택자가 든 이모지는 통과한다")
+		void allowed(String text) {
+			assertThat(UserTextRule.containsControlCharExceptNewline(text)).isFalse();
+		}
+
+		@ParameterizedTest
+		@ValueSource(strings = { "NUL\u0000", "탭\t", "캐리지\r리턴", "벨\u0007", "DEL\u007F", "C1\u0085" })
+		@DisplayName("NUL, 탭, 혼자 있는 \\r, 그 밖의 제어 문자는 막는다")
+		void blocked(String text) {
+			assertThat(UserTextRule.containsControlCharExceptNewline(text)).isTrue();
+		}
+
+	}
+
 }

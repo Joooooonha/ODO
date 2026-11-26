@@ -1,6 +1,7 @@
 package com.odo.performance.domain.entity;
 
 import java.time.Instant;
+import java.util.Comparator;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,6 +24,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "performance_member")
 public class PerformanceMember {
+
+	/** 명단 순서. 디렉터를 먼저, 같은 역할 안에서는 명단에 들어온 순서. 한 요청으로 같이 들어온 사람은 요청 순서(id). */
+	public static final Comparator<PerformanceMember> ROSTER_ORDER = Comparator
+		.comparing((PerformanceMember member) -> !member.isDirector())
+		.thenComparing(PerformanceMember::getJoinedAt)
+		.thenComparing(PerformanceMember::getId);
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)

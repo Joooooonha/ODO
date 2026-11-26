@@ -32,6 +32,9 @@ public interface PracticeVideoRepository {
 	/** UPLOADING이나 READY일 때만 DELETING으로 바꾼다(조건부 UPDATE). 동시에 두 번 와도 하나만 1을 받는다. */
 	int markDeleting(long id, Instant now);
 
+	/** READY인 영상의 재생 수를 1 더하고, 바뀐 행 수를 돌려준다. 그사이 삭제했으면 0이다. */
+	int incrementPlayCount(long id);
+
 	/** UPLOADING인 행을 지운다(올라온 파일이 달라 업로드를 버릴 때). */
 	int deleteUploading(long id);
 

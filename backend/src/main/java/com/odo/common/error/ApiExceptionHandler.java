@@ -18,6 +18,8 @@ import com.odo.performance.domain.exception.NotTeamMemberException;
 import com.odo.performance.domain.exception.PerformanceMemberNotFoundException;
 import com.odo.performance.domain.exception.PerformanceNotFoundException;
 import com.odo.performance.domain.exception.SongNotFoundException;
+import com.odo.practicevideo.domain.exception.InvalidCommentContentException;
+import com.odo.practicevideo.domain.exception.InvalidCommentPositionException;
 import com.odo.practicevideo.domain.exception.InvalidCursorException;
 import com.odo.practicevideo.domain.exception.InvalidDateRangeException;
 import com.odo.practicevideo.domain.exception.InvalidPracticeVideoDescriptionException;
@@ -27,6 +29,7 @@ import com.odo.practicevideo.domain.exception.InvalidSongException;
 import com.odo.practicevideo.domain.exception.NotPracticeVideoUploaderException;
 import com.odo.practicevideo.domain.exception.PracticeVideoNotFoundException;
 import com.odo.practicevideo.domain.exception.PracticeVideoNotReadyException;
+import com.odo.practicevideo.domain.exception.PracticeVideoThreadNotFoundException;
 import com.odo.practicevideo.domain.exception.UnsupportedPracticeVideoTypeException;
 import com.odo.practicevideo.domain.exception.UploadDeadlinePassedException;
 import com.odo.practicevideo.domain.exception.UploadedFileMismatchException;
@@ -380,6 +383,16 @@ public class ApiExceptionHandler {
 		return error(HttpStatus.BAD_REQUEST, "INVALID_CURSOR", ex);
 	}
 
+	@ExceptionHandler(InvalidCommentPositionException.class)
+	ResponseEntity<ErrorResponse> invalidCommentPosition(InvalidCommentPositionException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_COMMENT_POSITION", ex);
+	}
+
+	@ExceptionHandler(InvalidCommentContentException.class)
+	ResponseEntity<ErrorResponse> invalidCommentContent(InvalidCommentContentException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_COMMENT_CONTENT", ex);
+	}
+
 	// 연습 영상. 403 올린 디렉터가 아님
 
 	@ExceptionHandler(NotPracticeVideoUploaderException.class)
@@ -392,6 +405,11 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(PracticeVideoNotFoundException.class)
 	ResponseEntity<ErrorResponse> practiceVideoNotFound(PracticeVideoNotFoundException ex) {
 		return error(HttpStatus.NOT_FOUND, "PRACTICE_VIDEO_NOT_FOUND", ex);
+	}
+
+	@ExceptionHandler(PracticeVideoThreadNotFoundException.class)
+	ResponseEntity<ErrorResponse> practiceVideoThreadNotFound(PracticeVideoThreadNotFoundException ex) {
+		return error(HttpStatus.NOT_FOUND, "PRACTICE_VIDEO_THREAD_NOT_FOUND", ex);
 	}
 
 	// 연습 영상. 409 업로드의 지금 상태와 충돌

@@ -212,6 +212,58 @@ class PracticeVideoRequests {
 		return result.andReturn().getResponse().getContentAsString();
 	}
 
+	/** 공연 명단에 사람을 넣는다(팀장). 팀원이어야 한다. */
+	void addToRoster(long leader, long performanceId, List<Map<String, Object>> members) throws Exception {
+		send(post("/api/performances/{performanceId}/members", performanceId), leader, Map.of("members", members))
+			.andExpect(status().isCreated());
+	}
+
+	ResultActions recordView(long accountId, long videoId) throws Exception {
+		return mockMvc
+			.perform(put("/api/practice-videos/{id}/views/me", videoId).header("Authorization", bearer(accountId)));
+	}
+
+	ResultActions views(long accountId, long videoId) throws Exception {
+		return mockMvc.perform(get("/api/practice-videos/{id}/views", videoId).header("Authorization", bearer(accountId)));
+	}
+
+	ResultActions play(long accountId, long videoId) throws Exception {
+		return mockMvc.perform(post("/api/practice-videos/{id}/plays", videoId).header("Authorization", bearer(accountId)));
+	}
+
+	ResultActions threads(long accountId, long videoId) throws Exception {
+		return mockMvc
+			.perform(get("/api/practice-videos/{id}/threads", videoId).header("Authorization", bearer(accountId)));
+	}
+
+	/** 스레드 만들기. positionSeconds가 null이면 본문에서 뺀다. */
+	ResultActions createThread(long accountId, long videoId, Integer positionSeconds, String content)
+			throws Exception {
+		Map<String, Object> body = new HashMap<>();
+		if (positionSeconds != null) {
+			body.put("positionSeconds", positionSeconds);
+		}
+		body.put("content", content);
+		return send(post("/api/practice-videos/{id}/threads", videoId), accountId, body);
+	}
+
+	/** 스레드를 만들고 스레드 ID를 돌려준다. */
+	long createThreadId(long accountId, long videoId, int positionSeconds, String content) throws Exception {
+		return idOf(createThread(accountId, videoId, positionSeconds, content).andExpect(status().isCreated()));
+	}
+
+	ResultActions reply(long accountId, long threadId, String content) throws Exception {
+		Map<String, Object> body = new HashMap<>();
+		body.put("content", content);
+		return send(post("/api/practice-video-threads/{threadId}/comments", threadId), accountId, body);
+	}
+
+	/** 표에 남은 행 수. 영상을 지운 뒤 함께 지워졌는지 볼 때 쓴다. */
+	long countRows(String table, long videoId) {
+		Long count = jdbc.queryForObject("SELECT count(*) FROM " + table + " WHERE video_id = ?", Long.class, videoId);
+		return count == null ? 0 : count;
+	}
+
 	private ResultActions send(MockHttpServletRequestBuilder request, long accountId, Map<String, ?> body)
 			throws Exception {
 		return mockMvc.perform(request.header("Authorization", bearer(accountId))
