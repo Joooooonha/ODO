@@ -10,6 +10,12 @@ public interface SongRepository {
 
 	Song save(Song song);
 
+	/** 삭제한 곡도 찾는다. 삭제한 곡의 이름이 연습 영상에 남아야 한다. */
+	Optional<Song> findById(Long id);
+
+	/** 삭제한 곡도 찾는다. 여러 곡의 이름을 한 번의 쿼리(IN)로 읽는다. */
+	List<Song> findAllById(Iterable<Long> ids);
+
 	/** 삭제하지 않은 곡. */
 	Optional<Song> findByIdAndDeletedAtIsNull(Long id);
 

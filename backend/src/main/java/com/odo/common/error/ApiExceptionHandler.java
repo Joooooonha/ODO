@@ -3,6 +3,7 @@ package com.odo.common.error;
 import java.sql.SQLTransientConnectionException;
 
 import com.odo.account.domain.exception.InvalidNameException;
+import com.odo.common.storage.StorageUnavailableException;
 import com.odo.performance.domain.exception.AlreadyInPerformanceException;
 import com.odo.performance.domain.exception.DuplicateMemberException;
 import com.odo.performance.domain.exception.EmptyMembersException;
@@ -17,6 +18,19 @@ import com.odo.performance.domain.exception.NotTeamMemberException;
 import com.odo.performance.domain.exception.PerformanceMemberNotFoundException;
 import com.odo.performance.domain.exception.PerformanceNotFoundException;
 import com.odo.performance.domain.exception.SongNotFoundException;
+import com.odo.practicevideo.domain.exception.InvalidCursorException;
+import com.odo.practicevideo.domain.exception.InvalidDateRangeException;
+import com.odo.practicevideo.domain.exception.InvalidPracticeVideoDescriptionException;
+import com.odo.practicevideo.domain.exception.InvalidPracticeVideoFileSizeException;
+import com.odo.practicevideo.domain.exception.InvalidPracticeVideoTitleException;
+import com.odo.practicevideo.domain.exception.InvalidSongException;
+import com.odo.practicevideo.domain.exception.NotPracticeVideoUploaderException;
+import com.odo.practicevideo.domain.exception.PracticeVideoNotFoundException;
+import com.odo.practicevideo.domain.exception.PracticeVideoNotReadyException;
+import com.odo.practicevideo.domain.exception.UnsupportedPracticeVideoTypeException;
+import com.odo.practicevideo.domain.exception.UploadDeadlinePassedException;
+import com.odo.practicevideo.domain.exception.UploadedFileMismatchException;
+import com.odo.practicevideo.domain.exception.UploadedFileNotFoundException;
 import com.odo.schedule.domain.exception.CapacityBelowConfirmedException;
 import com.odo.schedule.domain.exception.InvalidCapacityException;
 import com.odo.schedule.domain.exception.InvalidDurationException;
@@ -327,6 +341,86 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(CapacityBelowConfirmedException.class)
 	ResponseEntity<ErrorResponse> capacityBelowConfirmed(CapacityBelowConfirmedException ex) {
 		return error(HttpStatus.CONFLICT, "CAPACITY_BELOW_CONFIRMED", ex);
+	}
+
+	// 연습 영상(08_PracticeVideo_spec.md). 400 입력 규칙 위반과 본문 값 오류
+
+	@ExceptionHandler(InvalidSongException.class)
+	ResponseEntity<ErrorResponse> invalidSong(InvalidSongException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_SONG", ex);
+	}
+
+	@ExceptionHandler(InvalidPracticeVideoTitleException.class)
+	ResponseEntity<ErrorResponse> invalidPracticeVideoTitle(InvalidPracticeVideoTitleException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_PRACTICE_VIDEO_TITLE", ex);
+	}
+
+	@ExceptionHandler(InvalidPracticeVideoDescriptionException.class)
+	ResponseEntity<ErrorResponse> invalidPracticeVideoDescription(InvalidPracticeVideoDescriptionException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_PRACTICE_VIDEO_DESCRIPTION", ex);
+	}
+
+	@ExceptionHandler(InvalidPracticeVideoFileSizeException.class)
+	ResponseEntity<ErrorResponse> invalidPracticeVideoFileSize(InvalidPracticeVideoFileSizeException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_PRACTICE_VIDEO_FILE_SIZE", ex);
+	}
+
+	@ExceptionHandler(UnsupportedPracticeVideoTypeException.class)
+	ResponseEntity<ErrorResponse> unsupportedPracticeVideoType(UnsupportedPracticeVideoTypeException ex) {
+		return error(HttpStatus.BAD_REQUEST, "UNSUPPORTED_PRACTICE_VIDEO_TYPE", ex);
+	}
+
+	@ExceptionHandler(InvalidDateRangeException.class)
+	ResponseEntity<ErrorResponse> invalidDateRange(InvalidDateRangeException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE", ex);
+	}
+
+	@ExceptionHandler(InvalidCursorException.class)
+	ResponseEntity<ErrorResponse> invalidCursor(InvalidCursorException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_CURSOR", ex);
+	}
+
+	// 연습 영상. 403 올린 디렉터가 아님
+
+	@ExceptionHandler(NotPracticeVideoUploaderException.class)
+	ResponseEntity<ErrorResponse> notPracticeVideoUploader(NotPracticeVideoUploaderException ex) {
+		return error(HttpStatus.FORBIDDEN, "NOT_PRACTICE_VIDEO_UPLOADER", ex);
+	}
+
+	// 연습 영상. 404 없거나 볼 수 없음
+
+	@ExceptionHandler(PracticeVideoNotFoundException.class)
+	ResponseEntity<ErrorResponse> practiceVideoNotFound(PracticeVideoNotFoundException ex) {
+		return error(HttpStatus.NOT_FOUND, "PRACTICE_VIDEO_NOT_FOUND", ex);
+	}
+
+	// 연습 영상. 409 업로드의 지금 상태와 충돌
+
+	@ExceptionHandler(PracticeVideoNotReadyException.class)
+	ResponseEntity<ErrorResponse> practiceVideoNotReady(PracticeVideoNotReadyException ex) {
+		return error(HttpStatus.CONFLICT, "PRACTICE_VIDEO_NOT_READY", ex);
+	}
+
+	@ExceptionHandler(UploadDeadlinePassedException.class)
+	ResponseEntity<ErrorResponse> uploadDeadlinePassed(UploadDeadlinePassedException ex) {
+		return error(HttpStatus.CONFLICT, "UPLOAD_DEADLINE_PASSED", ex);
+	}
+
+	@ExceptionHandler(UploadedFileNotFoundException.class)
+	ResponseEntity<ErrorResponse> uploadedFileNotFound(UploadedFileNotFoundException ex) {
+		return error(HttpStatus.CONFLICT, "UPLOADED_FILE_NOT_FOUND", ex);
+	}
+
+	@ExceptionHandler(UploadedFileMismatchException.class)
+	ResponseEntity<ErrorResponse> uploadedFileMismatch(UploadedFileMismatchException ex) {
+		return error(HttpStatus.CONFLICT, "UPLOADED_FILE_MISMATCH", ex);
+	}
+
+	// 503 저장소(R2)에 닿지 못함. 버그(500)가 아니라 잠시 뒤 다시 보내면 되는 경우다(08_PracticeVideo_spec.md).
+
+	@ExceptionHandler(StorageUnavailableException.class)
+	ResponseEntity<ErrorResponse> storageUnavailable(StorageUnavailableException ex) {
+		return error(HttpStatus.SERVICE_UNAVAILABLE, "STORAGE_UNAVAILABLE", "저장소에 닿지 못했다. 잠시 뒤 다시 보낸다");
 	}
 
 	// 503 서버가 바쁨. DB 연결을 대기 시간(HikariCP connection-timeout) 안에 받지 못했다. 잠시 뒤 다시 보내면 된다.
