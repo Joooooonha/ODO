@@ -28,6 +28,10 @@ interface PracticeVideoJpaRepository extends JpaRepository<PracticeVideo, Long>,
 	Optional<PracticeVideo> lockById(@Param("id") long id);
 
 	@Override
+	@Query(value = "SELECT * FROM practice_video WHERE id = :id FOR KEY SHARE", nativeQuery = true)
+	Optional<PracticeVideo> lockByIdForKeyShare(@Param("id") long id);
+
+	@Override
 	@Query("""
 			select v from PracticeVideo v
 			where v.performanceId = :performanceId

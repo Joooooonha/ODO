@@ -47,6 +47,16 @@ public class PracticeVideoAccess {
 		return video;
 	}
 
+	/**
+	 * 영상 행을 FOR KEY SHARE로 잠근 뒤 requireReadyVideo와 같이 확인한다. 영상에 딸린 행을 넣기 전에 쓴다.
+	 * 확인과 넣기 사이에 삭제가 행을 지우면 넣기가 FK 위반(500)이 되므로, 행 삭제가 이 트랜잭션의 커밋을 기다리게 한다.
+	 * 잠금 쿼리가 영속성 컨텍스트에 처음 읽어 넣어야 확인이 잠근 뒤의 상태를 보므로, 이 영상을 먼저 읽지 않은 트랜잭션에서 부른다.
+	 */
+	public PracticeVideo lockReadyVideo(long videoId, long accountId) {
+		practiceVideoRepository.lockByIdForKeyShare(videoId);
+		return requireReadyVideo(videoId, accountId);
+	}
+
 	/** 올린 디렉터 본인이 아니면 NotPracticeVideoUploaderException(403). 지금 역할이 디렉터인지는 보지 않는다. */
 	public void requireUploader(PracticeVideo video, long accountId) {
 		if (!video.isUploadedBy(accountId)) {

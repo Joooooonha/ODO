@@ -14,7 +14,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 코멘트 내용 규칙. 08_PracticeVideo_spec.md의 "입력 검증과 글자 규칙", "코멘트 (단위와 통합)".
- * NFC로 합치고 앞뒤 공백을 뺀 뒤 보이는 글자로 1~300자. 글자 종류는 막지 않고, 줄바꿈을 뺀 제어 문자만 막는다.
+ * NFC로 합치고 앞뒤 공백을 뺀 뒤 보이는 글자로 1~300자. 저장 길이(UTF-16)는 5,000까지다.
+ * 글자 종류는 막지 않고, 줄바꿈을 뺀 제어 문자만 막는다.
  */
 class PracticeVideoCommentTest {
 
@@ -43,6 +44,22 @@ class PracticeVideoCommentTest {
 		assertThatThrownBy(() -> PracticeVideoComment.requireValidContent("가".repeat(301)))
 			.isInstanceOf(InvalidCommentContentException.class);
 		assertThatThrownBy(() -> PracticeVideoComment.requireValidContent("👍🏽".repeat(301)))
+			.isInstanceOf(InvalidCommentContentException.class);
+	}
+
+	/**
+	 * 결합 문자는 몇 개를 붙여도 보이는 글자로 1자라, 보이는 글자만 세면 코멘트가 몇 MB가 될 수 있다(PR B 리뷰).
+	 * x 뒤에 U+0301을 19개 붙이면 1자, 길이 20이다. a와 달리 x는 NFC로 합쳐지는 글자가 없어 길이가 그대로다.
+	 */
+	@Test
+	@DisplayName("저장 길이는 5,000까지 받는다. 보이는 글자가 300자 안이어도 5,001이면 막는다")
+	void storedLength() {
+		String grapheme = "x" + "\u0301".repeat(19);
+		String atLimit = grapheme.repeat(250);
+		assertThat(atLimit).hasSize(5_000);
+
+		assertThat(PracticeVideoComment.requireValidContent(atLimit)).isEqualTo(atLimit);
+		assertThatThrownBy(() -> PracticeVideoComment.requireValidContent(atLimit + "\u0301"))
 			.isInstanceOf(InvalidCommentContentException.class);
 	}
 

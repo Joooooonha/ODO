@@ -25,8 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 시점 코멘트. 08_PracticeVideo_spec.md의 "시점 코멘트", API 명세의 "코멘트 목록", "스레드 만들기", "스레드에 답하기".
- * 명단의 누구나 보고 쓴다. 영상이 READY인지 먼저 확인한다. 확인한 직후 삭제되면 코멘트가 들어가지만, 영상 행을 지울 때
- * 함께 지워지므로 그대로 둔다.
+ * 명단의 누구나 보고 쓴다. 넣기 전에 영상 행을 잠그고 READY인지 확인한다(PracticeVideoAccess.lockReadyVideo).
+ * 확인이 먼저면 넣은 코멘트는 영상 행을 지울 때 함께 지워지고, 삭제가 먼저 행을 지우는 중이면 기다렸다가 404다.
  */
 @Service
 @RequiredArgsConstructor
@@ -73,7 +73,7 @@ public class PracticeVideoCommentService {
 	@Transactional
 	public PracticeVideoThreadResult createThread(long accountId, long videoId, Integer positionSeconds,
 			String content) {
-		practiceVideoAccess.requireReadyVideo(videoId, accountId);
+		practiceVideoAccess.lockReadyVideo(videoId, accountId);
 		if (positionSeconds == null) {
 			throw new InvalidRequestException();
 		}
@@ -96,7 +96,7 @@ public class PracticeVideoCommentService {
 		PracticeVideoThread thread = threadRepository.findById(threadId)
 			.orElseThrow(PracticeVideoThreadNotFoundException::new);
 		try {
-			practiceVideoAccess.requireReadyVideo(thread.getVideoId(), accountId);
+			practiceVideoAccess.lockReadyVideo(thread.getVideoId(), accountId);
 		}
 		catch (PracticeVideoNotFoundException | PracticeVideoNotReadyException ex) {
 			// URL이 가리키는 자원은 스레드다. 스레드는 READY인 영상에만 생기므로 업로드 중인 경우는 없다.

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import static com.odo.practicevideo.presentation.PracticeVideoRequests.member;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,6 +33,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 시청 확인과 현황. 08_PracticeVideo_spec.md의 "시청 확인과 현황 (통합)", 설계의 "대상자와 시청 확인",
  * API 명세의 "시청 확인 기록", "시청 현황".
  * 명단: leader(디렉터), choreographer(디렉터, 영상을 올림), dancer(팀원). 대상자는 choreographer를 뺀 사람이다.
+ * 계정 ID는 1000부터 시작한다. ID를 Long끼리 ==, !=로 비교하면 -128~127에서만 값이 같을 때 같다고 나와, 작은 ID로는
+ * 그 실수가 드러나지 않는다(PR B 리뷰).
  */
 @IntegrationTest
 class PracticeVideoViewIntegrationTest {
@@ -53,6 +56,9 @@ class PracticeVideoViewIntegrationTest {
 	@Autowired
 	InMemoryObjectStorage storage;
 
+	@Autowired
+	PlatformTransactionManager transactionManager;
+
 	private PracticeVideoRequests api;
 
 	private Fixture f;
@@ -60,6 +66,7 @@ class PracticeVideoViewIntegrationTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		DatabaseCleaner.clean(jdbc);
+		jdbc.execute("ALTER TABLE account ALTER COLUMN id RESTART WITH 1000");
 		clock.set(T0);
 		storage.reset();
 		api = new PracticeVideoRequests(mockMvc, accessTokenIssuer, jdbc, storage);
@@ -127,6 +134,21 @@ class PracticeVideoViewIntegrationTest {
 			long id = ready();
 
 			api.recordView(f.bystander(), id)
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.code").value("PRACTICE_VIDEO_NOT_FOUND"));
+			assertThat(api.countRows("practice_video_view", id)).isZero();
+		}
+
+		/**
+		 * 잠그지 않으면 READY로 읽은 뒤 기록을 넣다가, 삭제가 커밋되면 FK 위반으로 500이 된다(PR B 리뷰).
+		 * 확인할 때 영상 행을 잠그면 삭제의 커밋을 기다렸다가 행이 없어 404다.
+		 */
+		@Test
+		@DisplayName("삭제가 영상 행을 지우고 커밋하기 전에 기록하면, 기다렸다가 404 PRACTICE_VIDEO_NOT_FOUND이고 기록이 남지 않는다")
+		void whileRowDeleted() throws Exception {
+			long id = ready();
+
+			api.whileVideoRowDeleted(transactionManager, id, () -> api.recordView(f.dancer(), id))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.code").value("PRACTICE_VIDEO_NOT_FOUND"));
 			assertThat(api.countRows("practice_video_view", id)).isZero();

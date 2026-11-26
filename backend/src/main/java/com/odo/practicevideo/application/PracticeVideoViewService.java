@@ -44,7 +44,7 @@ public class PracticeVideoViewService {
 	 */
 	@Transactional
 	public void recordView(long accountId, long videoId) {
-		PracticeVideo video = practiceVideoAccess.requireReadyVideo(videoId, accountId);
+		PracticeVideo video = practiceVideoAccess.lockReadyVideo(videoId, accountId);
 		if (video.isUploadedBy(accountId)) {
 			return;
 		}
@@ -64,7 +64,7 @@ public class PracticeVideoViewService {
 
 		List<PerformanceMember> targets = performanceMemberRepository.findAllByPerformanceId(video.getPerformanceId())
 			.stream()
-			.filter(member -> member.getAccountId() != video.getUploaderAccountId())
+			.filter(member -> !video.isUploadedBy(member.getAccountId()))
 			.sorted(PerformanceMember.ROSTER_ORDER)
 			.toList();
 		Map<Long, PerformanceMember> targetsById = targets.stream()

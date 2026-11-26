@@ -3,6 +3,12 @@ package com.odo.practicevideo.presentation;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import com.jayway.jsonpath.JsonPath;
 import com.odo.auth.application.AccessTokenIssuer;
@@ -16,8 +22,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -256,6 +265,55 @@ class PracticeVideoRequests {
 		Map<String, Object> body = new HashMap<>();
 		body.put("content", content);
 		return send(post("/api/practice-video-threads/{threadId}/comments", threadId), accountId, body);
+	}
+
+	/**
+	 * 다른 트랜잭션이 영상 행을 지우고 커밋하지 않은 동안 call을 보내고, call이 잠금을 기다리는 것을 본 뒤 커밋한다.
+	 * 영상 삭제가 행 삭제까지 끝내는 순간에 들어온 요청이다. call의 결과를 돌려준다.
+	 */
+	ResultActions whileVideoRowDeleted(PlatformTransactionManager transactionManager, long videoId,
+			Callable<ResultActions> call) throws Exception {
+		TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+		CountDownLatch rowDeleted = new CountDownLatch(1);
+		CountDownLatch commit = new CountDownLatch(1);
+		ExecutorService executor = Executors.newFixedThreadPool(2);
+		try {
+			Future<?> deleting = executor.submit(() -> transaction.executeWithoutResult(status -> {
+				jdbc.update("DELETE FROM practice_video WHERE id = ?", videoId);
+				rowDeleted.countDown();
+				try {
+					commit.await(10, TimeUnit.SECONDS);
+				}
+				catch (InterruptedException ex) {
+					Thread.currentThread().interrupt();
+				}
+			}));
+			assertThat(rowDeleted.await(5, TimeUnit.SECONDS)).as("삭제가 영상 행을 지웠다").isTrue();
+
+			Future<ResultActions> calling = executor.submit(call);
+			assertThat(waitUntilSomeoneWaitsForLock()).as("요청이 삭제의 커밋을 기다린다").isTrue();
+
+			commit.countDown();
+			deleting.get(5, TimeUnit.SECONDS);
+			return calling.get(5, TimeUnit.SECONDS);
+		}
+		finally {
+			commit.countDown();
+			executor.shutdownNow();
+		}
+	}
+
+	/** 다른 트랜잭션의 잠금을 기다리는 세션이 생길 때까지 5초 동안 본다. */
+	private boolean waitUntilSomeoneWaitsForLock() throws InterruptedException {
+		long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+		while (System.nanoTime() < until) {
+			Long waiting = jdbc.queryForObject("SELECT count(*) FROM pg_locks WHERE NOT granted", Long.class);
+			if (waiting != null && waiting > 0) {
+				return true;
+			}
+			Thread.sleep(20);
+		}
+		return false;
 	}
 
 	/** 표에 남은 행 수. 영상을 지운 뒤 함께 지워졌는지 볼 때 쓴다. */

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -46,6 +47,9 @@ class PracticeVideoCommentIntegrationTest {
 
 	@Autowired
 	InMemoryObjectStorage storage;
+
+	@Autowired
+	PlatformTransactionManager transactionManager;
 
 	private PracticeVideoRequests api;
 
@@ -230,6 +234,35 @@ class PracticeVideoCommentIntegrationTest {
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.code").value("PRACTICE_VIDEO_THREAD_NOT_FOUND"));
 			assertThat(api.countRows("practice_video_comment", id)).isEqualTo(1);
+		}
+
+		/**
+		 * 잠그지 않으면 READY로 읽은 뒤 스레드를 넣다가, 삭제가 커밋되면 FK 위반으로 500이 된다(PR B 리뷰).
+		 * 확인할 때 영상 행을 잠그면 삭제의 커밋을 기다렸다가 행이 없어 404다.
+		 */
+		@Test
+		@DisplayName("삭제가 영상 행을 지우고 커밋하기 전에 스레드를 만들면, 기다렸다가 404 PRACTICE_VIDEO_NOT_FOUND이고 스레드와 코멘트가 남지 않는다")
+		void createWhileRowDeleted() throws Exception {
+			long id = ready();
+
+			api.whileVideoRowDeleted(transactionManager, id, () -> api.createThread(f.dancer(), id, 42, "팔 각도"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.code").value("PRACTICE_VIDEO_NOT_FOUND"));
+			assertThat(api.countRows("practice_video_thread", id)).isZero();
+			assertThat(api.countRows("practice_video_comment", id)).isZero();
+		}
+
+		@Test
+		@DisplayName("삭제가 영상 행을 지우고 커밋하기 전에 답하면, 기다렸다가 404 PRACTICE_VIDEO_THREAD_NOT_FOUND이고 코멘트가 남지 않는다")
+		void replyWhileRowDeleted() throws Exception {
+			long id = ready();
+			long thread = api.createThreadId(f.dancer(), id, 42, "팔 각도");
+
+			api.whileVideoRowDeleted(transactionManager, id, () -> api.reply(f.choreographer(), thread, "45도"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.code").value("PRACTICE_VIDEO_THREAD_NOT_FOUND"));
+			assertThat(api.countRows("practice_video_thread", id)).isZero();
+			assertThat(api.countRows("practice_video_comment", id)).isZero();
 		}
 
 		@Test
