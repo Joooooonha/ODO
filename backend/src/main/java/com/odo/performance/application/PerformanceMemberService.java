@@ -1,7 +1,6 @@
 package com.odo.performance.application;
 
 import java.time.Clock;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -26,12 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PerformanceMemberService {
 
-	/** 디렉터를 먼저, 같은 역할 안에서는 명단에 들어온 순서. 한 요청으로 같이 들어온 사람은 요청 순서(id). */
-	private static final Comparator<PerformanceMember> ROSTER_ORDER = Comparator
-		.comparing((PerformanceMember member) -> !member.isDirector())
-		.thenComparing(PerformanceMember::getJoinedAt)
-		.thenComparing(PerformanceMember::getId);
-
 	private final PerformanceMemberRepository performanceMemberRepository;
 
 	private final TeamMemberReader teamMemberReader;
@@ -50,7 +43,7 @@ public class PerformanceMemberService {
 		PerformanceMember me = performanceAccess.requireParticipant(performanceId, accountId);
 		List<PerformanceMember> members = performanceMemberRepository.findAllByPerformanceId(performanceId)
 			.stream()
-			.sorted(ROSTER_ORDER)
+			.sorted(PerformanceMember.ROSTER_ORDER)
 			.toList();
 		Map<Long, Integer> generations = teamMemberReader.generationsOf(me.getTeamId());
 		Map<Long, String> names = accountReader.namesOf(members.stream().map(PerformanceMember::getAccountId).toList());

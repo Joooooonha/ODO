@@ -20,6 +20,12 @@ public interface PracticeVideoRepository {
 	Optional<PracticeVideo> lockById(long id);
 
 	/**
+	 * 영상에 딸린 행(스레드, 코멘트, 시청 기록)을 넣기 전에 행을 FOR KEY SHARE로 잠근다. 행을 지우는 DELETE만 막고
+	 * DELETING으로 바꾸는 UPDATE는 막지 않는다. 행을 지우는 중이면 그 커밋을 기다리고, 지워졌으면 비어 있다.
+	 */
+	Optional<PracticeVideo> lockByIdForKeyShare(long id);
+
+	/**
 	 * 목록. 그 공연의 READY와, 내가 올렸고 완료 기한이 지나지 않은 UPLOADING 중 업로드 시각이 [from, to)이고
 	 * (업로드 시각, ID)가 커서보다 앞(작은)인 것. (업로드 시각, ID) 내림차순.
 	 */
@@ -31,6 +37,9 @@ public interface PracticeVideoRepository {
 
 	/** UPLOADING이나 READY일 때만 DELETING으로 바꾼다(조건부 UPDATE). 동시에 두 번 와도 하나만 1을 받는다. */
 	int markDeleting(long id, Instant now);
+
+	/** READY인 영상의 재생 수를 1 더하고, 바뀐 행 수를 돌려준다. 그사이 삭제했으면 0이다. */
+	int incrementPlayCount(long id);
 
 	/** UPLOADING인 행을 지운다(올라온 파일이 달라 업로드를 버릴 때). */
 	int deleteUploading(long id);

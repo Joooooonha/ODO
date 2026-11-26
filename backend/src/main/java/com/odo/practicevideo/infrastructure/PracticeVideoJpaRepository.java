@@ -28,6 +28,10 @@ interface PracticeVideoJpaRepository extends JpaRepository<PracticeVideo, Long>,
 	Optional<PracticeVideo> lockById(@Param("id") long id);
 
 	@Override
+	@Query(value = "SELECT * FROM practice_video WHERE id = :id FOR KEY SHARE", nativeQuery = true)
+	Optional<PracticeVideo> lockByIdForKeyShare(@Param("id") long id);
+
+	@Override
 	@Query("""
 			select v from PracticeVideo v
 			where v.performanceId = :performanceId
@@ -62,6 +66,11 @@ interface PracticeVideoJpaRepository extends JpaRepository<PracticeVideo, Long>,
 			                                 com.odo.practicevideo.domain.entity.PracticeVideoStatus.READY)
 			""")
 	int markDeleting(@Param("id") long id, @Param("now") Instant now);
+
+	@Override
+	@Modifying
+	@Query("update PracticeVideo v set v.playCount = v.playCount + 1 where v.id = :id and v.status = com.odo.practicevideo.domain.entity.PracticeVideoStatus.READY")
+	int incrementPlayCount(@Param("id") long id);
 
 	@Override
 	@Modifying
