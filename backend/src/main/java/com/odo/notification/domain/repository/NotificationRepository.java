@@ -12,6 +12,9 @@ public interface NotificationRepository {
 	/** 받는 사람의 알림 중 순번이 beforeSeq보다 작은 것, 순번이 큰 것부터. 첫 페이지는 beforeSeq에 Long.MAX_VALUE를 준다. */
 	List<Notification> findPage(long recipientAccountId, long beforeSeq, Limit limit);
 
+	/** 받는 사람의 알림 중 순번이 afterSeq보다 크고 upToSeq 이하인 것, 순번 순으로. 실시간 전달이 쓴다. */
+	List<Notification> findBetween(long recipientAccountId, long afterSeq, long upToSeq, Limit limit);
+
 	/** 내 알림 하나를 지운다. 없거나 남의 알림이면 0이다. */
 	int deleteMine(long id, long recipientAccountId);
 

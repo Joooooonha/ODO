@@ -25,6 +25,15 @@ interface NotificationJpaRepository extends JpaRepository<Notification, Long>, N
 			@Param("beforeSeq") long beforeSeq, Limit limit);
 
 	@Override
+	@Query("""
+			select n from Notification n
+			where n.recipientAccountId = :recipientAccountId and n.seq > :afterSeq and n.seq <= :upToSeq
+			order by n.seq
+			""")
+	List<Notification> findBetween(@Param("recipientAccountId") long recipientAccountId,
+			@Param("afterSeq") long afterSeq, @Param("upToSeq") long upToSeq, Limit limit);
+
+	@Override
 	@Modifying
 	@Query("delete from Notification n where n.id = :id and n.recipientAccountId = :recipientAccountId")
 	int deleteMine(@Param("id") long id, @Param("recipientAccountId") long recipientAccountId);
