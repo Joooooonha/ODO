@@ -89,7 +89,7 @@ PM 세션에서 결정한 뒤 작성한다. 선택 근거는 `InternalDocs/Spec/
 | 프레임워크 | Spring Boot (Spring Framework 7) | 4.0. 2026년 12월 말에 4.1로 올린다 |
 | 데이터베이스 | PostgreSQL | 17 |
 | 인증 | JWT, 카카오 소셜 로그인. 네이버 로그인은 1차 이후에 추가한다 | - |
-| 프론트엔드 | React, Vite | 프로젝트 생성 시 결정 |
+| 프론트엔드 | React, Vite | 프로젝트 생성 시 최신 안정판으로 고정. 주요 라이브러리: TypeScript, TanStack Router, TanStack Query, Zustand, CSS Modules, Base UI, Lucide, vite-plugin-pwa, React Hook Form, Zod, Vitest, Testing Library, MSW, Playwright |
 | 파일 저장소 | Cloudflare R2 | - |
 | 배포 단위 | 컨테이너. 도구와 클라우드 서비스는 인프라 세션에서 정한다 | - |
 
