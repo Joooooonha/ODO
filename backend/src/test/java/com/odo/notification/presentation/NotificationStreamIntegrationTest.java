@@ -339,6 +339,33 @@ class NotificationStreamIntegrationTest {
 		}
 
 		@Test
+		@DisplayName("알림함을 비웠으면 순번 차이가 상한보다 커도 0으로 연결해 reset 없이 새 알림을 받는다(PR #17 리뷰)")
+		void emptiedInbox() throws Exception {
+			notifyA(4);
+			jdbc.update("DELETE FROM notification WHERE recipient_account_id = ?", memberA);
+
+			try (SseClient client = open(server1(), memberA, "0")) {
+				assertThat(client.next(Duration.ofMillis(500))).as("reset이 오지 않는다").isNull();
+
+				notifyA(1);
+
+				assertThat(receiveIds(client, 1)).containsExactly("5");
+			}
+		}
+
+		@Test
+		@DisplayName("남은 알림이 상한 안이면 순번 차이가 상한보다 커도 reset 없이 남은 알림이 모두 온다(PR #17 리뷰)")
+		void remainingWithinLimit() throws Exception {
+			notifyA(5);
+			jdbc.update("DELETE FROM notification WHERE recipient_account_id = ? AND seq <= 3", memberA);
+
+			try (SseClient client = open(server1(), memberA, "0")) {
+				assertThat(receiveIds(client, 2)).containsExactly("4", "5");
+				assertThat(client.next(Duration.ofMillis(500))).isNull();
+			}
+		}
+
+		@Test
 		@DisplayName("상한을 넘게 밀렸으면 알림 없이 reset이 오고 연결이 닫힌다. 같은 계정의 밀리지 않은 연결은 알림을 그대로 받는다")
 		void overLimit() throws Exception {
 			notifyA(4);
