@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.odo.auth.application.AccessTokenIssuer;
+import com.odo.support.Concurrently;
 import com.odo.support.DatabaseCleaner;
 import com.odo.support.IntegrationTest;
 import com.odo.support.MutableClock;
@@ -12,6 +13,7 @@ import com.odo.support.TestTeams;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -187,6 +189,20 @@ class NotificationRecordIntegrationTest {
 			api.designateDirector(leader, performanceId, memberA).andExpect(status().isOk());
 			api.designateDirector(leader, performanceId, memberA).andExpect(status().isOk());
 
+			assertThat(api.typesOf(memberA)).containsExactly("PERFORMANCE_MEMBER_ADDED",
+					"PERFORMANCE_DIRECTOR_ASSIGNED");
+		}
+
+		@RepeatedTest(10)
+		@DisplayName("같은 사람을 동시에 두 번 디렉터로 지정하면 둘 다 200이고 지정 알림은 한 건이다(PR #16 리뷰)")
+		void designatedConcurrently() throws Exception {
+			long performanceId = api.createPerformanceId(leader, teamId, "2026 정기공연",
+					List.of(director(leader), member(memberA)));
+
+			List<Integer> statuses = Concurrently
+				.statuses(Concurrently.run(2, () -> api.designateDirector(leader, performanceId, memberA)));
+
+			assertThat(statuses).containsExactly(200, 200);
 			assertThat(api.typesOf(memberA)).containsExactly("PERFORMANCE_MEMBER_ADDED",
 					"PERFORMANCE_DIRECTOR_ASSIGNED");
 		}

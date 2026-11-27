@@ -12,6 +12,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.LongStream;
 
+import com.odo.account.domain.repository.AccountRepository;
 import com.odo.support.DatabaseCleaner;
 import com.odo.support.IntegrationTest;
 import com.odo.support.MutableClock;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -49,6 +51,9 @@ class NotificationWriterIntegrationTest {
 
 	@Autowired
 	TeamService teamService;
+
+	@Autowired
+	AccountRepository accountRepository;
 
 	@Autowired
 	TransactionTemplate transactionTemplate;
@@ -294,6 +299,50 @@ class NotificationWriterIntegrationTest {
 					String.class, memberA))
 				.containsExactly("FIRST", "SECOND");
 			assertThat(seqsOf(memberA)).containsExactly(1L, 2L);
+		}
+
+		@Test
+		@DisplayName("앞선 엔티티 변경은 알림함 잠금보다 먼저 DB에 나간다. 알림함 잠금이 트랜잭션의 마지막 잠금이 되게 한다(PR #16 리뷰)")
+		void entityChangesFlushedBeforeInboxLock() throws Exception {
+			addInTransaction(draft(List.of(memberA)));
+			CountDownLatch inboxLocked = new CountDownLatch(1);
+			CountDownLatch release = new CountDownLatch(1);
+			ExecutorService executor = Executors.newFixedThreadPool(2);
+			try {
+				// 다른 트랜잭션이 김(memberA)의 알림함 행을 잡고 있다.
+				Future<?> holder = executor.submit(() -> transactionTemplate.executeWithoutResult(status -> {
+					jdbc.queryForList("SELECT account_id FROM notification_inbox WHERE account_id = ? FOR UPDATE",
+							memberA);
+					inboxLocked.countDown();
+					await(release);
+				}));
+				assertThat(inboxLocked.await(5, TimeUnit.SECONDS)).as("알림함 행을 잡았다").isTrue();
+
+				// 계정 이름을 바꾸고(아직 flush 전) 김에게 알림을 더한 뒤 커밋한다. 커밋 직전의 저장이 알림함 잠금에서 기다린다.
+				Future<?> writing = executor.submit(() -> transactionTemplate.executeWithoutResult(status -> {
+					accountRepository.findById(memberB).orElseThrow().changeName("이서윤", clock.instant());
+					writer.add(draft(List.of(memberA)));
+				}));
+				assertThat(waitUntilSomeoneWaitsForLock()).as("알림 저장이 알림함 잠금을 기다린다").isTrue();
+
+				// 이름 변경이 먼저 나갔다면 계정 행은 이미 잠겨 있다.
+				assertThatThrownBy(() -> jdbc.queryForList("SELECT id FROM account WHERE id = ? FOR UPDATE NOWAIT",
+						memberB))
+					.as("계정 행이 이미 잠겨 있다")
+					.isInstanceOf(DataAccessException.class);
+
+				release.countDown();
+				holder.get(5, TimeUnit.SECONDS);
+				writing.get(5, TimeUnit.SECONDS);
+			}
+			finally {
+				release.countDown();
+				executor.shutdownNow();
+			}
+
+			assertThat(seqsOf(memberA)).containsExactly(1L, 2L);
+			assertThat(jdbc.queryForObject("SELECT name FROM account WHERE id = ?", String.class, memberB))
+				.isEqualTo("이서윤");
 		}
 
 		@RepeatedTest(10)

@@ -90,8 +90,10 @@ public class PerformanceMemberService {
 		if (role != PerformanceRole.DIRECTOR) {
 			throw new InvalidRoleException();
 		}
+		// 대상 행을 잠그고 읽는다. 동시에 같은 사람을 지정해도 뒤의 것은 바뀐 역할(DIRECTOR)을 읽어 이벤트를 다시 내지 않는다.
+		// 잠금 쿼리가 이 행의 첫 읽기여야 영속성 컨텍스트에 잠근 뒤의 값이 들어간다(requireLeader는 팀장 행만 읽는다).
 		PerformanceMember target = performanceMemberRepository
-			.findByPerformanceIdAndAccountId(performanceId, targetAccountId)
+			.lockByPerformanceIdAndAccountId(performanceId, targetAccountId)
 			.orElseThrow(PerformanceMemberNotFoundException::new);
 		if (target.designateDirector(clock.instant())) {
 			eventPublisher.publishEvent(new PerformanceDirectorDesignatedEvent(leader.getTeamId(), performanceId,
