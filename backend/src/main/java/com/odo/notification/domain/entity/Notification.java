@@ -14,14 +14,15 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.ColumnTransformer;
 
 /**
- * 알림 이벤트 한 건. 받는 사람마다 한 행이다. 11_Notification_spec.md의 "알림 이벤트 기록".
- * payload는 화면에 보여 줄 값의 복사본(JSON 문자열)이다. 가리키던 자료가 지워져도 알림을 보여 줄 수 있게 한다.
+ * 알림함의 알림 한 건. 받는 사람마다 한 행이다. 11_Notification_spec.md의 "데이터".
+ * seq는 받는 사람의 순번이고, 한 사람 안에서 커밋 순서와 같다(NotificationWriter).
+ * payload(JSON 문자열)에는 볼 때 읽을 수 없는 값만 남는다. 사건의 내용(바뀐 상태)과 삭제 알림의 제목이다.
  */
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "notification_event")
-public class NotificationEvent {
+@Table(name = "notification")
+public class Notification {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,8 +31,14 @@ public class NotificationEvent {
 	@Column(name = "recipient_account_id", nullable = false)
 	private Long recipientAccountId;
 
+	@Column(nullable = false)
+	private Long seq;
+
 	@Column(name = "team_id", nullable = false)
 	private Long teamId;
+
+	@Column(name = "actor_account_id", nullable = false)
+	private Long actorAccountId;
 
 	@Column(nullable = false, length = 50)
 	private String type;
@@ -50,10 +57,12 @@ public class NotificationEvent {
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
 
-	private NotificationEvent(long recipientAccountId, long teamId, String type, String targetType, long targetId,
-			String payload, Instant createdAt) {
+	private Notification(long recipientAccountId, long seq, long teamId, long actorAccountId, String type,
+			String targetType, long targetId, String payload, Instant createdAt) {
 		this.recipientAccountId = recipientAccountId;
+		this.seq = seq;
 		this.teamId = teamId;
+		this.actorAccountId = actorAccountId;
 		this.type = type;
 		this.targetType = targetType;
 		this.targetId = targetId;
@@ -61,9 +70,10 @@ public class NotificationEvent {
 		this.createdAt = createdAt;
 	}
 
-	public static NotificationEvent createEvent(long recipientAccountId, long teamId, String type, String targetType,
-			long targetId, String payloadJson, Instant now) {
-		return new NotificationEvent(recipientAccountId, teamId, type, targetType, targetId, payloadJson, now);
+	public static Notification createNotification(long recipientAccountId, long seq, long teamId,
+			long actorAccountId, String type, String targetType, long targetId, String payloadJson, Instant now) {
+		return new Notification(recipientAccountId, seq, teamId, actorAccountId, type, targetType, targetId,
+				payloadJson, now);
 	}
 
 }

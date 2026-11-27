@@ -16,6 +16,9 @@ import com.odo.team.domain.entity.JoinRequest;
 import com.odo.team.domain.entity.JoinRequestStatus;
 import com.odo.team.domain.entity.Team;
 import com.odo.team.domain.entity.TeamMember;
+import com.odo.team.domain.event.JoinRequestApprovedEvent;
+import com.odo.team.domain.event.JoinRequestRejectedEvent;
+import com.odo.team.domain.event.JoinRequestedEvent;
 import com.odo.team.domain.event.TeamMemberJoinedEvent;
 import com.odo.team.domain.exception.AlreadyMemberException;
 import com.odo.team.domain.exception.AlreadyRequestedException;
@@ -35,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 초대와 입장 요청. 02_TeamSpace_spec.md의 "초대와 입장", "입장 요청 상태".
  * 상태를 바꾸는 동작(승인, 거절, 취소)은 조건부 UPDATE로 해서 동시에 와도 하나만 반영된다.
+ * 요청, 승인, 거절은 같은 트랜잭션 안에서 사실 이벤트를 발행하고, 알림 기능이 받아 알림으로 바꾼다. 취소는 발행하지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -129,6 +133,8 @@ public class JoinRequestService {
 			}
 			throw ex;
 		}
+		eventPublisher.publishEvent(new JoinRequestedEvent(team.getId(), request.getId(), accountId,
+				teamMemberReader.leaderIdOf(team.getId())));
 		return JoinRequestResult.of(request, team);
 	}
 
@@ -161,13 +167,16 @@ public class JoinRequestService {
 			throw ex;
 		}
 		eventPublisher.publishEvent(new TeamMemberJoinedEvent(teamId, member.getAccountId()));
+		// 팀원이 생긴 것과 요청이 승인된 것은 다른 사실이라 따로 발행한다(11_Notification_spec.md의 "알림 기록 방식").
+		eventPublisher.publishEvent(new JoinRequestApprovedEvent(teamId, requestId, leaderId, request.getAccountId()));
 		return TeamMemberResult.of(member, accountReader.nameOf(member.getAccountId()));
 	}
 
 	/** 거절. 예외는 승인과 같다. */
 	@Transactional
 	public void reject(long leaderId, long teamId, long requestId) {
-		decide(leaderId, teamId, requestId, JoinRequestStatus.REJECTED);
+		JoinRequest request = decide(leaderId, teamId, requestId, JoinRequestStatus.REJECTED);
+		eventPublisher.publishEvent(new JoinRequestRejectedEvent(teamId, requestId, leaderId, request.getAccountId()));
 	}
 
 	/** 내 요청 취소. 남의 요청이면 RequestNotFoundException, 이미 처리됨 RequestNotPendingException. */

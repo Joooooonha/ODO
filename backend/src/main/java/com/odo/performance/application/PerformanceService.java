@@ -17,11 +17,13 @@ import com.odo.performance.domain.repository.PerformanceMemberRepository;
 import com.odo.performance.domain.repository.PerformanceRepository;
 import com.odo.team.application.TeamAccess;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 공연 만들기, 공연 목록, 공연 상세, 공연 수정. 06_Performance_spec.md의 "API 명세".
+ * 공연을 만들면 같은 트랜잭션 안에서 명단 추가 이벤트를 발행한다(06_Performance_spec.md의 "알림 이벤트").
  */
 @Service
 @RequiredArgsConstructor
@@ -36,6 +38,8 @@ public class PerformanceService {
 	private final PerformanceAccess performanceAccess;
 
 	private final TeamAccess teamAccess;
+
+	private final ApplicationEventPublisher eventPublisher;
 
 	private final Clock clock;
 
@@ -55,6 +59,7 @@ public class PerformanceService {
 			.orElseThrow(LeaderNotInMembersException::new);
 		performanceRepository.save(performance);
 		performanceRoster.enrollMembers(performance.getId(), teamId, members, performance.getCreatedAt());
+		eventPublisher.publishEvent(PerformanceRoster.enrolledEvent(teamId, performance.getId(), leaderId, members));
 		return PerformanceDetailResult.of(performance, leader.role());
 	}
 

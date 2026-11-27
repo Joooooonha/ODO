@@ -6,28 +6,26 @@ import java.util.List;
 import java.util.Map;
 
 import com.odo.account.application.AccountReader;
-import com.odo.notification.application.NotificationEventDraft;
-import com.odo.notification.application.NotificationEventRecorder;
 import com.odo.schedule.application.dto.ParticipantResult;
 import com.odo.schedule.domain.entity.ParticipantStatus;
 import com.odo.schedule.domain.entity.Schedule;
 import com.odo.schedule.domain.entity.ScheduleParticipant;
+import com.odo.schedule.domain.event.ScheduleParticipantStatusChangedEvent;
 import com.odo.schedule.domain.exception.ParticipantNotFoundException;
 import com.odo.schedule.domain.repository.ScheduleParticipantRepository;
 import com.odo.team.application.TeamMemberReader;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 참여자 목록과 팀장의 참여자 상태 변경. 03_Schedule_spec.md의 "연습 일정의 참여자와 참여 투표"와 API 명세.
- * 투표 결과는 팀장이 바꾸지 않는다. 상태를 바꾸면 그 사람에게 알림 이벤트가 남는다.
+ * 투표 결과는 팀장이 바꾸지 않는다. 상태를 바꾸면 같은 트랜잭션 안에서 사실 이벤트를 발행하고, 알림 기능이 그 사람에게 알림을 남긴다.
  */
 @Service
 @RequiredArgsConstructor
 public class ScheduleParticipantService {
-
-	static final String STATUS_CHANGED = "SCHEDULE_PARTICIPANT_STATUS_CHANGED";
 
 	private final ScheduleParticipantRepository participantRepository;
 
@@ -37,7 +35,7 @@ public class ScheduleParticipantService {
 
 	private final TeamMemberReader teamMemberReader;
 
-	private final NotificationEventRecorder notificationEventRecorder;
+	private final ApplicationEventPublisher eventPublisher;
 
 	private final Clock clock;
 
@@ -70,10 +68,8 @@ public class ScheduleParticipantService {
 			.orElseThrow(ParticipantNotFoundException::new);
 		schedule.requireAllowedStatus(status);
 		if (participant.changeStatus(status, now)) {
-			Map<String, Object> payload = Map.of("title", schedule.getTitle(), "startAt",
-					schedule.getStartAt().toString(), "status", status.name());
-			notificationEventRecorder.record(new NotificationEventDraft(schedule.getTeamId(), STATUS_CHANGED,
-					ScheduleService.TARGET_TYPE, scheduleId, payload), List.of(targetAccountId), accountId);
+			eventPublisher.publishEvent(new ScheduleParticipantStatusChangedEvent(schedule.getTeamId(), scheduleId,
+					accountId, targetAccountId, status));
 		}
 		return new ParticipantResult(targetAccountId, accountReader.nameOf(targetAccountId),
 				teamMemberReader.generationOf(schedule.getTeamId(), targetAccountId), participant.getStatus(),

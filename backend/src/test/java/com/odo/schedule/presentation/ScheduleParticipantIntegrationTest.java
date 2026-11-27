@@ -223,7 +223,7 @@ class ScheduleParticipantIntegrationTest {
 		void sameStatus() throws Exception {
 			long scheduleId = createVoting();
 			api.setVote(scheduleId, memberA, "NO", clock.instant());
-			jdbc.update("DELETE FROM notification_event");
+			jdbc.update("DELETE FROM notification");
 
 			api.changeStatus(leader, scheduleId, memberA, "OPTIONAL")
 				.andExpect(status().isOk())
@@ -270,7 +270,7 @@ class ScheduleParticipantIntegrationTest {
 		@DisplayName("상태가 바뀐 사람에게만 알림 이벤트가 남고, 팀장이 자기 상태를 바꾸면 남지 않는다")
 		void notification() throws Exception {
 			long scheduleId = createVoting();
-			jdbc.update("DELETE FROM notification_event");
+			jdbc.update("DELETE FROM notification");
 
 			api.changeStatus(leader, scheduleId, memberA, "REQUIRED").andExpect(status().isOk());
 			api.changeStatus(leader, scheduleId, leader, "REQUIRED").andExpect(status().isOk());

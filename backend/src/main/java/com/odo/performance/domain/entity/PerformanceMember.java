@@ -72,13 +72,14 @@ public class PerformanceMember {
 		return role == PerformanceRole.DIRECTOR;
 	}
 
-	/** 디렉터로 바꾼다. 이미 디렉터면 아무것도 바꾸지 않는다. */
-	public void designateDirector(Instant now) {
+	/** 디렉터로 바꾸고 바뀌었는지를 돌려준다. 이미 디렉터면 아무것도 바꾸지 않고 false다. */
+	public boolean designateDirector(Instant now) {
 		if (isDirector()) {
-			return;
+			return false;
 		}
 		this.role = PerformanceRole.DIRECTOR;
 		this.updatedAt = now;
+		return true;
 	}
 
 }

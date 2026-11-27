@@ -4,6 +4,9 @@ import java.sql.SQLTransientConnectionException;
 
 import com.odo.account.domain.exception.InvalidNameException;
 import com.odo.common.storage.StorageUnavailableException;
+import com.odo.notification.domain.exception.InvalidNotificationCursorException;
+import com.odo.notification.domain.exception.InvalidNotificationSeqException;
+import com.odo.notification.domain.exception.NotificationNotFoundException;
 import com.odo.performance.domain.exception.AlreadyInPerformanceException;
 import com.odo.performance.domain.exception.DuplicateMemberException;
 import com.odo.performance.domain.exception.EmptyMembersException;
@@ -381,6 +384,21 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(InvalidCursorException.class)
 	ResponseEntity<ErrorResponse> invalidCursor(InvalidCursorException ex) {
 		return error(HttpStatus.BAD_REQUEST, "INVALID_CURSOR", ex);
+	}
+
+	@ExceptionHandler(InvalidNotificationCursorException.class)
+	ResponseEntity<ErrorResponse> invalidNotificationCursor(InvalidNotificationCursorException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_CURSOR", ex);
+	}
+
+	@ExceptionHandler(InvalidNotificationSeqException.class)
+	ResponseEntity<ErrorResponse> invalidNotificationSeq(InvalidNotificationSeqException ex) {
+		return error(HttpStatus.BAD_REQUEST, "INVALID_NOTIFICATION_SEQ", ex);
+	}
+
+	@ExceptionHandler(NotificationNotFoundException.class)
+	ResponseEntity<ErrorResponse> notificationNotFound(NotificationNotFoundException ex) {
+		return error(HttpStatus.NOT_FOUND, "NOTIFICATION_NOT_FOUND", ex);
 	}
 
 	@ExceptionHandler(InvalidCommentPositionException.class)

@@ -96,9 +96,8 @@ class ScheduleApiIntegrationTest {
 		return api.createScheduleId(leader, teamId, body);
 	}
 
-	private String notifiedTitle(String type) {
-		return jdbc.queryForObject("SELECT payload->>'title' FROM notification_event WHERE type = ? LIMIT 1",
-				String.class, type);
+	private String notifiedTitle(String type) throws Exception {
+		return api.notifiedTitle(type);
 	}
 
 	@Nested
@@ -292,7 +291,7 @@ class ScheduleApiIntegrationTest {
 			assertThat(api.notified("SCHEDULE_CREATED")).containsExactly(memberA, memberB);
 			assertThat(notifiedTitle("SCHEDULE_CREATED")).isEqualTo("자유 연습");
 
-			jdbc.update("DELETE FROM notification_event");
+			jdbc.update("DELETE FROM notification");
 			Map<String, Object> nonVoting = scheduleBody("공연팀 연습");
 			nonVoting.put("requiredAccountIds", List.of(memberA));
 			create(nonVoting);

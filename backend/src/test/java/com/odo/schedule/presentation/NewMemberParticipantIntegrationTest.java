@@ -85,8 +85,10 @@ class NewMemberParticipantIntegrationTest {
 		return new long[] { applicant, requestId };
 	}
 
+	/** 일정 알림만 센다. 승인 자체의 알림(TEAM_JOIN_APPROVED)은 일정이 남긴 것이 아니다. */
 	private int notificationsFor(long accountId) {
-		return jdbc.queryForObject("SELECT count(*) FROM notification_event WHERE recipient_account_id = ?",
+		return jdbc.queryForObject(
+				"SELECT count(*) FROM notification WHERE recipient_account_id = ? AND type LIKE 'SCHEDULE\\_%'",
 				Integer.class, accountId);
 	}
 
