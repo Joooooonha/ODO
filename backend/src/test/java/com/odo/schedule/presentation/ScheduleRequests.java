@@ -264,12 +264,26 @@ class ScheduleRequests {
 	/** 그 종류의 알림 이벤트를 받은 사람. 받는 사람 ID 순이다. */
 	List<Long> notified(String type) {
 		return jdbc.queryForList(
-				"SELECT recipient_account_id FROM notification_event WHERE type = ? ORDER BY recipient_account_id",
+				"SELECT recipient_account_id FROM notification WHERE type = ? ORDER BY recipient_account_id",
 				Long.class, type);
 	}
 
+	/**
+	 * 그 종류의 알림을 받은 사람 한 명이 알림 목록에서 보는 일정 이름. 제목은 알림을 볼 때 읽고, 삭제 알림만 지울 때의 제목이다
+	 * (11_Notification_spec.md의 "보여 줄 값: 볼 때 읽기").
+	 */
+	String notifiedTitle(String type) throws Exception {
+		long recipient = jdbc.queryForObject(
+				"SELECT recipient_account_id FROM notification WHERE type = ? ORDER BY id LIMIT 1", Long.class, type);
+		String response = body(
+				mockMvc.perform(get("/api/notifications").header("Authorization", bearer(recipient)))
+					.andExpect(status().isOk()));
+		List<String> names = JsonPath.read(response, "$.items[?(@.type == '" + type + "')].target.name");
+		return names.getFirst();
+	}
+
 	int countNotifications() {
-		return jdbc.queryForObject("SELECT count(*) FROM notification_event", Integer.class);
+		return jdbc.queryForObject("SELECT count(*) FROM notification", Integer.class);
 	}
 
 	// 응답 읽기

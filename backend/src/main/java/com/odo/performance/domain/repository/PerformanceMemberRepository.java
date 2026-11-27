@@ -17,6 +17,13 @@ public interface PerformanceMemberRepository {
 	/** 요청마다 하는 명단 확인. unique (performance_id, account_id) 인덱스로 찾는다. */
 	Optional<PerformanceMember> findByPerformanceIdAndAccountId(Long performanceId, Long accountId);
 
+	/**
+	 * 명단의 한 사람 행을 FOR UPDATE로 잠그고 읽는다. 디렉터 지정이 쓴다.
+	 * 같은 사람을 동시에 지정하면 뒤의 것이 앞의 커밋을 기다린 뒤 바뀐 역할을 읽어, 지정 이벤트가 한 번만 나간다(PR #16 리뷰).
+	 * 이 행을 FK로 가리키는 테이블이 없어 다른 INSERT를 막지 않는다.
+	 */
+	Optional<PerformanceMember> lockByPerformanceIdAndAccountId(long performanceId, long accountId);
+
 	List<PerformanceMember> findAllByPerformanceId(Long performanceId);
 
 	/** 명단에 넣으려는 사람 중 이미 있는 사람. */

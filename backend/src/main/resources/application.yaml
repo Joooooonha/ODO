@@ -69,3 +69,5 @@ odo:
     page-size: 20
     cleanup-interval: 10m
     cleanup-enabled: true
+  notification:
+    page-size: 20

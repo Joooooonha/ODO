@@ -9,17 +9,20 @@ import com.odo.performance.application.dto.MemberAssignment;
 import com.odo.performance.application.dto.PerformanceMemberResult;
 import com.odo.performance.domain.entity.PerformanceMember;
 import com.odo.performance.domain.entity.PerformanceRole;
+import com.odo.performance.domain.event.PerformanceDirectorDesignatedEvent;
 import com.odo.performance.domain.exception.EmptyMembersException;
 import com.odo.performance.domain.exception.InvalidRoleException;
 import com.odo.performance.domain.exception.PerformanceMemberNotFoundException;
 import com.odo.performance.domain.repository.PerformanceMemberRepository;
 import com.odo.team.application.TeamMemberReader;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 명단 조회, 명단에 추가, 디렉터 지정. 06_Performance_spec.md의 "API 명세".
+ * 명단에 추가하거나 실제로 디렉터로 바뀌면 같은 트랜잭션 안에서 이벤트를 발행한다(06_Performance_spec.md의 "알림 이벤트").
  */
 @Service
 @RequiredArgsConstructor
@@ -34,6 +37,8 @@ public class PerformanceMemberService {
 	private final PerformanceAccess performanceAccess;
 
 	private final AccountReader accountReader;
+
+	private final ApplicationEventPublisher eventPublisher;
 
 	private final Clock clock;
 
@@ -65,7 +70,11 @@ public class PerformanceMemberService {
 		if (members.isEmpty()) {
 			throw new EmptyMembersException();
 		}
-		return performanceRoster.enrollMembers(performanceId, leader.getTeamId(), members, clock.instant());
+		List<PerformanceMemberResult> enrolled = performanceRoster.enrollMembers(performanceId, leader.getTeamId(),
+				members, clock.instant());
+		eventPublisher.publishEvent(
+				PerformanceRoster.enrolledEvent(leader.getTeamId(), performanceId, leaderId, members));
+		return enrolled;
 	}
 
 	/**
@@ -81,10 +90,15 @@ public class PerformanceMemberService {
 		if (role != PerformanceRole.DIRECTOR) {
 			throw new InvalidRoleException();
 		}
+		// 대상 행을 잠그고 읽는다. 동시에 같은 사람을 지정해도 뒤의 것은 바뀐 역할(DIRECTOR)을 읽어 이벤트를 다시 내지 않는다.
+		// 잠금 쿼리가 이 행의 첫 읽기여야 영속성 컨텍스트에 잠근 뒤의 값이 들어간다(requireLeader는 팀장 행만 읽는다).
 		PerformanceMember target = performanceMemberRepository
-			.findByPerformanceIdAndAccountId(performanceId, targetAccountId)
+			.lockByPerformanceIdAndAccountId(performanceId, targetAccountId)
 			.orElseThrow(PerformanceMemberNotFoundException::new);
-		target.designateDirector(clock.instant());
+		if (target.designateDirector(clock.instant())) {
+			eventPublisher.publishEvent(new PerformanceDirectorDesignatedEvent(leader.getTeamId(), performanceId,
+					leaderId, targetAccountId));
+		}
 		Integer generation = teamMemberReader.generationOf(leader.getTeamId(), targetAccountId);
 		return PerformanceMemberResult.of(target, accountReader.nameOf(targetAccountId), generation);
 	}

@@ -2,7 +2,6 @@ package com.odo.schedule.application;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -11,8 +10,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import com.odo.notification.application.NotificationEventDraft;
-import com.odo.notification.application.NotificationEventRecorder;
 import com.odo.schedule.application.dto.CreateScheduleCommand;
 import com.odo.schedule.application.dto.PracticeRoomResult;
 import com.odo.schedule.application.dto.ScheduleDetailResult;
@@ -25,6 +22,9 @@ import com.odo.schedule.domain.entity.PracticeRoom;
 import com.odo.schedule.domain.entity.Schedule;
 import com.odo.schedule.domain.entity.ScheduleParticipant;
 import com.odo.schedule.domain.entity.Vote;
+import com.odo.schedule.domain.event.ScheduleCreatedEvent;
+import com.odo.schedule.domain.event.ScheduleDeletedEvent;
+import com.odo.schedule.domain.event.ScheduleUpdatedEvent;
 import com.odo.schedule.domain.exception.DuplicateMemberException;
 import com.odo.schedule.domain.exception.InvalidPracticeRoomException;
 import com.odo.schedule.domain.exception.NotTeamMemberException;
@@ -37,6 +37,7 @@ import com.odo.team.domain.entity.TeamMember;
 import com.odo.team.domain.repository.TeamMemberRepository;
 import com.odo.team.domain.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -44,19 +45,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 일정 만들기, 목록, 상세, 수정, 삭제. 03_Schedule_spec.md의 "일정"과 API 명세.
- * 등록, 수정, 삭제는 팀장만 하고 알림 이벤트를 남긴다(받는 사람은 필수와 선택 참여자, 조작한 팀장 본인은 빠진다).
+ * 등록, 수정, 삭제는 팀장만 하고, 같은 트랜잭션 안에서 사실 이벤트를 발행한다. 이벤트에 관련된 사람(제외되지 않은 필수와 선택 참여자)을
+ * 담고, 알림 기능이 받아 알림으로 바꾼다(조작한 팀장 본인은 알림에서 빠진다). 11_Notification_spec.md의 "이벤트와 알림".
  */
 @Service
 @RequiredArgsConstructor
 public class ScheduleService {
-
-	static final String TARGET_TYPE = "SCHEDULE";
-
-	static final String SCHEDULE_CREATED = "SCHEDULE_CREATED";
-
-	static final String SCHEDULE_UPDATED = "SCHEDULE_UPDATED";
-
-	static final String SCHEDULE_DELETED = "SCHEDULE_DELETED";
 
 	private final ScheduleRepository scheduleRepository;
 
@@ -72,7 +66,7 @@ public class ScheduleService {
 
 	private final ScheduleAccess scheduleAccess;
 
-	private final NotificationEventRecorder notificationEventRecorder;
+	private final ApplicationEventPublisher eventPublisher;
 
 	private final Clock clock;
 
@@ -105,7 +99,7 @@ public class ScheduleService {
 			.filter(participant -> participant.getStatus() != ParticipantStatus.EXCLUDED)
 			.map(ScheduleParticipant::getAccountId)
 			.toList();
-		notify(schedule, SCHEDULE_CREATED, notified, accountId);
+		eventPublisher.publishEvent(new ScheduleCreatedEvent(teamId, schedule.getId(), accountId, notified));
 		return detailOf(schedule, accountId, now);
 	}
 
@@ -163,20 +157,22 @@ public class ScheduleService {
 				ParticipantStatus.OPTIONAL, Vote.YES);
 		schedule.update(command.title(), command.startAt(), command.durationMinutes(), practiceRoomId, command.memo(),
 				command.voteDeadline(), command.capacity(), confirmedCount, now);
-		notify(schedule, SCHEDULE_UPDATED, participantRepository.findNotifiedAccountIds(scheduleId), accountId);
+		eventPublisher.publishEvent(new ScheduleUpdatedEvent(schedule.getTeamId(), scheduleId, accountId,
+				participantRepository.findNotifiedAccountIds(scheduleId)));
 		return detailOf(schedule, accountId, now);
 	}
 
 	/**
 	 * 일정을 지운다. 참여자 행은 DB에서 함께 지워진다(on delete cascade). 종료나 마감과 관계없이 지울 수 있다.
-	 * 알림 이벤트에는 제목을 복사해 둔다. 지운 뒤에는 일정을 다시 읽을 수 없기 때문이다.
+	 * 삭제 이벤트에 제목을 담아 알림에 복사해 둔다. 지운 뒤에는 일정을 다시 읽을 수 없기 때문이다.
 	 * 없음, 이미 지움, 팀원 아님 ScheduleNotFoundException, 팀장 아님 NotTeamLeaderException.
 	 */
 	@Transactional
 	public void deleteSchedule(long accountId, long scheduleId) {
 		Schedule schedule = scheduleAccess.lockScheduleAsLeader(scheduleId, accountId);
 		List<Long> notified = participantRepository.findNotifiedAccountIds(scheduleId);
-		notify(schedule, SCHEDULE_DELETED, notified, accountId);
+		eventPublisher.publishEvent(
+				new ScheduleDeletedEvent(schedule.getTeamId(), scheduleId, schedule.getTitle(), accountId, notified));
 		scheduleRepository.delete(schedule);
 	}
 
@@ -236,13 +232,6 @@ public class ScheduleService {
 	/** 장소가 없으면 null. Map.of()의 get(null)은 NPE를 던지므로 먼저 본다. */
 	private static String roomNameOf(Map<Long, String> roomNames, Schedule schedule) {
 		return schedule.getPracticeRoomId() == null ? null : roomNames.get(schedule.getPracticeRoomId());
-	}
-
-	private void notify(Schedule schedule, String type, Collection<Long> recipients, long actorAccountId) {
-		Map<String, Object> payload = Map.of("title", schedule.getTitle(), "startAt", schedule.getStartAt().toString());
-		notificationEventRecorder.record(
-				new NotificationEventDraft(schedule.getTeamId(), type, TARGET_TYPE, schedule.getId(), payload), recipients,
-				actorAccountId);
 	}
 
 }

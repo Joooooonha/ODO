@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 
 import com.odo.account.application.AccountReader;
 import com.odo.performance.application.dto.MemberAssignment;
+import com.odo.performance.domain.event.PerformanceMembersEnrolledEvent;
 import com.odo.performance.application.dto.PerformanceMemberResult;
 import com.odo.performance.domain.entity.PerformanceMember;
 import com.odo.performance.domain.exception.AlreadyInPerformanceException;
@@ -91,6 +92,16 @@ class PerformanceRoster {
 			}
 		}
 		return false;
+	}
+
+	/** 넣은 사람과 역할로 명단 추가 이벤트를 만든다. 공연 만들기와 명단에 추가가 enrollMembers 뒤에 발행한다. */
+	static PerformanceMembersEnrolledEvent enrolledEvent(long teamId, long performanceId, long actorAccountId,
+			List<MemberAssignment> assignments) {
+		return new PerformanceMembersEnrolledEvent(teamId, performanceId, actorAccountId,
+				assignments.stream()
+					.map(assignment -> new PerformanceMembersEnrolledEvent.Enrollment(assignment.accountId(),
+							assignment.role()))
+					.toList());
 	}
 
 }

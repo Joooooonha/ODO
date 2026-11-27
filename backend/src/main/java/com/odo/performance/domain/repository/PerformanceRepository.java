@@ -12,6 +12,8 @@ public interface PerformanceRepository {
 
 	Optional<Performance> findById(Long id);
 
+	List<Performance> findAllById(Iterable<Long> ids);
+
 	/** 내 공연 목록. 최근에 만든 것부터. */
 	List<Performance> findAllByIdInOrderByCreatedAtDescIdDesc(Collection<Long> ids);
 
