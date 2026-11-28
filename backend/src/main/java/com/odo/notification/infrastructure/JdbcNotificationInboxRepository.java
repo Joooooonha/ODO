@@ -1,5 +1,11 @@
 package com.odo.notification.infrastructure;
 
+import java.sql.Array;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.odo.notification.domain.repository.NotificationInboxRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -24,6 +30,28 @@ class JdbcNotificationInboxRepository implements NotificationInboxRepository {
 				RETURNING last_seq
 				""", Long.class, accountId, count);
 		return lastSeq;
+	}
+
+	@Override
+	public Map<Long, Long> findLastSeqs(Collection<Long> accountIds) {
+		Map<Long, Long> lastSeqs = new HashMap<>();
+		jdbc.query(connection -> {
+			var statement = connection
+				.prepareStatement("SELECT account_id, last_seq FROM notification_inbox WHERE account_id = ANY(?)");
+			Array ids = connection.createArrayOf("bigint", accountIds.toArray());
+			statement.setArray(1, ids);
+			return statement;
+		}, row -> {
+			lastSeqs.put(row.getLong("account_id"), row.getLong("last_seq"));
+		});
+		return lastSeqs;
+	}
+
+	@Override
+	public long findLastSeq(long accountId) {
+		List<Long> values = jdbc.queryForList("SELECT last_seq FROM notification_inbox WHERE account_id = ?",
+				Long.class, accountId);
+		return values.isEmpty() ? 0 : values.getFirst();
 	}
 
 	@Override

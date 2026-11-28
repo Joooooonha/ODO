@@ -23,7 +23,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.containsStringIgnoringCase;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -389,6 +392,23 @@ class NotificationApiIntegrationTest {
 			api.opened(memberA, -1)
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("INVALID_NOTIFICATION_SEQ"));
+		}
+
+	}
+
+	@Nested
+	@DisplayName("CORS")
+	class Cors {
+
+		@Test
+		@DisplayName("프론트 출처의 실시간 연결 사전 요청에 Last-Event-ID를 허락한다. 화면은 처음 연결부터 이 헤더를 보낸다(PR #17 리뷰)")
+		void allowsLastEventId() throws Exception {
+			mockMvc
+				.perform(options("/api/notifications/stream").header("Origin", "http://localhost:5173")
+					.header("Access-Control-Request-Method", "GET")
+					.header("Access-Control-Request-Headers", "authorization,last-event-id"))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Access-Control-Allow-Headers", containsStringIgnoringCase("last-event-id")));
 		}
 
 	}

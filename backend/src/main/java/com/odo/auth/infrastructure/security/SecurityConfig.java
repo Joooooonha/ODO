@@ -120,7 +120,9 @@ public class SecurityConfig {
 		CorsConfiguration cors = new CorsConfiguration();
 		cors.setAllowedOrigins(List.of(properties.frontendBaseUrl()));
 		cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-		cors.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+		// Last-Event-ID: 알림 실시간 연결이 마지막으로 받은 순번을 보낸다. 허락하지 않으면 브라우저가 사전 요청에서 연결을 막는다
+		// (11_Notification_spec.md의 "실시간 연결").
+		cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "Last-Event-ID"));
 		// 갱신과 로그아웃 요청에 갱신 토큰 쿠키를 받기 위해 필요하다
 		cors.setAllowCredentials(true);
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

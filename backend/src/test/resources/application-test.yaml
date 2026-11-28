@@ -24,6 +24,9 @@ odo:
   practice-video:
     # 테스트는 청소 작업을 끄고 removeExpired()를 직접 부른다.
     cleanup-enabled: false
+  notification:
+    # MockMvc 테스트는 감지기를 끈다. 실시간 통합 테스트(NotificationStreamIntegrationTest)는 켠다.
+    detector-enabled: false
 
 spring:
   security:

@@ -69,6 +69,7 @@ import com.odo.team.domain.exception.RequestNotFoundException;
 import com.odo.team.domain.exception.RequestNotPendingException;
 import com.odo.team.domain.exception.TeamNotFoundException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -483,8 +484,12 @@ public class ApiExceptionHandler {
 		return error(status, code, ex.getMessage());
 	}
 
+	/**
+	 * 형식을 JSON으로 정해 둔다. 실시간 연결은 Accept: text/event-stream으로 오는데, 형식을 정하지 않으면 그 Accept에 맞는 형식이
+	 * 없어 오류 본문을 쓰지 못한다(11_Notification_spec.md의 "실시간 연결" 오류).
+	 */
 	private static ResponseEntity<ErrorResponse> error(HttpStatus status, String code, String message) {
-		return ResponseEntity.status(status).body(new ErrorResponse(code, message));
+		return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(new ErrorResponse(code, message));
 	}
 
 }
